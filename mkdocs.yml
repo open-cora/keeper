@@ -44,9 +44,6 @@ extra:
     srcset: "assets/hero-keeper-1200.webp 1200w, assets/hero-keeper-2400.webp 2400w, assets/hero-keeper-3200.webp 3200w"
     image_alt: >-
       Clio, Muse of History, by Charles Meynier, 1800: a winged woman seated among ruins, writing on a tablet with a stylus.
-    strip_label: Pilot
-    strip_text: 2-BM at APS
-    strip_url: https://github.com/open-cora/keeper
 
 markdown_extensions:
   - admonition
