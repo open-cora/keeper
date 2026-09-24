@@ -1,0 +1,59 @@
+site_name: CORA
+site_description: The system of record for the experiment.
+repo_url: https://github.com/open-cora/keeper
+repo_name: open-cora/keeper
+edit_uri: ""
+
+theme:
+  name: material
+  custom_dir: overrides
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/theme.css
+
+extra_javascript:
+  - javascripts/hero-fade.js
+
+extra:
+  hero:
+    masthead: Keeper
+    tagline: Themis, goddess of order and justice
+    image: assets/hero-keeper.webp
+    image_small: assets/hero-keeper-1200.webp
+    image_alt: >-
+      Clio, Muse of History, by Charles Meynier, 1800: a winged woman seated among ruins, writing on a tablet with a stylus.
+    strip_label: Pilot
+    strip_text: 2-BM at APS
+    strip_url: https://github.com/open-cora/keeper
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
