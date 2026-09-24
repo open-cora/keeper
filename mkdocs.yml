@@ -40,8 +40,8 @@ extra:
   hero:
     masthead: Keeper
     tagline: Themis, goddess of order and justice
-    image: assets/hero-keeper.webp
-    image_small: assets/hero-keeper-1200.webp
+    image: assets/hero-keeper-3200.webp
+    srcset: "assets/hero-keeper-1200.webp 1200w, assets/hero-keeper-2400.webp 2400w, assets/hero-keeper-3200.webp 3200w"
     image_alt: >-
       Clio, Muse of History, by Charles Meynier, 1800: a winged woman seated among ruins, writing on a tablet with a stylus.
     strip_label: Pilot
