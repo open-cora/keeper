@@ -199,7 +199,7 @@ def _cited_names(doc: str) -> list[str]:
         span = span.strip()
         # A span with a space inside it is a phrase, not a reference:
         # `Malformed {vo_type} payload`, `BCs -> infrastructure -> shared`,
-        # `Phase 8e`. Only a single token can be looked up.
+        # `two words`. Only a single token can be looked up.
         if not span or " " in span:
             continue
         head = re.split(r"[.(\[]", span, maxsplit=1)[0]

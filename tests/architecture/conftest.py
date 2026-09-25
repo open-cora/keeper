@@ -214,6 +214,38 @@ def tracked_markdown_files() -> frozenset[Path]:
 
 
 @cache
+def tracked_prose_files() -> frozenset[Path]:
+    """Absolute paths to every tracked `.md` file this project owns.
+
+    Wider than `tracked_markdown_files()`, which reaches `docs/` alone. The
+    root files, the beamline pages and the per-directory READMEs were
+    checked by nothing, and a planning page is where a plan coordinate is
+    most tempting to write.
+
+    The two client packages are excluded because they are other projects
+    with their own copies of these rules, enforced by their own suites. The
+    exclusion is by pathspec rather than by filtering afterwards, so a
+    client's page is never read here at all. It goes away with them.
+
+    Kept separate from `tracked_markdown_files()` rather than replacing it,
+    because the product-name rule is deliberately narrower: `beamlines/`
+    exists to say which products a beamline runs.
+    """
+    env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
+    result = subprocess.run(
+        ["git", "ls-files", "*.md", ":(exclude)apps/conductor", ":(exclude)apps/reporter"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    return frozenset(
+        REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".md")
+    )
+
+
+@cache
 def tracked_file_basenames() -> frozenset[str]:
     """Every git-tracked file in the repository, by basename alone.
 

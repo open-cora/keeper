@@ -1,4 +1,4 @@
-"""No phase, iteration, or audit tags in source.
+"""No phase, iteration, or audit tags in source, tests or documentation.
 
 `Phase 8f-d`, `Iter B-3`, `slice 5g-c`, `audit-2026-05-20`: these name a moment
 in a plan, and they rot the moment the plan moves. The current code is what is
@@ -7,13 +7,30 @@ true; ordering lives in git history.
 The check is literal AND shape-based, because the literal forms are easy to
 avoid by accident while the shape (`6g-c`, `5g-a`) reads as a coordinate and
 sneaks through review.
+
+## Why all three, and not just `src`
+
+This reached `src/keeper` alone, which left the larger half of the prose
+unchecked: `docs/` is where a plan coordinate is most tempting to write,
+because a page explaining why something is the way it is has the history
+fresh in mind. The client packages next door check their source, their tests
+and their pages together, and there is no reason this tree should be the
+lenient one.
+
+Widening it cost two rewrites and one exclusion, which is the usual price and
+the reason the rule is cheap.
 """
 
 import re
+from pathlib import Path
 
 import pytest
 
-from tests.architecture.conftest import tracked_python_files
+from tests.architecture.conftest import (
+    tracked_prose_files,
+    tracked_python_files,
+    tracked_test_files,
+)
 
 pytestmark = pytest.mark.architecture
 
@@ -44,14 +61,36 @@ _PATTERNS = (
 )
 
 
-def test_tracked_python_files_carry_no_phase_markers() -> None:
+_THIS_FILE = "test_no_phase_markers.py"
+"""The one file excluded, because it has to name what it refuses.
+
+Scanning it fails on its own patterns and on its own worked examples. The
+cost is that a real tag written into this file goes unseen, which is the
+narrowest hole available: any file defining these forms has to spell them.
+"""
+
+
+def _offenders(paths: frozenset[Path]) -> list[str]:
     hits: list[str] = []
-    for path in sorted(tracked_python_files()):
-        for lineno, line in enumerate(path.read_text().splitlines(), 1):
-            for pattern in _PATTERNS:
-                if pattern.search(line):
-                    hits.append(f"{path}:{lineno}: {line.strip()}")
-                    break
+    for path in sorted(paths):
+        if path.name == _THIS_FILE:
+            continue
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if any(pattern.search(line) for pattern in _PATTERNS):
+                hits.append(f"{path}:{lineno}: {line.strip()}")
+    return hits
+
+
+def test_the_tag_scan_reaches_source_tests_and_documentation() -> None:
+    """Guard the enumeration: an empty file set makes the rule vacuous."""
+    assert tracked_python_files(), "No source file scanned."
+    assert tracked_test_files(), "No test file scanned."
+    assert tracked_prose_files(), "No prose scanned."
+
+
+def test_tracked_files_carry_no_phase_markers() -> None:
+    hits = _offenders(tracked_python_files() | tracked_test_files() | tracked_prose_files())
     assert not hits, (
-        "Phase / iteration / audit tag in source. Git log is the right home:\n" + "\n".join(hits)
+        "Phase / iteration / audit tag in source, tests or documentation. "
+        "Git log is the right home:\n" + "\n".join(hits)
     )

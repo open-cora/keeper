@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.architecture.conftest import tracked_markdown_files, tracked_python_files
+from tests.architecture.conftest import tracked_prose_files, tracked_python_files
 
 pytestmark = pytest.mark.architecture
 
@@ -40,7 +40,7 @@ def test_the_dash_scan_reaches_both_source_and_documentation() -> None:
     reporting green on a question they had stopped asking.
     """
     assert tracked_python_files(), "No source file scanned."
-    assert tracked_markdown_files(), "No documentation scanned."
+    assert tracked_prose_files(), "No prose scanned."
 
 
 def test_tracked_python_files_carry_no_em_dashes() -> None:
@@ -48,6 +48,6 @@ def test_tracked_python_files_carry_no_em_dashes() -> None:
     assert not hits, "Em or en dash in source:\n" + "\n".join(hits)
 
 
-def test_tracked_markdown_files_carry_no_em_dashes() -> None:
-    hits = _offenders(tracked_markdown_files())
-    assert not hits, "Em or en dash in docs:\n" + "\n".join(hits)
+def test_tracked_prose_files_carry_no_em_dashes() -> None:
+    hits = _offenders(tracked_prose_files())
+    assert not hits, "Em or en dash in prose:\n" + "\n".join(hits)

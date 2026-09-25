@@ -1,7 +1,7 @@
 [project]
 name = "keeper"
 version = "0.1.0"
-description = "Automated Rarely, Overpromised Continuously: a parallel domain-modeling effort on an event-sourced chassis"
+description = "The system of record for the experiment: a parallel domain-modeling effort on an event-sourced chassis"
 readme = "README.md"
 requires-python = ">=3.13"
 authors = [{ name = "Doga Gursoy" }]
