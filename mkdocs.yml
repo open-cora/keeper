@@ -1,4 +1,4 @@
-site_name: CORA
+site_name: Keeper
 site_description: The system of record for the experiment.
 repo_url: https://github.com/open-cora/keeper
 repo_name: open-cora/keeper
@@ -53,6 +53,33 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
 
 nav:
   - Home: index.md
+  - Bounded contexts:
+      - Access: bounded-contexts/access.md
+      - Execution: bounded-contexts/execution.md
+      - Custody: bounded-contexts/custody.md
+      - Counsel: bounded-contexts/counsel.md
+      - Equipment: bounded-contexts/equipment.md
+  - Reference:
+      - Overview: reference/index.md
+      - Workflow: reference/workflow.md
+      - Layout: reference/layout.md
+      - Modeling: reference/modeling.md
+      - Patterns: reference/patterns.md
+      - Conventions: reference/conventions.md
+      - Naming: reference/naming.md
+      - Runtime: reference/runtime.md
+      - Client contract: reference/client-contract.md
+      - Glossary: reference/glossary.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
