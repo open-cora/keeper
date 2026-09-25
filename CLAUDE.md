@@ -4,9 +4,9 @@ This file is read by Claude Code (and other agents that respect `CLAUDE.md`). Ke
 
 ## What this repo is
 
-The keeper is a parallel modeling effort on a chassis inherited from its sibling project CORA: event-sourced bounded contexts over Postgres, hexagonal ports and adapters, paired REST and MCP surfaces, one handler per command.
+The keeper is a parallel modeling effort on an inherited chassis: event-sourced bounded contexts over Postgres, hexagonal ports and adapters, paired REST and MCP surfaces, one handler per command.
 
-The chassis was copied once and is owned outright from that point on. There is no shared package with CORA and no expectation that a fix in one lands in the other. Do not reach into the CORA tree for code, and do not add provenance comments pointing at it.
+The chassis was copied once, from an earlier private tree, and is owned outright from that point on. There is no shared package with that tree and no expectation that a fix in one lands in the other. Do not reach into it for code, and do not add provenance comments pointing at it.
 
 The domains are the open question. The baseline carries zero bounded contexts on purpose, so the first ones can be modeled without inheriting a vocabulary.
 
@@ -47,7 +47,7 @@ Auto-memory grows monotonically without a forcing function. These rules curb dri
 - Any index description containing a count or a date older than 7 days requires a Read of the underlying file before quoting in chat.
 - Memo files over ~300 lines: split into 2-3 sibling files linked from the first.
 
-The keeper's memory is separate from CORA's because the project path differs. Chassis-level memos (naming rules, test infra, commit cadence, writing style) may be re-derived here; domain memos must not be carried across.
+The keeper's memory is separate from that tree's because the project path differs. Chassis-level memos (naming rules, test infra, commit cadence, writing style) may be re-derived here; domain memos must not be carried across.
 
 ## Commits
 
