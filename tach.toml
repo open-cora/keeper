@@ -1,0 +1,303 @@
+# Tach: declarative dependency contract for the keeper package.
+#
+# Enforces:
+#   1. Layered: shared depends on nothing; infrastructure depends only
+#      on shared; BCs depend on shared + infrastructure (+ any sibling
+#      aggregate kernels they NAME); api depends on every BC.
+#      `keeper.shared` is the pure-value-object foundation (identifier
+#      value objects, identity aliases, bounded-text validators, JSON
+#      Schema helpers); `keeper.infrastructure` is composition root,
+#      adapters, ports, and event-sourcing machinery.
+#   2. Cross-BC: a BC may only reach into a sibling BC through that
+#      sibling's `aggregates.*` namespace (the read-side public
+#      surface). Never through `features.*` (sibling slice handlers).
+#   3. Aggregate kernels are leaf modules with their own dependency
+#      whitelist, so cross-BC deps target `keeper.X.aggregates`
+#      specifically and `keeper.X.features` is implicitly forbidden
+#      to outsiders.
+#
+# Cross-slice independence inside a BC and slice file contracts are
+# enforced by `tests/architecture/` (AST-based) rather than tach,
+# because per-slice module declarations would balloon this file.
+#
+# What this file does NOT say, because the distinction misleads readers:
+#
+# It constrains IMPORTS. Naming is one of several ways one BC comes to
+# depend on another, and the rest leave no import to constrain:
+#
+#   - A Protocol in `keeper.infrastructure.ports`, implemented by one BC's
+#     adapter and consumed by another. Both sides name only
+#     `keeper.infrastructure`, which every module does, so no edge appears
+#     here even though the dependency is real.
+#   - An event subscription, which names its producer with a STRING.
+#   - Anything under `tests`, which `exclude` drops entirely.
+#
+# So read this as the doors that have been cut, not as a map of what
+# depends on what. Where the two differ, the map is the larger one.
+#
+# `tests/architecture/test_tach_edges_are_used.py` fails on an entry no
+# source file takes up, so a permission whose reason has gone away does
+# not quietly stay.
+#
+# Run: `uv run tach check` (also wired into pre-commit and CI).
+# Visualize: `uv run tach show` opens the dependency graph.
+
+exclude = ["tests", "**/__pycache__", ".venv", "build", "dist"]
+source_roots = ["src"]
+
+# Shared kernel: pure value objects and helpers with zero `keeper.*`
+# imports. Adapter-free and side-effect-free. Importable from every
+# BC and from `keeper.infrastructure`. Modules that depend on ports,
+# the kernel, or adapters belong in `keeper.infrastructure`, not here.
+[[modules]]
+path = "keeper.shared"
+depends_on = []
+
+# Infrastructure: composition root, adapters, ports, event-sourcing
+# machinery, and cross-cutting concerns. May reach down into
+# `keeper.shared`.
+#
+# The Kernel data class lives in `keeper.infrastructure.kernel` and carries
+# zero BC imports, so every BC's wire / handler / route can import it
+# without transitively pulling in another BC. Anything that needs a BC to
+# build it (the authorize factory, for one) is injected into
+# `build_kernel` by the composition root instead.
+[[modules]]
+path = "keeper.infrastructure"
+depends_on = ["keeper.shared"]
+
+# API layer: composition root and the FastAPI/MCP app. Depends on every
+# BC, so each new BC adds itself here.
+[[modules]]
+path = "keeper.api"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.access",
+    "keeper.authority",
+    "keeper.counsel",
+    "keeper.custody",
+    "keeper.equipment",
+    "keeper.execution",
+]
+
+# Bounded contexts go below, two entries each:
+#
+#   [[modules]]
+#   path = "keeper.<bc>.aggregates"
+#   depends_on = ["keeper.infrastructure"]
+#
+#   [[modules]]
+#   path = "keeper.<bc>"
+#   depends_on = ["keeper.infrastructure", "keeper.<bc>.aggregates"]
+#
+# Declare an edge only once something imports it. A permission nothing
+# takes up fails `test_every_declared_dependency_edge_is_taken_up_by_an_import`,
+# so "keeper.shared" belongs here only when the BC actually imports from it.
+# This template used to list it by default and the first BC to copy the
+# template would have failed CI on its first run.
+#
+# A BC that legitimately reads a sibling's read-side surface adds
+# "keeper.<sibling>.aggregates" to the second entry, never the first, and
+# never the sibling's bare package path.
+
+# Access BC: identity. `aggregates` is the read-side surface a sibling BC
+# may reach into; the package itself re-exports it and nothing more yet.
+[[modules]]
+path = "keeper.access.aggregates"
+depends_on = ["keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.access"
+depends_on = ["keeper.shared", "keeper.infrastructure", "keeper.access.aggregates"]
+
+# Authority BC: authorization. Holds the Policy aggregate, the rulebook a
+# deployment authorizes against.
+[[modules]]
+path = "keeper.authority.aggregates"
+depends_on = ["keeper.shared", "keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.authority"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.authority.aggregates",
+    "keeper.access.aggregates",
+]
+
+# Execution BC: what this system can be asked to run, and what happened
+# when it ran. Holds the Plan and Run aggregates.
+#
+# No sibling edge outward. Execution reads nobody. It is now read BY
+# Custody, which does not appear here: an edge is declared on the module
+# that does the importing, and the door itself is the interface block at
+# the foot of this file.
+[[modules]]
+path = "keeper.execution.aggregates"
+depends_on = ["keeper.shared", "keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.execution"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.execution.aggregates",
+]
+
+# Custody BC: where the data a run produced is being kept. Holds the
+# Dataset aggregate.
+#
+# The second entry reaches into Execution's aggregates, which the first
+# must not: the aggregates package is the leaf, and a leaf that could
+# import a sibling would let an event class pull in another context's
+# whole history. The two names that door passes are at the foot of this
+# file.
+[[modules]]
+path = "keeper.custody.aggregates"
+depends_on = ["keeper.shared", "keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.custody"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.custody.aggregates",
+    "keeper.execution.aggregates",
+]
+
+# Counsel BC: what was put forward to run next, and was it taken. Holds
+# the Proposal aggregate.
+#
+# The second entry reaches into Execution's aggregates, which the first
+# must not, for the reason the Custody block gives: the aggregates
+# package is the leaf, and a leaf that could import a sibling would let
+# an event class pull in another context's whole history.
+[[modules]]
+path = "keeper.counsel.aggregates"
+depends_on = ["keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.counsel"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.counsel.aggregates",
+    "keeper.execution.aggregates",
+]
+
+# Equipment reaches into no sibling at all, and it is the first context
+# here that does not. The second entry's list is the bare minimum: its
+# own aggregates, plus the two layers every module gets.
+#
+# That is the model rather than a context not finished yet. A device is
+# not registered by a run, not faulted by one, and not cited by one, so
+# there is no fact either side holds that the other needs. Whether a run
+# touched a faulted device is a question about both, and belongs to
+# whichever context grows a reason to ask it, with a join it writes
+# itself.
+[[modules]]
+path = "keeper.equipment.aggregates"
+depends_on = ["keeper.shared", "keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.equipment"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.equipment.aggregates",
+]
+
+# The cross-BC doors, and how wide each one is.
+#
+# `PolicyAuthorize` will not authorize a principal Access does not hold an
+# active actor for, so Authority reads two names out of Access and nothing
+# else. `visibility` scopes this interface to Authority alone: Access's own
+# slices keep the whole package, which they need, because a decider and its
+# events and its fold all live under here.
+#
+# One name. The set is read off what the consumer imports, which is the only
+# way to size a public surface honestly, and the first draft of this block
+# exposed `Actor` as well: the adapter reads `.active` off what `load_actor`
+# returns and never names the type, so that entry was a door held open for
+# nobody. `test_tach_edges_are_used.py` caught it and is what keeps the
+# claim true.
+#
+# What is deliberately absent is the reason for the block at all. `fold` and
+# the event classes are exported from that package because Access's own
+# slices need them, and a sibling holding them could build an
+# ActorDeactivated and append it, going around the decider that refuses
+# deactivating an actor twice. The edge above does not prevent that; this
+# does.
+[[interfaces]]
+from = ["keeper.access.aggregates"]
+expose = ["actor.load_actor"]
+visibility = ["keeper.authority"]
+
+# Custody reads Execution to refuse a dataset citing a run that is not
+# there. Two names, both about that one check, which is why they are
+# written out rather than the package being opened.
+#
+# `load_run` is the existence check. Custody never names `Run` itself:
+# the handler tests the result for None and reads nothing off it, so
+# exposing the type would be a door held open for nobody, which is the
+# mistake `test_tach_edges_are_used.py` caught on the Access block above.
+#
+# This door was one name wider. `normalize_occurred_at` passed through it
+# until a third consumer arrived and the rule of three in
+# docs/reference/layout.md sent it to `keeper.shared.instant`, which every
+# module may import without an edge. A door that narrows is the ordinary
+# outcome of a helper finding its level, not a loss of access.
+#
+# It then gained a name rather than losing one, when a dataset moved from
+# citing a run to citing one step of an execution. Two refusals where
+# there was one, because a step is an entity inside that aggregate rather
+# than a stream of its own: the execution can be absent, and it can be
+# present without holding the step named.
+[[interfaces]]
+from = ["keeper.execution.aggregates"]
+expose = [
+    "execution.load_execution",
+    "execution.ExecutionNotFoundError",
+    "execution.ExecutionStepNotFoundError",
+]
+visibility = ["keeper.custody"]
+
+# Counsel reads Execution three times, and the three reads are different
+# in kind, which is why this door is wider than Custody's.
+#
+# Making a proposal loads a plan and reads its schema, so the decision
+# needs the plan itself and a context module names the type.
+#
+# Taking a proposal loads an execution and finds one step inside it,
+# which is the pair of checks Custody makes, and then follows that step's
+# reference to the composed step of the procedure it was dispatched from.
+# That last hop is what the extra names buy: the decision asks which plan
+# the step runs, and the answer lives on the definition.
+#
+# Eleven names where Custody needs three, and the difference is exactly
+# that Custody checks existence and reads nothing off what it loaded. A door
+# is sized by what the consumer imports, which is the only honest way to
+# size one, and `test_tach_edges_are_used.py` is what keeps that true.
+#
+# This door traded a name rather than simply widening. `ExecutionStep`
+# left it when the step stopped carrying a copied plan id: the handler
+# searches for the step and reads one field off it without ever writing
+# the type down, so keeping it would be a door held open for nobody.
+# `Execution` itself was never here for the same reason.
+[[interfaces]]
+from = ["keeper.execution.aggregates"]
+expose = [
+    "plan.load_plan",
+    "plan.Plan",
+    "plan.PlanNotFoundError",
+    "execution.load_execution",
+    "execution.ExecutionNotFoundError",
+    "execution.ExecutionStepNotFoundError",
+    "procedure.load_procedure",
+    "procedure.ComposedStep",
+    "procedure.ProcedureNotFoundError",
+    "procedure.ProcedureStepNotFoundError",
+    "procedure.runs_plan",
+]
+visibility = ["keeper.counsel"]

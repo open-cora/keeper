@@ -1,0 +1,113 @@
+"""Run the grant: authorize, load, decide, append.
+
+Update-style. The policy already exists, so the handler loads and folds
+it first, and passes the version it read back as `expected_version`: two
+operators granting at once produce one append and one `ConcurrencyError`
+rather than two appends that each believed they were first.
+
+No idempotency wrapper. A replayed grant is already refused by the
+domain, so a retry key would buy a friendlier status code rather than
+prevent a second write, which is the same reasoning Access gives for
+leaving it off its two switch slices.
+"""
+
+from typing import Protocol
+from uuid import UUID
+
+from keeper.authority.aggregates.policy import (
+    POLICY_STREAM_TYPE,
+    load_policy_with_version,
+    to_payload,
+)
+from keeper.authority.errors import UnauthorizedError
+from keeper.authority.features.grant_permission.command import GrantPolicyPermission
+from keeper.authority.features.grant_permission.decider import decide
+from keeper.infrastructure.kernel import Kernel
+from keeper.infrastructure.logging import get_logger
+from keeper.infrastructure.ports import Deny
+from keeper.infrastructure.slices.envelope import to_new_event
+from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+
+_COMMAND_NAME = "GrantPolicyPermission"
+
+_log = get_logger(__name__)
+
+
+class Handler(Protocol):
+    """The bare handler. No idempotent variant; see the module docstring."""
+
+    async def __call__(
+        self,
+        command: GrantPolicyPermission,
+        *,
+        principal_id: UUID,
+        correlation_id: UUID,
+        causation_id: UUID | None = None,
+        surface_id: UUID = NIL_SENTINEL_ID,
+    ) -> None: ...
+
+
+def bind(deps: Kernel) -> Handler:
+    """Build the handler, closed over the process-wide dependencies."""
+
+    async def handler(
+        command: GrantPolicyPermission,
+        *,
+        principal_id: UUID,
+        correlation_id: UUID,
+        causation_id: UUID | None = None,
+        surface_id: UUID = NIL_SENTINEL_ID,
+    ) -> None:
+        decision = await deps.authz.authorize(
+            principal_id=principal_id,
+            command_name=_COMMAND_NAME,
+            surface_id=surface_id,
+        )
+        if isinstance(decision, Deny):
+            _log.info(
+                "grant_permission.denied",
+                command_name=_COMMAND_NAME,
+                policy_id=str(command.policy_id),
+                principal_id=str(principal_id),
+                correlation_id=str(correlation_id),
+                reason=decision.reason,
+            )
+            raise UnauthorizedError(decision.reason)
+
+        state, version = await load_policy_with_version(deps.event_store, command.policy_id)
+        now = deps.clock.now()
+        events = decide(state, command, now=now)
+
+        await deps.event_store.append(
+            POLICY_STREAM_TYPE,
+            command.policy_id,
+            version,
+            [
+                to_new_event(
+                    event_type=type(event).__name__,
+                    payload=to_payload(event),
+                    occurred_at=event.occurred_at,
+                    event_id=deps.id_generator.new_id(),
+                    command_name=_COMMAND_NAME,
+                    correlation_id=correlation_id,
+                    causation_id=causation_id,
+                    principal_id=principal_id,
+                )
+                for event in events
+            ],
+        )
+
+        _log.info(
+            "grant_permission.success",
+            command_name=_COMMAND_NAME,
+            policy_id=str(command.policy_id),
+            granted_to=str(command.permission.principal_id),
+            granted_command=command.permission.command_name,
+            principal_id=str(principal_id),
+            correlation_id=str(correlation_id),
+        )
+
+    return handler
+
+
+__all__ = ["Handler", "bind"]
