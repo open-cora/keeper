@@ -2,7 +2,7 @@
 
 For humans and LLM agents writing the keeper code, and for code reviewers. Not a tutorial. The rules to honor when modifying the keeper so the codebase does not drift. If the code disagrees with this page, the code is wrong.
 
-These conventions were inherited from the sibling project CORA, which is not public, along with the chassis, then stripped of that project's domain vocabulary. The rules are the same. The examples started as placeholders and most are now drawn from the keeper's own contexts, so a page reasoning about a plan or a run is reasoning about this tree. [Modeling](modeling.md) is the exception and still works in `Thing` and `ThingRegistered` throughout.
+These conventions were inherited along with the chassis, from an earlier private tree, then stripped of that tree's domain vocabulary. The rules are the same. The examples started as placeholders and most are now drawn from the keeper's own contexts, so a page reasoning about a plan or a run is reasoning about this tree. [Modeling](modeling.md) is the exception and still works in `Thing` and `ThingRegistered` throughout.
 
 ## Pages
 

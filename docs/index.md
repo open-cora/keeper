@@ -6,7 +6,7 @@ template: home.html
 
 The system of record for the experiment.
 
-An event-sourced system of record, built on the chassis from its sibling project CORA, which is not public, and modelling its own domains.
+An event-sourced system of record, built on a chassis inherited from an earlier private tree, and modelling its own domains.
 
 ## Where the documentation stands
 

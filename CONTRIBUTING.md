@@ -5,8 +5,8 @@ cited, and learned from, not because it is soliciting contributions.
 
 ## Where the code is developed
 
-This repository is a published mirror. The work happens in
-[open-cora/cora](https://github.com/open-cora/cora), a development tree holding
+**This repository is what you deploy, install and cite.** Development happens
+in [open-cora/cora](https://github.com/open-cora/cora), a tree holding
 this project and the clients that call it side by side, and this repository is
 extracted from `apps/keeper` with `git subtree`, so the history here is the
 real history rather than a squashed import.
@@ -66,12 +66,16 @@ Three things that are easy to get wrong here:
 Commits follow Conventional Commits with a scope; the subject says what and
 the body says why.
 
-## Relationship to CORA
+## The inherited chassis
 
-The keeper's chassis was copied once from its sibling project CORA, which is
-not public, and is owned outright from that point. There is no shared package and no
-expectation that a fix in one reaches the other. A patch here does not reach
-CORA, and vice versa.
+The keeper's chassis was copied once from an earlier, private tree, and is
+owned outright from that point. There is no shared package and no expectation
+that a fix in one reaches the other. A patch here does not reach that tree, and
+nothing a reader can get to depends on it.
+
+It is left unnamed on purpose. It carried the name CORA first, which is now the
+name of the development tree this project is published from, and repeating one
+name for two things costs a reader more than the provenance is worth.
 
 ## License
 

@@ -35,29 +35,33 @@ page](docs/index.md), where the numbers are pinned against the fitness suite and
 cannot drift. They are not repeated here, because two copies of a count is one
 copy and one liability.
 
-## Relationship to CORA
+## The inherited chassis
 
-The keeper started from a copy of CORA's chassis and owns it outright from that point on.
-There is no shared package, no vendoring registry, and no expectation that a fix in
-one lands in the other. The two are free to diverge, including in the plumbing.
+The keeper started from a copy of an earlier, private tree's chassis and owns it
+outright from that point on. There is no shared package, no vendoring registry, and
+no expectation that a fix in one lands in the other. The two are free to diverge,
+including in the plumbing.
+
+That tree is left unnamed here on purpose. It carried the name CORA first, which is
+now the name of the development tree this project is published from, and one name for
+two things costs a reader more than the provenance is worth.
 
 What was carried: the event store and its envelope, idempotency, the evolver and
 update-handler scaffolding, ports and adapters for the cross-cutting concerns, edge
 auth, observability, the test tiers, and the code conventions in
 [docs/reference/](docs/reference/index.md).
 
-What was left behind: every domain model. No bounded context here is CORA's, and the
-contexts that exist were modelled from questions about a beamline rather than carried
-across.
+What was left behind: every domain model. No bounded context here came across, and
+the ones that exist were modelled from questions about a beamline.
 
 Nothing is claimed about individual words. An earlier version of this section promised
-that CORA's facility vocabulary appeared nowhere in the tree, and that was already
-untrue: `beam` is a message prefix in the reporter's fixtures, and both projects serve
+that the other tree's facility vocabulary appeared nowhere here, and that was already
+untrue: `beam` is a message prefix in the reporter's fixtures, and both serve
 facilities where a beam, an enclosure and a clearance are the plainest words available.
 Two projects reaching the same ordinary noun for the same real thing is convergence,
 and the line worth holding is against inheriting a model, not against sharing a
-dictionary. What source may not do is explain this tree by describing that one, which
-is CLAUDE.md's rule and is enforced by
+dictionary. What source may not do is explain this project by describing that one,
+which is CLAUDE.md's rule and is enforced by
 `tests/architecture/test_no_sibling_project_vocabulary.py`.
 
 ## Quick start
@@ -74,11 +78,11 @@ make test           # full suite
 make dev            # API at http://localhost:8000, health at /health
 ```
 
-Postgres binds host port **5433**, not 5432, and the Compose project is named
-`keeper` explicitly. Both are so this can run alongside a CORA checkout: the two
-repos' compose files sit in identically-named `infra/` directories, so without
-an explicit project name Compose treats them as one project and starting either
-one stops the other.
+Postgres binds host port **5433**, not 5432, so it does not collide with a
+Postgres already running on the default port. The Compose project is named
+`keeper` explicitly for a related reason: Compose derives a project name from
+the containing directory, so two checkouts whose compose files both sit in
+`infra/` are treated as one project, and starting either one stops the other.
 
 ## Layout
 
@@ -100,12 +104,14 @@ rather than a convention.
 
 ## Where the code is developed
 
-This repository is a published mirror. The work happens in
-[open-cora/cora](https://github.com/open-cora/cora), a development tree holding
-this project and its clients side by side, and each of them is extracted from
-it with its history intact. Everything here is complete and runs standalone;
-what it is missing is the other projects, and the end-to-end tests that need
-more than one of them at once.
+**This repository is what you deploy, install and cite.** It is one
+deployable, versioned and released on its own, and it runs standalone: its own
+lockfile, its own suite, its own site.
+
+**Development happens in [open-cora/cora](https://github.com/open-cora/cora)**,
+a tree holding this project and its clients side by side, from which each is
+extracted with its history intact. What is missing here is the other projects
+and the end-to-end tests that need more than one of them at once.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening anything, because where
 a change lands depends on which of the two repositories you are looking at.

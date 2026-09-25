@@ -6,8 +6,8 @@ The glossary covers the chassis, plus the domain vocabulary of each bounded cont
 
 ## Project name
 
-- **Keeper.** This project. The system of record for the experiment, and a parallel modeling effort on the architecture described in these pages. Its chassis was copied once from the sibling project CORA, which is not public.
-- **CORA.** The sibling project this chassis was copied from. The keeper owns its copy outright; the two share no code and are free to diverge. When these pages cite a convention as inherited, CORA is where it came from.
+- **Keeper.** This project. The system of record for the experiment, and a parallel modeling effort on the architecture described in these pages. Its chassis was copied once from an earlier, private tree.
+- **CORA.** The development tree this project is published from, and the projects in it. Development happens there; this repository is what a deployment installs and what a paper cites. The name is older than that arrangement: an earlier, private tree carried it first and is where this chassis was copied from. That tree is not this one, these pages do not name it again, and nothing here depends on it.
 
 ## Architecture
 

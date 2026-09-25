@@ -19,7 +19,7 @@ keywords:
   - model-context-protocol
 abstract: >-
   The keeper is the system of record for the experiment, and a parallel
-  modeling effort sharing the architecture of its sibling project CORA:
+  modeling effort on an inherited architecture:
   event-sourced bounded contexts over Postgres, hexagonal ports and adapters,
   and equivalent REST and agent-protocol (MCP) API surfaces backed by a single
   handler per command. The chassis is inherited; the subject of the work is
