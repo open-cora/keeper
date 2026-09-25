@@ -12,5 +12,5 @@ description = "Allowlist machine-generated content that resembles high-entropy s
 # Atlas migration sums are SHA256 base64 hashes that legitimately
 # look like API keys to entropy-based detectors.
 paths = [
-    '''apps/keeper/infra/atlas/migrations/atlas\.sum''',
+    '''infra/atlas/migrations/atlas\.sum''',
 ]

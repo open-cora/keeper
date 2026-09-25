@@ -28,6 +28,13 @@ machinery declares itself in its own name and needs no list.
 Both lane files are read, and both must name every tier. The Makefile is
 the local mirror of the workflow, and a mirror nobody compares is how the
 two drift until a change passes `make test-noio` and fails in CI.
+
+Both are this project's own, not the repository's. They used to be the
+repository's, because this project had no Makefile and no workflow of its
+own. Now it has both, and the repository's delegate to them rather than
+spelling the lanes a second time. That is the arrangement this rule wants:
+two spellings compared against each other, and no third one that nothing
+compares.
 """
 
 import re
@@ -36,13 +43,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.architecture.conftest import REPO_ROOT, TESTS_ROOT, discovered_tiers
+from tests._roots import APP_ROOT
+from tests.architecture.conftest import TESTS_ROOT, discovered_tiers
 
 pytestmark = pytest.mark.architecture
 
 _LANE_FILES: tuple[Path, ...] = (
-    REPO_ROOT / "Makefile",
-    REPO_ROOT / ".github" / "workflows" / "ci.yml",
+    APP_ROOT / "Makefile",
+    APP_ROOT / ".github" / "workflows" / "ci.yml",
 )
 
 _TIER_PATH = re.compile(r"(?<![\w/])tests/([a-z0-9_]+)")
@@ -81,14 +89,14 @@ def test_the_lane_scan_finds_tiers_in_every_lane_file() -> None:
     """
     assert discovered_tiers(), "No tier directory found under tests/."
     for lane_file in _LANE_FILES:
-        # Checked before it is read, because both of these sit outside this
-        # project and are reached through the repository root. A root that
-        # moved raises FileNotFoundError from inside a cached helper, which
-        # names neither the cause nor the cure.
+        # Checked before it is read, because a missing lane file raises
+        # FileNotFoundError from inside a cached helper, which names neither
+        # the cause nor the cure.
         assert lane_file.is_file(), (
             f"{lane_file} is not there, so this rule can read no lane at all. "
-            "Both lane files are resolved against the repository root; if "
-            "this project moved, that is the thing to check first."
+            "Both lane files are resolved against the project root, and this "
+            "project carries its own; if one was deleted rather than moved, "
+            "the lanes it held are running nowhere."
         )
         assert _tiers_named_by(lane_file), (
             f"No tests/<tier> path found on any pytest line in {lane_file.name}, "

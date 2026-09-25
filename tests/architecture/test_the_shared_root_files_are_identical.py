@@ -5,17 +5,18 @@ build and ship separately cannot import one another and a repository has
 to hold its own licence, its own Python pin and its own scanning workflow.
 Duplication is the right answer and drift is what makes it the wrong one.
 
-## Why this check cannot outlive the split
+## Why this check outlives the split after all
 
-It reaches across `apps/` to compare three trees, which is possible for
-exactly as long as those trees share a checkout. Once each project is a
-repository of its own there is nothing here to compare, and this file
-should be deleted rather than adapted: a copy of it in one repository
-could only check that repository against itself.
+An earlier version of this docstring said the opposite: that the rule
+could only work while the trees shared a checkout, and should be deleted
+once each project became a repository of its own. That was written when
+the plan was four independent repositories.
 
-That is the whole reason it is worth having now. This is the window in
-which a copy can be edited on one side and not the others, and after it
-closes the copies drift by a slower mechanism that a test cannot see.
+The plan changed. This tree stays one tree and publishes each project as a
+mirror, so the copies never stop sharing a checkout and this rule never
+stops having something to compare. It is the reason the duplication is
+tolerable: four copies that a test proves identical are a different thing
+from four copies that merely started out that way.
 
 ## What is deliberately not here
 
@@ -50,15 +51,28 @@ not belong here; it belongs in the list the module docstring refuses.
 """
 
 PROJECTS: tuple[tuple[str, str], ...] = (
-    ("keeper", "."),
+    ("root", "."),
+    ("keeper", "apps/keeper"),
     ("conductor", "apps/conductor"),
     ("reporter", "apps/reporter"),
 )
-"""Each project, and the directory that becomes its repository root.
+"""Each repository published from this tree, and its root directory.
 
-The keeper's is the checkout itself, because the keeper is what this
-repository becomes: the root files are already its files and a second copy
-under `apps/keeper` would be the drift this module exists to catch.
+Four, not three. The checkout itself is one of them: it is published as
+the development tree, so it carries the same licence and the same pin as
+the projects inside it and is as able to drift from them.
+
+It is labelled by position rather than by name, and that is not a style
+choice. Its name is also the sibling project's, which
+`test_no_sibling_project_vocabulary.py` refuses anywhere in this project's
+source, so spelling it here trips a live rule on a word that now means two
+things. The label only ever appears in a failure message, and "root" says
+which directory to look in, which is what a reader of that message needs.
+
+The keeper's entry used to be the checkout, back when the root files were
+the keeper's files and it had no directory of its own to put them in. It
+has one now, so the two are separate entries and each is checked against
+the rest.
 
 Written out per project rather than probed for. An earlier version looked
 for a project's own copy and fell back to the root when it found none,
@@ -110,19 +124,4 @@ def test_every_copy_of_a_shared_file_is_byte_identical(relative: str) -> None:
         "keeps them in step. Either copy the intended version across, or, if "
         "this file now has to say something different per project, drop it "
         "from SHARED_FILES and say why in the module docstring."
-    )
-
-
-def test_the_keeper_keeps_its_copies_at_the_repository_root() -> None:
-    """The fallback in `_copy_path` is load-bearing, so pin what it means.
-
-    If the keeper ever grew its own `apps/keeper/LICENSE`, this rule would
-    start comparing that one and the root file would go unchecked while
-    still being the one a reader finds. Both would then be shipped by the
-    split, one of them stale.
-    """
-    shadowed = [f for f in SHARED_FILES if (REPO_ROOT / "apps" / "keeper" / f).exists()]
-    assert not shadowed, (
-        f"apps/keeper carries its own {shadowed}, shadowing the root copy "
-        "this rule compares against. The keeper's copies are the root files."
     )
