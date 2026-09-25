@@ -8,7 +8,7 @@ same kind of thing that issued it.
 
 `surface_id: UUID` names the process-level arrival point (HTTP /
 MCP stdio / MCP streamable-http) through which the request entered
-The keeper. Every route and tool resolves a concrete one per request from
+the keeper. Every route and tool resolves a concrete one per request from
 the constants in `keeper.infrastructure.request`; no aggregate models a
 surface today, so those constants are a namespace rather than foreign
 keys. Edge auth layers OAuth `aud` validation on top.

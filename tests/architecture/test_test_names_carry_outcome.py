@@ -21,7 +21,14 @@ pytestmark = pytest.mark.architecture
 MIN_WORDS = 4
 """`test_` plus at least three more words. `test_decide_emits_x` clears it."""
 
-VAGUE_ENDINGS = frozenset({"works", "ok", "correct", "good", "valid", "test", "it"})
+VAGUE_ENDINGS = frozenset({"works", "ok", "correct", "good", "valid", "test"})
+"""Endings that name no outcome.
+
+`it` was in here and earned nothing. A name short enough for a trailing
+`it` to be a hand-wave is already caught by the word count, so every name
+this reached was one where `it` was an ordinary object pronoun: six of
+them in the conductor's suite at once, all good names.
+"""
 
 NEGATORS = frozenset({"not", "never"})
 """Words that make a vague ending precise.
