@@ -44,7 +44,7 @@ extra:
     srcset: "assets/hero-keeper-1200.webp 1200w, assets/hero-keeper-2400.webp 2400w, assets/hero-keeper-3200.webp 3200w"
     image_alt: >-
       Clio, Muse of History, by Charles Meynier, 1800: a winged woman seated among ruins, writing on a tablet with a stylus.
-    credit: Charles Meynier · Clio, Muse of History · public domain
+    credit: Charles Meynier · Clio, Muse of History · Cleveland Museum of Art
     credit_url: https://www.clevelandart.org/art/2003.6.5
 
 markdown_extensions:
