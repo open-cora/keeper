@@ -1,3 +1,7 @@
+---
+template: home.html
+---
+
 # Keeper
 
 The system of record for the experiment.
