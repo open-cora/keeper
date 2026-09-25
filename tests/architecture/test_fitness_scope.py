@@ -148,13 +148,17 @@ def test_chassis_packages_contribute_no_aggregates_or_slices() -> None:
 
 
 def test_the_repository_root_is_a_repository_root() -> None:
-    """The root every cross-project rule resolves against is really one.
+    """The root the cross-project rule resolves against is really one.
 
     It is derived from git rather than by counting directory levels, and
     the count is what this replaced. Two above `apps/keeper` is right in
-    this tree and two above the checkout once the project flattens to a
-    repository of its own, at which point the enumerators read whatever
-    directory happens to hold the clone.
+    this tree and wrong in the published mirror, where the project is the
+    checkout, and a count that is two too high names whatever directory
+    happens to hold the clone.
+
+    One rule still crosses between the roots, the one comparing the copies
+    every project carries. Everything else is scoped to the project, which
+    is what lets the mirror run the same suite and get the same answer.
     """
     assert (REPO_ROOT / ".git").exists(), f"{REPO_ROOT} is not a repository root."
     assert APP_ROOT.is_relative_to(REPO_ROOT), f"{APP_ROOT} is not inside {REPO_ROOT}."
@@ -170,31 +174,7 @@ def test_every_enumerator_finds_something() -> None:
     assert tracked_test_files(), "No tracked test file under tests/."
     assert tracked_markdown_files(), "No tracked documentation under docs/."
     assert tracked_migration_files(), "No tracked migration under infra/atlas/migrations/."
-    assert tracked_file_basenames(), "No tracked file anywhere in the repository."
-
-
-def test_the_two_roots_enumerate_one_repository() -> None:
-    """The project-scoped and repository-scoped enumerators agree on the tree.
-
-    `tracked_python_files()` runs git from `APP_ROOT`, and
-    `tracked_file_basenames()` runs it from `REPO_ROOT`. If those ever named
-    different repositories, both would still return files and every rule
-    over them would still pass, while the citation check resolved this
-    project's prose against somebody else's tree. Every file the first one
-    finds must be a file the second one has heard of.
-    """
-    everything = tracked_file_basenames()
-    missing = sorted(
-        path.name
-        for path in tracked_python_files() | tracked_test_files()
-        if path.name not in everything
-    )
-    assert not missing, (
-        "Files tracked from the project root that the repository root has "
-        f"never heard of: {missing}. The two roots are naming different "
-        "trees, and every rule that crosses between them is reading the "
-        "wrong one."
-    )
+    assert tracked_file_basenames(), "No tracked file anywhere in the project."
 
 
 def test_every_enumerated_file_sits_under_the_root_it_was_enumerated_from() -> None:

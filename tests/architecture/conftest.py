@@ -245,17 +245,19 @@ def tracked_prose_files() -> frozenset[Path]:
 
 @cache
 def tracked_file_basenames() -> frozenset[str]:
-    """Every git-tracked file in the repository, by basename alone.
+    """Every git-tracked file this project owns, by basename alone.
 
     For the one check that asks whether a path a docstring cites still
     exists. Basenames rather than paths because a citation is prose and
     may be written from any directory's point of view; the question it
     answers is whether the reader has something to open.
 
-    Still enumerated from the repository root, unlike every other scan
-    here. Scoping it to the project is the right end state and waits on
-    the project carrying its own CLAUDE.md, CONTRIBUTING.md and the rest,
-    which docstrings already cite.
+    Rooted at the project like every other scan here. It used to reach the
+    repository root, which resolved a citation of `CLAUDE.md` against a
+    file one directory up: correct for a reader of this tree and wrong for
+    a reader of the published mirror, where that file would not exist. The
+    project carries its own now, so the scan can ask the question the
+    mirror's reader would ask.
 
     Enumerated from git rather than from a filesystem walk, and that is
     the other reason this exists. An `rglob` descends into
@@ -266,7 +268,7 @@ def tracked_file_basenames() -> frozenset[str]:
     env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
     result = subprocess.run(
         ["git", "ls-files"],
-        cwd=REPO_ROOT,
+        cwd=_APP_ROOT,
         capture_output=True,
         text=True,
         check=True,
