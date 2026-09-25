@@ -27,7 +27,7 @@
 -- producing rows. No deployment holds such data. The aggregate landed in this
 -- same series of changes and nothing is published.
 
-DROP TABLE IF EXISTS proj_execution_walk_summary;
+DROP TABLE IF EXISTS proj_execution_walk_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 CREATE TABLE proj_execution_walk_summary (
     walk_id          uuid        PRIMARY KEY,

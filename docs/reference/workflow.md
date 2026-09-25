@@ -165,7 +165,7 @@ Run one mutation with `apps/keeper/tests/_mutation/harness.py`:
 ```
 cd apps/keeper
 uv run python tests/_mutation/harness.py "the stream type is renamed" \
-  -e "sed -i '' 's/\"Actor\"/\"Aktor\"/' src/keeper/access/aggregates/actor/read.py" \
+  -e "perl -pi -e 's/\"Actor\"/\"Aktor\"/' src/keeper/access/aggregates/actor/read.py" \
   tests/architecture
 ```
 

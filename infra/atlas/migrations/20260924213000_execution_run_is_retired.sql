@@ -37,6 +37,6 @@
 -- no bookmark, and it would otherwise hold a cursor for a projection nothing
 -- registers, which is a row that only ever confuses whoever reads that table.
 
-DROP TABLE IF EXISTS proj_execution_run_summary;
+DROP TABLE IF EXISTS proj_execution_run_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 DELETE FROM projection_bookmarks WHERE name = 'proj_execution_run_summary';

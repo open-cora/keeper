@@ -28,7 +28,7 @@
 -- acceptable for the same reason: nothing is deployed and no procedure in any
 -- database anybody keeps was ever published.
 
-DROP TABLE IF EXISTS proj_execution_procedure_summary;
+DROP TABLE IF EXISTS proj_execution_procedure_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 CREATE TABLE proj_execution_procedure_summary (
     procedure_id uuid        PRIMARY KEY,

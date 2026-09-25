@@ -25,7 +25,7 @@
 -- version of the projection reads `execution_id`, so a replay over them fails
 -- rather than producing rows. No deployment holds such data.
 
-DROP TABLE IF EXISTS proj_custody_dataset_summary;
+DROP TABLE IF EXISTS proj_custody_dataset_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 CREATE TABLE proj_custody_dataset_summary (
     dataset_id          uuid        PRIMARY KEY,
