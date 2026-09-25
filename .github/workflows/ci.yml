@@ -1,0 +1,231 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Five lanes, split by what they need rather than by cost: the suite is small
+# enough that sharding would cost more in runner startup than it saves.
+#   - lint: ruff, pyright, tach
+#   - test-noio: unit + architecture + contract, all in-memory
+#   - test-db: integration + e2e, each spinning its own Postgres container
+#   - docs: the site, strict
+#   - migrations: atlas hash, validate, and the destructive-DDL scan
+# Re-split by cost when a lane's wall-clock starts to matter, not before.
+#
+# The pytest paths below are compared against the Makefile's by
+# tests/architecture/test_every_tier_is_named_by_a_ci_lane.py: every tier
+# under tests/ must be named by both, and every path either one names must be
+# a directory that exists. A mirror nobody compares is how the two drift until
+# a change passes `make test-noio` and fails here.
+jobs:
+  lint:
+    name: Lint, typecheck, arch
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src tests
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src tests
+
+      - name: Typecheck (pyright strict)
+        run: uv run pyright src tests
+
+      - name: Dependency contract (tach)
+        run: uv run tach check
+
+      # Test tiers and CI lanes are checked against each other in
+      # tests/architecture/test_every_tier_is_named_by_a_ci_lane.py, which
+      # runs in the test-noio lane below. It used to be a shell step here,
+      # where nobody could run it: a new directory under tests/ failed its
+      # hand-written allowlist on a tree that passed every local gate.
+
+  test-noio:
+    name: Tests (no DB)
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - name: Test (unit + architecture + contract)
+        # APP_ENV=test comes from tests/conftest.py, so these tiers build
+        # in-memory adapters and start no container. CI=true activates the
+        # Hypothesis `ci` profile: derandomized seed, no example database, no
+        # deadline.
+        run: uv run pytest tests/unit tests/architecture tests/contract -n 4 --dist=worksteal --cov --cov-report=term-missing
+
+  test-db:
+    name: Tests (DB)
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+      # GitHub Actions tears down containers when the job ends, so the
+      # testcontainers Ryuk reaper sidecar adds startup cost and the odd flake
+      # for no benefit. Disabled per upstream guidance for ephemeral CI.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - name: Test (integration + e2e)
+        # One Postgres container per xdist worker, then a per-test template
+        # clone. `-n 4` matches the runner's core count; more workers
+        # oversubscribe, because the tier is I/O-bound on its containers
+        # rather than CPU-bound.
+        run: uv run pytest tests/integration tests/e2e -n 4 --dist=worksteal
+
+  docs:
+    # `--strict` is the only thing that fails a build on a broken cross-link.
+    # It shells out to the Makefile rather than repeating the mkdocs
+    # invocation, so the pinned theme version has one home.
+    name: Docs (strict)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - name: Build the site, strict
+        run: make docs-build
+
+  migrations:
+    name: Migrations (atlas hash + safety scan)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/atlas
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history, so the safety scan can diff the migration directory
+          # against the merge base.
+          fetch-depth: 0
+
+      - name: Install Atlas
+        uses: ariga/setup-atlas@v0
+
+      - name: Verify atlas.sum is up to date
+        run: |
+          atlas migrate hash
+          if ! git diff --quiet migrations/atlas.sum; then
+            echo "::error::atlas.sum is stale. Run 'make migrate-hash' and commit." >&2
+            git diff migrations/atlas.sum
+            exit 1
+          fi
+
+      # `atlas migrate hash` is blind to version collisions: it will happily
+      # re-hash a directory holding two files with the same timestamp, so the
+      # check above stays green even when `atlas migrate apply` would refuse.
+      # Each colliding file also arrives in a separate PR, so per-PR hashing
+      # never sees both. `validate` replays the directory against an ephemeral
+      # dev database and rejects duplicate versions, out-of-order files, and
+      # checksum drift, which is the fresh-clone break this guards against.
+      - name: Validate migration directory
+        run: atlas migrate validate --env local
+
+      # The scan scripts have no runtime dependency on this project; this
+      # borrows its locked pytest rather than maintaining a second Python
+      # environment for a couple of dozen fixture-file tests. Running them is
+      # what keeps the safety scan self-checking: a scan script that always
+      # exits 0 is indistinguishable from a clean tree, so without these the
+      # gate can go inert without anyone noticing.
+      - uses: ./.github/actions/setup
+
+      - name: Run scan script regression tests
+        run: uv run --project ../.. pytest scripts/tests -v
+
+      # `git diff --name-only` prints repo-root-relative paths regardless of
+      # this job's working-directory, so the diff is computed once here and
+      # shared via a step output rather than repeated per scan.
+      - name: Determine changed migration files
+        id: changed_migrations
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "No base sha (initial push or detached HEAD); nothing to scan."
+            {
+              echo "changed<<SCAN_EOF"
+              echo "SCAN_EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only --diff-filter=A "$base"...HEAD -- migrations/ | grep '\.sql$' || true)
+          echo "Changed migrations: $changed"
+          {
+            echo "changed<<SCAN_EOF"
+            echo "$changed"
+            echo "SCAN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Atlas moved `migrate lint` behind a cloud login, which this project
+      # deliberately skips. A narrow grep-based scan on net-new files stands
+      # in: it blocks irreversible or locking-prone DDL (DROP TABLE, DROP
+      # COLUMN, TRUNCATE, ALTER COLUMN ... TYPE without USING). It catches the
+      # common foot-guns and does not pretend to be a planner-aware lint.
+      - name: Safety scan changed migration files
+        if: steps.changed_migrations.outputs.changed != ''
+        run: |
+          root=$(git rev-parse --show-toplevel)
+          changed="${{ steps.changed_migrations.outputs.changed }}"
+          "$root/infra/atlas/scripts/scan_destructive_ddl.sh" "$root" $changed
+
+      # Refuses a migration that drops a constraint or an index and adds
+      # nothing back in the same file: a bare removal of an integrity
+      # guarantee with no replacement to show for it.
+      #
+      # `always()` so a failure in the scan above does not hide a separate
+      # constraint-drop finding in the same push; without it an author fixes
+      # the first failure and only then discovers the second.
+      - name: Constraint-drop scan changed migration files
+        if: always() && steps.changed_migrations.outputs.changed != ''
+        run: |
+          root=$(git rev-parse --show-toplevel)
+          changed="${{ steps.changed_migrations.outputs.changed }}"
+          "$root/infra/atlas/scripts/scan_constraint_drops.sh" "$root" $changed
+
+  ci-gate:
+    # One aggregate context for branch protection. Protection matches job
+    # names by exact string, so requiring individual lanes means editing the
+    # rule whenever a lane is renamed or re-sharded. Worse, GitHub treats a
+    # SKIPPED required check as satisfied, so a lane that is skipped rather
+    # than failed would silently satisfy protection. This job reports on every
+    # run and is green only if every lane actually succeeded.
+    name: CI gate
+    # Without `always()` this job would itself be skipped when an upstream
+    # lane fails, which is exactly the hole it exists to close.
+    if: always()
+    needs: [lint, test-noio, test-db, docs, migrations]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Every upstream lane must have succeeded
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Upstream lane results: $results"
+          for r in $results; do
+            if [ "$r" != "success" ]; then
+              echo "::error::A CI lane did not succeed (results: $results)." >&2
+              exit 1
+            fi
+          done
+          echo "OK: every CI lane succeeded."
