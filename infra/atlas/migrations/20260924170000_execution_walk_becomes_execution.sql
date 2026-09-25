@@ -30,7 +30,7 @@
 -- No deployment holds such rows. The aggregate was added and renamed inside one
 -- series of changes and nothing is published.
 
-DROP TABLE IF EXISTS proj_execution_walk_summary;
+DROP TABLE IF EXISTS proj_execution_walk_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 CREATE TABLE proj_execution_execution_summary (
     execution_id     uuid        PRIMARY KEY,

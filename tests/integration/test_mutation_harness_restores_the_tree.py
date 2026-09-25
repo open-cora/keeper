@@ -76,13 +76,13 @@ def test_an_untracked_file_in_the_tree_is_refused_before_any_test_runs(repo: Pat
 
 def test_an_edit_that_matches_nothing_is_reported_rather_than_run(repo: Path) -> None:
     """A sed that hits nothing would otherwise read as a gap in the tests."""
-    result = _run(repo, "sed -i '' 's/NOTHING_MATCHES_THIS/x/' calc.py", _RED)
+    result = _run(repo, "perl -pi -e 's/NOTHING_MATCHES_THIS/x/' calc.py", _RED)
     assert result.outcome == ERROR
     assert "changed nothing" in result.detail
 
 
 def test_a_caught_mutation_leaves_the_file_exactly_as_it_was(repo: Path) -> None:
-    result = _run(repo, "sed -i '' 's/VALUE = 1/VALUE = 99/' calc.py", _RED)
+    result = _run(repo, "perl -pi -e 's/VALUE = 1/VALUE = 99/' calc.py", _RED)
 
     assert result.outcome == CAUGHT
     assert (repo / "calc.py").read_text(encoding="utf-8") == "VALUE = 1\n"
@@ -90,7 +90,7 @@ def test_a_caught_mutation_leaves_the_file_exactly_as_it_was(repo: Path) -> None
 
 
 def test_a_surviving_mutation_leaves_the_file_exactly_as_it_was(repo: Path) -> None:
-    result = _run(repo, "sed -i '' 's/VALUE = 1/VALUE = 99/' calc.py", _GREEN)
+    result = _run(repo, "perl -pi -e 's/VALUE = 1/VALUE = 99/' calc.py", _GREEN)
 
     assert result.outcome == SURVIVED
     assert (repo / "calc.py").read_text(encoding="utf-8") == "VALUE = 1\n"
@@ -130,7 +130,7 @@ def test_an_edit_that_stages_itself_is_reported_as_an_unrestorable_tree(repo: Pa
     mutation. The harness has to say so and stop the batch, because a
     verdict after this point is measuring the previous mutation.
     """
-    result = _run(repo, "sed -i '' 's/VALUE = 1/VALUE = 99/' calc.py && git add -A", _RED)
+    result = _run(repo, "perl -pi -e 's/VALUE = 1/VALUE = 99/' calc.py && git add -A", _RED)
 
     assert result.outcome == ERROR
     assert "did not restore" in result.detail

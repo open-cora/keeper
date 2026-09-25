@@ -22,7 +22,7 @@
 -- supply a value, the table is derived, and the bookmark below starts at zero
 -- so the worker recomputes every row from the log.
 
-DROP TABLE IF EXISTS proj_execution_execution_summary;
+DROP TABLE IF EXISTS proj_execution_execution_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 CREATE TABLE proj_execution_execution_summary (
     execution_id     uuid        PRIMARY KEY,
