@@ -54,7 +54,7 @@ Kind = Literal["command", "query"]
 # after whichever bounded context reached for this decorator first would put
 # that accident in the scope of every span the process emits, and span names
 # already carry the BC as their first segment.
-_tracer = trace.get_tracer("aroc")
+_tracer = trace.get_tracer("keeper")
 
 
 class _AsyncHandler[**P, R](Protocol):
@@ -88,7 +88,7 @@ def with_tracing[**P, R](
     traces group naturally by bounded context in the UI.
     """
     span_name = f"{bc}.{kind}.{command_name}"
-    name_attr = f"aroc.{kind}"
+    name_attr = f"keeper.{kind}"
 
     async def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
         attributes: dict[str, Any] = {

@@ -1,6 +1,6 @@
 """Shared-kernel layer: cross-BC value objects and pure helpers.
 
-Every module here has zero `aroc.*` imports outside `keeper.shared.*` itself:
+Every module here has zero `keeper.*` imports outside `keeper.shared.*` itself:
 the purity test that distinguishes shared-kernel from infrastructure. These
 are domain primitives (the `Identifier` value object, NewType identity
 aliases, bounded-text validators, JSON Schema helpers) usable from any BC

@@ -30,7 +30,7 @@ from tests.architecture.conftest import append_only_table_lineage, tracked_migra
 
 pytestmark = pytest.mark.architecture
 
-APP_ROLE = "aroc_app"
+APP_ROLE = "keeper_app"
 
 
 _LINE_COMMENT = re.compile(r"--[^\n]*")

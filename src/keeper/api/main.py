@@ -117,7 +117,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     # security the deployment proxy enforces, so MCP's own check is relaxed
     # here rather than duplicated.
     mcp = FastMCP(
-        "aroc",
+        "keeper",
         streamable_http_path="/",
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=False,

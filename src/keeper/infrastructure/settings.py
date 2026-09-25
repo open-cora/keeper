@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Database
-    database_url: str = "postgresql://keeper:aroc@localhost:5433/aroc"
+    database_url: str = "postgresql://keeper:keeper@localhost:5433/keeper"
     db_pool_min_size: int = 1
     db_pool_max_size: int = 10
 
@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     # exporter always exports every span, because development is loud by
     # design.
     otel_exporter: OtelExporter = "none"
-    otel_service_name: str = "aroc-api"
+    otel_service_name: str = "keeper"
     otel_sampler_ratio: float = 1.0
 
     # Edge authentication.

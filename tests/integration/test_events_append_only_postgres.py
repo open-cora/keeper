@@ -23,7 +23,7 @@ from tests.integration.conftest import ClonedDatabase
 
 pytestmark = [pytest.mark.integration]
 
-APP_ROLE = "aroc_app"
+APP_ROLE = "keeper_app"
 
 _INSERT = """
 INSERT INTO events (

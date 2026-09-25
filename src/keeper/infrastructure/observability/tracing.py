@@ -110,7 +110,7 @@ def build_tracing(settings: "Settings") -> tuple[TracerProvider | None, Teardown
         {
             SERVICE_NAME: settings.otel_service_name,
             SERVICE_VERSION: __version__,
-            SERVICE_NAMESPACE: "aroc",
+            SERVICE_NAMESPACE: "keeper",
             DEPLOYMENT_ENVIRONMENT: settings.app_env,
         }
     )

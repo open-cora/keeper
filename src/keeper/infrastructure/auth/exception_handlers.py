@@ -62,7 +62,7 @@ _log = get_logger(__name__)
 # The "realm" parameter is REQUIRED in RFC 6750 §3 challenges. AROC
 # is one realm; future multi-realm setups (multiple deployments
 # behind a single gateway) override via a settings-driven helper.
-_REALM = "aroc"
+_REALM = "keeper"
 
 # Per RFC 9728 §4.1, the WWW-Authenticate challenge MAY carry a
 # `resource_metadata` parameter pointing at the protected-resource
