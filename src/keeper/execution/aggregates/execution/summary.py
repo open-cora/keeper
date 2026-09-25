@@ -58,7 +58,7 @@ class ExecutionSummary:
     an execution whose driver died partway: that one shows as `RUNNING` with
     `reported_count` short of `step_count`, and stays that way. Nothing
     here can tell either from something merely slow, which is the limit
-    docs/reference/conducting.md names rather than papers over.
+    the conductor's conducting page names rather than papers over.
     """
 
     execution_id: UUID

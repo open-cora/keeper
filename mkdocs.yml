@@ -1,0 +1,50 @@
+site_name: Keeper
+site_description: The system of record for the experiment
+repo_url: https://github.com/open-cora/keeper
+edit_uri: ""
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+nav:
+  - Home: index.md
+  - Bounded contexts:
+      - Access: bounded-contexts/access.md
+      - Execution: bounded-contexts/execution.md
+      - Custody: bounded-contexts/custody.md
+      - Counsel: bounded-contexts/counsel.md
+      - Equipment: bounded-contexts/equipment.md
+  - Reference:
+      - Overview: reference/index.md
+      - Workflow: reference/workflow.md
+      - Layout: reference/layout.md
+      - Modeling: reference/modeling.md
+      - Patterns: reference/patterns.md
+      - Conventions: reference/conventions.md
+      - Naming: reference/naming.md
+      - Runtime: reference/runtime.md
+      - Client contract: reference/client-contract.md
+      - Glossary: reference/glossary.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight

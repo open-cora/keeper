@@ -55,8 +55,6 @@ point: this used to count directory levels, which is an arithmetic fact
 about a layout that is about to change.
 """
 
-_MIGRATIONS_DIR = REPO_ROOT / "infra" / "atlas" / "migrations"
-
 SRC_ROOT = _APP_ROOT / "src"
 KEEPER_ROOT = SRC_ROOT / "keeper"
 TESTS_ROOT = _APP_ROOT / "tests"
@@ -196,20 +194,25 @@ def _tracked_python_files_under(subdir: str) -> frozenset[Path]:
 def tracked_markdown_files() -> frozenset[Path]:
     """Absolute paths to git-tracked `.md` files under `docs/`.
 
-    Rooted at the repo root rather than `apps/keeper`, because docs/ sits outside
-    the API package. Keeps the same GIT_DIR strip for the same reason.
+    Rooted at the project, because the keeper's pages moved in with it. This
+    used to reach the repository root, which is the shape it had when `docs/`
+    was one directory serving one application.
+
+    Narrower than `tracked_prose_files()` on purpose: the product-name rule
+    reads this one, and the pages outside `docs/` are a README and a beamline
+    page rather than the reference set that rule is about.
     """
     env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
     result = subprocess.run(
         ["git", "ls-files", "docs"],
-        cwd=REPO_ROOT,
+        cwd=_APP_ROOT,
         capture_output=True,
         text=True,
         check=True,
         env=env,
     )
     return frozenset(
-        REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".md")
+        _APP_ROOT / line for line in result.stdout.splitlines() if line.endswith(".md")
     )
 
 
@@ -217,31 +220,26 @@ def tracked_markdown_files() -> frozenset[Path]:
 def tracked_prose_files() -> frozenset[Path]:
     """Absolute paths to every tracked `.md` file this project owns.
 
-    Wider than `tracked_markdown_files()`, which reaches `docs/` alone. The
-    root files, the beamline pages and the per-directory READMEs were
-    checked by nothing, and a planning page is where a plan coordinate is
-    most tempting to write.
+    Wider than `tracked_markdown_files()`, which reaches `docs/` alone: this
+    adds the README at the root and the one under `tests/e2e/`. Both were
+    checked by nothing.
 
-    The two client packages are excluded because they are other projects
-    with their own copies of these rules, enforced by their own suites. The
-    exclusion is by pathspec rather than by filtering afterwards, so a
-    client's page is never read here at all. It goes away with them.
-
-    Kept separate from `tracked_markdown_files()` rather than replacing it,
-    because the product-name rule is deliberately narrower: `beamlines/`
-    exists to say which products a beamline runs.
+    It used to exclude the two client packages by pathspec, because it ran
+    from the repository root and would otherwise have read another project's
+    pages. Running from the project root makes that exclusion unnecessary,
+    which is the better way for an exclusion to go away.
     """
     env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
     result = subprocess.run(
-        ["git", "ls-files", "*.md", ":(exclude)apps/conductor", ":(exclude)apps/reporter"],
-        cwd=REPO_ROOT,
+        ["git", "ls-files", "*.md"],
+        cwd=_APP_ROOT,
         capture_output=True,
         text=True,
         check=True,
         env=env,
     )
     return frozenset(
-        REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".md")
+        _APP_ROOT / line for line in result.stdout.splitlines() if line.endswith(".md")
     )
 
 
@@ -254,13 +252,16 @@ def tracked_file_basenames() -> frozenset[str]:
     may be written from any directory's point of view; the question it
     answers is whether the reader has something to open.
 
+    Still enumerated from the repository root, unlike every other scan
+    here. Scoping it to the project is the right end state and waits on
+    the project carrying its own CLAUDE.md, CONTRIBUTING.md and the rest,
+    which docstrings already cite.
+
     Enumerated from git rather than from a filesystem walk, and that is
-    the whole reason this exists. An `rglob` from the repo root descends
-    into `.claude/worktrees/`, where another session's checkout holds its
-    own copy of the tree, so a citation of a file deleted here resolves
-    against a stale copy over there and the check passes. That is the
-    same hazard the GIT_DIR strip below guards, reached by a different
-    route.
+    the other reason this exists. An `rglob` descends into
+    `.claude/worktrees/`, where another session's checkout holds its own
+    copy of the tree, so a citation of a file deleted here resolves
+    against a stale copy over there. Same hazard, different route.
     """
     env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
     result = subprocess.run(

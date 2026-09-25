@@ -32,7 +32,7 @@ import pytest
 
 from keeper.shared.json_schema.subset import ALLOWED_SCHEMA_KEYS
 from keeper.shared.json_schema.validation import ALLOWED_UNIT_SYSTEMS
-from tests.architecture.conftest import REPO_ROOT
+from tests._roots import APP_ROOT
 from tests.architecture.test_fitness_scope import (
     EXPECTED_AGGREGATE_COUNT,
     EXPECTED_BC_COUNT,
@@ -41,8 +41,8 @@ from tests.architecture.test_fitness_scope import (
 
 pytestmark = pytest.mark.architecture
 
-_CONVENTIONS = REPO_ROOT / "docs" / "reference" / "conventions.md"
-_HOME = REPO_ROOT / "docs" / "index.md"
+_CONVENTIONS = APP_ROOT / "docs" / "reference" / "conventions.md"
+_HOME = APP_ROOT / "docs" / "index.md"
 
 _SCOPE_COUNT_LINES: tuple[tuple[str, str, int], ...] = (
     ("bounded contexts", r"^   bounded contexts\s+(\d+)\s", EXPECTED_BC_COUNT),

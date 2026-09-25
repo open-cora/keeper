@@ -56,23 +56,13 @@ nothing else.
 Widening either one is the moment to add a real exclusion, and until then
 an exclusion here would be a filter that has never removed anything.
 
-**The beamline page.** `docs/beamlines/` documents a beamline this
-system is pointed at, and which engine and which control system it runs are
-the whole of what such a page is for. The docstring above says those are a
-deployment's facts rather than modelling ones; on a page that states no
-modelling claim at all, removing the product name removes the subject rather
-than a contamination.
-
-This is the one exclusion by name rather than by construction, and it is
-narrow on purpose. It reaches one directory, whose reason for existing is to
-describe a beamline, so no reference page and no context page can reach for
-it. `test_the_beamline_exclusion_removes_something` below is what stops it
-becoming the filter this file elsewhere warns about, the one that has never
-removed anything.
-
-What it deliberately does not rescue is a reference page. A rule stated on one
-of those while naming a product is exactly the defect this file exists for,
-whichever directory it sits in.
+**The beamline page.** It used to live under this project's `docs/` and
+needed an exclusion by name, because which engine and which control system a
+beamline runs are the whole of what such a page is for. It now sits with the
+descriptors it describes, outside this project, so the exclusion went with
+it. Removing it was not a decision: the guard that asked whether it still
+filtered anything failed the moment the page moved, which is what that kind
+of guard is for.
 
 **Test data.** Tests pass a scheme string like an engine's name into an
 open-scheme field, which is a value rather than an assertion. A test
@@ -191,53 +181,17 @@ def find_products(text: str) -> list[tuple[int, str]]:
     ]
 
 
-EXCLUDED_DOCS_DIRECTORY = "docs/beamlines"
-"""The one subtree excluded by name; see the module docstring for why.
-
-A beamline page's subject is which products it runs, so the rule
-would delete the content rather than improve it. Everything else under
-`docs/` is scanned, including the reference pages, where naming a product
-is the defect this file is about.
-"""
-
-
-def _is_excluded(path: Path) -> bool:
-    """Whether a path sits in the one subtree this rule does not reach."""
-    return path.is_relative_to(REPO_ROOT / EXCLUDED_DOCS_DIRECTORY)
-
-
 def _scanned_files() -> list[Path]:
-    """Tracked source and documentation, minus this file and the beamlines.
+    """Tracked source and documentation, minus this file.
 
     This file has to name what it refuses, so scanning it would fail on
-    its own list.
+    its own list. Nothing else is excluded: the one subtree that was, the
+    beamline pages, no longer sits in this project.
     """
     return sorted(
         path
         for path in tracked_python_files() | tracked_markdown_files()
-        if path.name != _THIS_FILE and not _is_excluded(path)
-    )
-
-
-def test_the_beamline_exclusion_removes_something() -> None:
-    """Guard the exclusion: one that removes nothing should not be here.
-
-    The mirror of the vacuity pins in `test_fitness_scope.py`. An exclusion
-    carried against a subtree with no product name in it is a permission
-    nobody is using, and the next reader cannot tell it from one that was
-    needed. If this fails, either the beamline pages stopped naming a
-    product, in which case delete the exclusion and the module docstring
-    paragraph that argues for it, or the directory moved.
-    """
-    excluded = sorted(
-        path
-        for path in tracked_markdown_files()
-        if _is_excluded(path) and find_products(path.read_text(encoding="utf-8"))
-    )
-    assert excluded, (
-        f"Nothing under {EXCLUDED_DOCS_DIRECTORY}/ names a product, so the "
-        "exclusion is removing nothing. Delete it rather than carry a filter "
-        "that has never filtered."
+        if path.name != _THIS_FILE
     )
 
 
@@ -315,7 +269,7 @@ def test_no_source_or_docs_file_names_a_particular_product() -> None:
         "are a deployment's facts, so a rule stated for one reads as a rule "
         "derived from one. Say what holds for any of them, and keep what only "
         "one does in the client package that speaks to it, or on a beamline "
-        f"page under {EXCLUDED_DOCS_DIRECTORY}/."
+        "page beside the descriptors."
     )
 
 
