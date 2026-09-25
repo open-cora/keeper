@@ -31,6 +31,18 @@ def _offenders(paths: frozenset[Path]) -> list[str]:
     return hits
 
 
+def test_the_dash_scan_reaches_both_source_and_documentation() -> None:
+    """Guard the enumeration: an empty file set makes the rule vacuous.
+
+    Both halves are enumerated from git, and the documentation half is
+    rooted outside this project. A root that moved, or a pathspec that
+    stopped matching, leaves the rules below iterating over nothing and
+    reporting green on a question they had stopped asking.
+    """
+    assert tracked_python_files(), "No source file scanned."
+    assert tracked_markdown_files(), "No documentation scanned."
+
+
 def test_tracked_python_files_carry_no_em_dashes() -> None:
     hits = _offenders(tracked_python_files())
     assert not hits, "Em or en dash in source:\n" + "\n".join(hits)

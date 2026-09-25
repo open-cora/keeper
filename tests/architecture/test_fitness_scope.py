@@ -25,11 +25,34 @@ tree; the aggregate and slice counts read git's tracked set, because that is
 what the rules themselves read. A bounded context whose files are all
 unstaged therefore shows up as one BC with zero aggregates, which is exactly
 the state where a full green run has checked nothing inside it.
+
+## The layer underneath the counts
+
+Every count above is derived by enumerating files, and every enumeration
+resolves against a root. A wrong root is the cheapest way to make the whole
+directory vacuous at once, and the quietest: `git ls-files` run in a
+directory that happens to be tracked by some other repository succeeds, so
+the rules come back green having read the wrong tree.
+
+The checks at the end of this module hold that layer. They are relational
+rather than numeric on purpose. A pinned file count would have to be bumped
+on every commit that adds a module, which teaches everyone to bump it
+without looking, and that is the opposite of what the pins above are for.
 """
 
 import pytest
 
-from tests.architecture.conftest import discovered_aggregates, discovered_bcs, discovered_slices
+from tests._roots import APP_ROOT, REPO_ROOT
+from tests.architecture.conftest import (
+    discovered_aggregates,
+    discovered_bcs,
+    discovered_slices,
+    tracked_file_basenames,
+    tracked_markdown_files,
+    tracked_migration_files,
+    tracked_python_files,
+    tracked_test_files,
+)
 
 pytestmark = pytest.mark.architecture
 
@@ -122,3 +145,66 @@ def test_chassis_packages_contribute_no_aggregates_or_slices() -> None:
             f"`{label}` is owned by chassis package `{owner}`, which has no "
             "aggregates or slices. The bounded-context filter was dropped."
         )
+
+
+def test_the_repository_root_is_a_repository_root() -> None:
+    """The root every cross-project rule resolves against is really one.
+
+    It is derived from git rather than by counting directory levels, and
+    the count is what this replaced. Two above `apps/keeper` is right in
+    this tree and two above the checkout once the project flattens to a
+    repository of its own, at which point the enumerators read whatever
+    directory happens to hold the clone.
+    """
+    assert (REPO_ROOT / ".git").exists(), f"{REPO_ROOT} is not a repository root."
+    assert APP_ROOT.is_relative_to(REPO_ROOT), f"{APP_ROOT} is not inside {REPO_ROOT}."
+
+
+def test_every_enumerator_finds_something() -> None:
+    """Guard the enumerations themselves: an empty one passes every rule.
+
+    Named one at a time rather than in a loop, so a failure says which
+    pathspec stopped matching instead of which index of a tuple did.
+    """
+    assert tracked_python_files(), "No tracked source file under src/keeper."
+    assert tracked_test_files(), "No tracked test file under tests/."
+    assert tracked_markdown_files(), "No tracked documentation under docs/."
+    assert tracked_migration_files(), "No tracked migration under infra/atlas/migrations/."
+    assert tracked_file_basenames(), "No tracked file anywhere in the repository."
+
+
+def test_the_two_roots_enumerate_one_repository() -> None:
+    """The project-scoped and repository-scoped enumerators agree on the tree.
+
+    `tracked_python_files()` runs git from `APP_ROOT`, and
+    `tracked_file_basenames()` runs it from `REPO_ROOT`. If those ever named
+    different repositories, both would still return files and every rule
+    over them would still pass, while the citation check resolved this
+    project's prose against somebody else's tree. Every file the first one
+    finds must be a file the second one has heard of.
+    """
+    everything = tracked_file_basenames()
+    missing = sorted(
+        path.name
+        for path in tracked_python_files() | tracked_test_files()
+        if path.name not in everything
+    )
+    assert not missing, (
+        "Files tracked from the project root that the repository root has "
+        f"never heard of: {missing}. The two roots are naming different "
+        "trees, and every rule that crosses between them is reading the "
+        "wrong one."
+    )
+
+
+def test_every_enumerated_file_sits_under_the_root_it_was_enumerated_from() -> None:
+    """A path outside its own root means the root moved under the pathspec.
+
+    `relative_to` is what the failure messages across this directory are
+    built from, and it raises rather than reporting when this is false, so
+    a rule would die with a ValueError naming neither cause nor cure.
+    """
+    for path in tracked_python_files() | tracked_test_files():
+        assert path.is_relative_to(APP_ROOT), f"{path} is outside {APP_ROOT}."
+    for path in tracked_markdown_files() | set(tracked_migration_files()):
+        assert path.is_relative_to(REPO_ROOT), f"{path} is outside {REPO_ROOT}."

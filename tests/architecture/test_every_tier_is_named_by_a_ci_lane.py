@@ -81,6 +81,15 @@ def test_the_lane_scan_finds_tiers_in_every_lane_file() -> None:
     """
     assert discovered_tiers(), "No tier directory found under tests/."
     for lane_file in _LANE_FILES:
+        # Checked before it is read, because both of these sit outside this
+        # project and are reached through the repository root. A root that
+        # moved raises FileNotFoundError from inside a cached helper, which
+        # names neither the cause nor the cure.
+        assert lane_file.is_file(), (
+            f"{lane_file} is not there, so this rule can read no lane at all. "
+            "Both lane files are resolved against the repository root; if "
+            "this project moved, that is the thing to check first."
+        )
         assert _tiers_named_by(lane_file), (
             f"No tests/<tier> path found on any pytest line in {lane_file.name}, "
             "so the lane derivation has stopped working."

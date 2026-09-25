@@ -44,13 +44,16 @@ import subprocess
 from functools import cache
 from pathlib import Path
 
-# tests/architecture/conftest.py -> apps/keeper/
-_APP_ROOT = Path(__file__).resolve().parents[2]
-# apps/keeper/ -> repo root -> infra/atlas/migrations
-REPO_ROOT = _APP_ROOT.parent.parent
-"""The repository root. Public because more than one check reaches a path
-outside `apps/keeper`, and two spellings of the same root is how they end up
-disagreeing about which directory they are looking in."""
+from tests._roots import APP_ROOT as _APP_ROOT
+from tests._roots import REPO_ROOT
+
+__all__ = ["REPO_ROOT"]
+"""Re-exported, because most of this directory imports its roots from here.
+
+`tests/_roots.py` is where both are derived, and the derivation is the
+point: this used to count directory levels, which is an arithmetic fact
+about a layout that is about to change.
+"""
 
 _MIGRATIONS_DIR = REPO_ROOT / "infra" / "atlas" / "migrations"
 
