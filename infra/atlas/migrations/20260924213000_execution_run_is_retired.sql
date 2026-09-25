@@ -1,0 +1,42 @@
+-- The Run aggregate is retired, and its summary table goes with it.
+--
+-- The first destructive migration in this tree. Every other one is a CREATE,
+-- or a DROP and rebuild of a projection this system can recompute from the
+-- log. This is neither: nothing will recompute `proj_execution_run_summary`,
+-- because no code left in the tree knows how.
+--
+-- A run and one acquisition step of a procedure were the same fact in two
+-- vocabularies. A run cited a plan and carried the parameters it was given; an
+-- acquisition step cites a plan and carries the parameters it was dispatched
+-- with. What a run had beyond that was the engine's own reference for it, and
+-- that now sits on the step as `engine_reference`. So the record is not lost,
+-- it is one scale down, and the two contexts that pointed at a run point at a
+-- step instead.
+--
+-- Dropping the table is safe in the sense that matters: it is derived, and the
+-- events it was derived from are still there.
+--
+-- ## The rows this cannot drop, and does not
+--
+-- `events` is append-only and the application's role holds no DELETE grant on
+-- it, which is the guarantee the whole store rests on. So every `Run` stream
+-- ever written stays exactly where it is, under a `stream_type` no loader in
+-- this tree will ask for again.
+--
+-- That is the honest cost of this change and it is recorded here rather than
+-- left to be discovered. Those rows are unreachable, not gone: a person with
+-- SQL can still read them, and `RETIRED_STREAM_TYPES` in
+-- `test_stream_types_are_pinned.py` is what says which name to look under.
+--
+-- Acceptable because nothing is deployed and no run in any database anybody
+-- keeps was ever published. A deployment that had accumulated real runs would
+-- need a backfill composing a one-step procedure per run before this landed,
+-- and that backfill is not written because there is nothing to run it against.
+--
+-- The bookmark row goes too. The worker raises when a registered projection has
+-- no bookmark, and it would otherwise hold a cursor for a projection nothing
+-- registers, which is a row that only ever confuses whoever reads that table.
+
+DROP TABLE IF EXISTS proj_execution_run_summary;
+
+DELETE FROM projection_bookmarks WHERE name = 'proj_execution_run_summary';

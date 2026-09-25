@@ -40,7 +40,7 @@ from testcontainers.postgres import PostgresContainer
 
 from keeper.infrastructure.schema import parse_versions
 from tests._postgres import normalize_async_url
-from tests._roots import REPO_ROOT
+from tests._roots import APP_ROOT
 
 os.environ.setdefault("APP_ENV", "test")
 
@@ -64,7 +64,7 @@ settings.register_profile(
 )
 settings.load_profile("ci" if os.environ.get("CI") == "true" else "dev")
 
-_MIGRATIONS_DIR = REPO_ROOT / "infra" / "atlas" / "migrations"
+_MIGRATIONS_DIR = APP_ROOT / "infra" / "atlas" / "migrations"
 
 
 def _migration_files() -> list[Path]:

@@ -282,6 +282,10 @@ def tracked_migration_files() -> tuple[Path, ...]:
     a half-staged migration on disk would otherwise leak into an architecture
     run and false-fail the GRANT and REVOKE checks.
 
+    Enumerated from the project root rather than the repository root, because
+    the migrations are the keeper's own and sit inside it. They used to sit
+    beside it, which is why this reached outward at all.
+
     Returns a tuple, not a frozenset, because migration ORDER is semantically
     meaningful: a later `ALTER ... RENAME` or `DROP` discards an earlier
     `CREATE`, and a walker that folds them in the wrong order gets the current
@@ -290,14 +294,14 @@ def tracked_migration_files() -> tuple[Path, ...]:
     env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
     result = subprocess.run(
         ["git", "ls-files", "infra/atlas/migrations"],
-        cwd=REPO_ROOT,
+        cwd=_APP_ROOT,
         capture_output=True,
         text=True,
         check=True,
         env=env,
     )
     return tuple(
-        sorted(REPO_ROOT / line for line in result.stdout.splitlines() if line.endswith(".sql"))
+        sorted(_APP_ROOT / line for line in result.stdout.splitlines() if line.endswith(".sql"))
     )
 
 
