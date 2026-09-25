@@ -233,8 +233,8 @@ def get_surface_id(request: Request) -> UUID:
 def get_mcp_surface_id() -> UUID:
     """Resolve the arrival Surface for an MCP tool call.
 
-    AROC only serves MCP over streamable-http in production (per
-    `aroc/api/main.py` mounting `streamable_http_app()`). Stdio is
+    the keeper only serves MCP over streamable-http in production (per
+    `keeper/api/main.py` mounting `streamable_http_app()`). Stdio is
     unreachable in production. The adapter returns the streamable-
     http constant unconditionally, no `ctx` parameter needed, so
     existing MCP tool signatures don't change.

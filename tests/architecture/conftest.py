@@ -2,12 +2,12 @@
 
 These run alongside the rest of the suite but enforce structural invariants
 the import graph, the AST, and the filesystem can prove. Tach (`tach.toml` at
-the apps/api root) handles dependency-graph rules; everything under this
+the apps/keeper root) handles dependency-graph rules; everything under this
 directory handles the rules tach cannot express: slice file contracts, decider
 purity, completeness of wiring.
 
 `SRC_ROOT` is computed relative to this file so the tests work whether pytest
-runs from `apps/api/` (the Makefile target) or from the repository root (CI).
+runs from `apps/keeper/` (the Makefile target) or from the repository root (CI).
 
 ## Enumeration is git-aware, not filesystem-aware
 
@@ -44,12 +44,12 @@ import subprocess
 from functools import cache
 from pathlib import Path
 
-# tests/architecture/conftest.py -> apps/api/
+# tests/architecture/conftest.py -> apps/keeper/
 _APP_ROOT = Path(__file__).resolve().parents[2]
-# apps/api/ -> repo root -> infra/atlas/migrations
+# apps/keeper/ -> repo root -> infra/atlas/migrations
 REPO_ROOT = _APP_ROOT.parent.parent
 """The repository root. Public because more than one check reaches a path
-outside `apps/api`, and two spellings of the same root is how they end up
+outside `apps/keeper`, and two spellings of the same root is how they end up
 disagreeing about which directory they are looking in."""
 
 _MIGRATIONS_DIR = REPO_ROOT / "infra" / "atlas" / "migrations"
@@ -193,7 +193,7 @@ def _tracked_python_files_under(subdir: str) -> frozenset[Path]:
 def tracked_markdown_files() -> frozenset[Path]:
     """Absolute paths to git-tracked `.md` files under `docs/`.
 
-    Rooted at the repo root rather than `apps/api`, because docs/ sits outside
+    Rooted at the repo root rather than `apps/keeper`, because docs/ sits outside
     the API package. Keeps the same GIT_DIR strip for the same reason.
     """
     env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}

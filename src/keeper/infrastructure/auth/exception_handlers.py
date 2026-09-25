@@ -59,14 +59,14 @@ from keeper.infrastructure.ports import IntrospectionUnavailableError, InvalidTo
 
 _log = get_logger(__name__)
 
-# The "realm" parameter is REQUIRED in RFC 6750 §3 challenges. AROC
+# The "realm" parameter is REQUIRED in RFC 6750 §3 challenges. The keeper
 # is one realm; future multi-realm setups (multiple deployments
 # behind a single gateway) override via a settings-driven helper.
 _REALM = "keeper"
 
 # Per RFC 9728 §4.1, the WWW-Authenticate challenge MAY carry a
 # `resource_metadata` parameter pointing at the protected-resource
-# metadata document. AROC's lives at this fixed path (registered by
+# metadata document. The keeper's lives at this fixed path (registered by
 # `register_protected_resource_metadata_route`).
 _RESOURCE_METADATA_PATH = "/.well-known/oauth-protected-resource"
 

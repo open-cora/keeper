@@ -15,11 +15,11 @@ Composition order at the wiring site (innermost first): tracing wraps
 idempotency wraps the bare handler, so cache hits, cache misses, and
 domain failures all attribute to the tracing span correctly.
 
-Span attributes use the `aroc.*` namespace for project-specific
+Span attributes use the `keeper.*` namespace for project-specific
 metadata (`keeper.bc`, `keeper.command`, `keeper.query`, `keeper.principal_id`);
 HTTP / DB / messaging attributes come from the underlying
 instrumentations. `keeper.principal_id` is sniffed from kwargs since
-every handler in AROC takes `principal_id: UUID` as a keyword arg
+every handler in the keeper takes `principal_id: UUID` as a keyword arg
 (per the cross-BC handler-call convention). When present, the value
 is recorded so trace queries can filter "everything principal X did
 in this trace", aligning with the 2026 multi-agent identity audit

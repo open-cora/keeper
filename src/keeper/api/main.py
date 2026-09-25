@@ -193,7 +193,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                     tracing_teardown()
 
     fastapi_app = FastAPI(
-        title="AROC",
+        title="Keeper",
         version=__version__,
         description="A parallel domain-modeling effort on an event-sourced chassis",
         lifespan=lifespan,

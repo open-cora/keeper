@@ -1,4 +1,4 @@
-"""The open-scheme identifier pair for a concept AROC references but does not model."""
+"""The open-scheme identifier pair for a concept the keeper references but does not model."""
 
 import pytest
 

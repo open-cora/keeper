@@ -1,9 +1,9 @@
 """No slice imports from a sibling slice in the same bounded context.
 
 Vertical slices are independent units. A handler, decider or route in
-`aroc.<bc>.features.<slice_a>` may not import from
-`aroc.<bc>.features.<slice_b>`. Shared types belong in the aggregate
-kernel under `aroc.<bc>.aggregates`; pure cross-BC value objects belong
+`keeper.<bc>.features.<slice_a>` may not import from
+`keeper.<bc>.features.<slice_b>`. Shared types belong in the aggregate
+kernel under `keeper.<bc>.aggregates`; pure cross-BC value objects belong
 in `keeper.shared`; cross-BC machinery with port or kernel dependencies
 belongs in `keeper.infrastructure`.
 

@@ -27,11 +27,11 @@ Three modes, in priority order:
      is False (dev / test posture). Production deployments configure
      IdPs and run with the flag on.
 
-Lives at `aroc/infrastructure/` (sibling to `request.py`) because
+Lives at `keeper/infrastructure/` (sibling to `request.py`) because
 A BC's MCP tool modules consume it; per tach, BCs may depend on
 `keeper.infrastructure` but NOT `keeper.api`. Importing FastMCP's
 `Context` here is fine, the SDK is a leaf dependency, not part
-of AROC's BC layer. Tools call through this helper rather than
+of the keeper's BC layer. Tools call through this helper rather than
 reaching into `ctx.request_context.request.state` directly so the
 3-mode logic stays in exactly one place.
 

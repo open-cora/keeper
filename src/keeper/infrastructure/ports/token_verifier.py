@@ -63,8 +63,8 @@ from "our upstream is down."
 - The Authorize port stays unchanged, it already takes
   `principal_id: UUID`. `TokenVerifier.verify` returns the principal,
   Authorize gates the call.
-- No session / cookie / CSRF concerns, AROC is stateless bearer.
-- No OAuth client flows, AROC is a Resource Server (RS); the
+- No session / cookie / CSRF concerns, the keeper is stateless bearer.
+- No OAuth client flows, the keeper is a Resource Server (RS); the
   client obtains the token from the IdP and brings it. A later pass captures
   the trigger for revisiting OAuth-client capability.
 """

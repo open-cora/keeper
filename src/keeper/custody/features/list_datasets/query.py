@@ -29,7 +29,7 @@ class ListDatasets:
     """Read a page of datasets, newest first.
 
     `step_id` narrows to what one run produced, which is the whole reason
-    this slice exists. It is an AROC id rather than an engine's, because
+    this slice exists. It is a keeper id rather than an engine's, because
     that is what the record carries and a caller holding an engine's uid
     resolves it through `GET /runs` first.
 

@@ -1,6 +1,6 @@
-# keeper
+# Keeper
 
-FastAPI + MCP backend for AROC. Python 3.13.
+FastAPI + MCP backend for the keeper. Python 3.13.
 
 For repo-wide context see the [root README](../../README.md); for the rules
 that govern code here, see [docs/reference/](../../docs/reference/index.md).
@@ -13,7 +13,7 @@ It delegates here automatically.
 To run uv directly inside this app:
 
 ```bash
-cd apps/api
+cd apps/keeper
 uv sync
 uv run pytest
 uv run uvicorn keeper.api.main:app --reload
@@ -23,7 +23,7 @@ uv run uvicorn keeper.api.main:app --reload
 
 ```
 src/keeper/
-├── shared/           pure value objects and helpers; zero aroc.* imports
+├── shared/           pure value objects and helpers; zero keeper.* imports
 ├── infrastructure/   ports, adapters, composition root, event-sourcing machinery
 └── api/              FastAPI app, middleware, error handlers, MCP mount
 ```

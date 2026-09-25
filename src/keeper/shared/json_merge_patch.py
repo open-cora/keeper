@@ -55,12 +55,12 @@ def merge_patch(current: Mapping[str, Any], patch: Mapping[str, Any]) -> dict[st
 
     The result is `copy.deepcopy`'d so caller mutations of the
     returned dict do not propagate into `current` or into the event
-    payload that this dict becomes. AROC's parameter/settings dicts
+    payload that this dict becomes. The keeper's parameter/settings dicts
     are typically small (5-30 keys), so deepcopy cost is negligible
     compared to the safety guarantee.
 
     Note: cannot represent "set key to null"; null is overloaded as
-    the delete sentinel. AROC values are never null in practice.
+    the delete sentinel. The keeper values are never null in practice.
     """
     result: dict[str, Any] = copy.deepcopy(dict(current))
     for key, value in patch.items():

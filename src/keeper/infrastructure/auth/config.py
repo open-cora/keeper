@@ -3,7 +3,7 @@
 Defines the typed shape that `Settings.identity_providers` carries
 (loaded from env vars in `keeper.infrastructure.settings.Settings`).
 Production deployments configure one entry per IdP that mints tokens
-for AROC: an introspection-only provider such as Globus Auth, a JWT
+for the keeper: an introspection-only provider such as Globus Auth, a JWT
 provider such as Microsoft Entra,
 etc.
 
@@ -107,7 +107,7 @@ class IdpConfig(BaseModel):
 
     The `audiences` map binds the 3 SYSTEM Surface UUIDs to the
     audience strings the IdP signs into the token's `aud` claim for
-    that Surface. AROC registers itself with the IdP using these
+    that Surface. The keeper registers itself with the IdP using these
     audience strings; the IdP issues tokens with `aud=<the one for
     the Surface the caller wants to reach>`.
 
@@ -149,7 +149,7 @@ class IdpConfig(BaseModel):
     introspection_client_id: str | None = Field(
         default=None,
         description=(
-            "OAuth client id AROC presents to the IdP's introspection "
+            "OAuth client id the keeper presents to the IdP's introspection "
             "endpoint via HTTP Basic. Required when introspection_url "
             "is set. Distinct from the user-facing client_id."
         ),
@@ -167,7 +167,7 @@ class IdpConfig(BaseModel):
     audiences: dict[UUID, str] = Field(
         default_factory=lambda: {},
         description=(
-            "Surface UUID → audience string. AROC registers the audience "
+            "Surface UUID → audience string. The keeper registers the audience "
             "strings with the IdP at deployment; the IdP signs them into "
             "the 'aud' claim. Per RFC 8707 §3 each Surface gets a "
             "distinct audience so cross-Surface token replay fails."
@@ -218,7 +218,7 @@ class IdpConfig(BaseModel):
         description=(
             "Production MUST be False. Same shape as "
             "allow_insecure_jwks_url; without HTTPS the introspection "
-            "POST leaks AROC's client_secret to MITM."
+            "POST leaks the keeper's client_secret to MITM."
         ),
     )
 

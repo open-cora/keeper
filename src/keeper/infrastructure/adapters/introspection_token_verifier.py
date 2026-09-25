@@ -105,9 +105,9 @@ class IntrospectionTokenVerifier:
     ) -> None:
         """Construct an introspection verifier bound to one IdP issuer.
 
-        `client_id` + `client_secret` authenticate AROC to the IdP's
+        `client_id` + `client_secret` authenticate the keeper to the IdP's
         introspection endpoint via HTTP Basic (RFC 7662 §2.1).
-        These are AROC's own credentials at the IdP, distinct from
+        These are the keeper's own credentials at the IdP, distinct from
         the user-token being introspected. Accept either a raw `str`
         or a `pydantic.SecretStr`; either way the value is wrapped
         in `SecretStr` so it never shows in `__repr__` / tracebacks
@@ -126,9 +126,9 @@ class IntrospectionTokenVerifier:
 
         `allow_insecure_introspection_url`: production MUST be False
         (default). Test/dev fixtures using `http://127.0.0.1:...`
-        opt in by passing True. Otherwise AROC's client_secret would
+        opt in by passing True. Otherwise the keeper's client_secret would
         traverse plain HTTP basic-auth and an attacker MITMing the
-        introspection POST captures AROC's IdP credentials.
+        introspection POST captures the keeper's IdP credentials.
         """
         if cache_ttl_seconds < 1:
             msg = (
@@ -240,7 +240,7 @@ class IntrospectionTokenVerifier:
             )
             raise IntrospectionUnavailableError(self._issuer, f"http {response.status_code}")
         if response.status_code != 200:
-            # 4xx from the IdP, typically AROC's introspection
+            # 4xx from the IdP, typically the keeper's introspection
             # credentials are wrong, OR the IdP rejects the request
             # shape. Map to InvalidTokenError so the caller sees 401,
             # not 503; the cause is upstream config, not transient.

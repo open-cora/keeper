@@ -106,7 +106,7 @@ def postgres_container(worker_id: str) -> Generator[PostgresContainer]:
     and so an interrupted run cannot collide on the name.
     """
     container = PostgresContainer("pgvector/pgvector:pg18", driver=None)
-    container.with_name(f"aroc-pgtest-{worker_id}")
+    container.with_name(f"keeper-pgtest-{worker_id}")
     container.start()
     try:
         yield container

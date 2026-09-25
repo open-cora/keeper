@@ -11,7 +11,7 @@ Tokens in JWT").
 PyJWT (`pyjwt[crypto]` dep) is the one library dependency for
 edge-auth.
 The `[crypto]` extra pulls `cryptography` for RS256/ES256, every
-real-world IdP uses one of these two. AROC does NOT roll its own
+real-world IdP uses one of these two. The keeper does NOT roll its own
 signature verify or JOSE parsing; that's the library's whole job.
 
 ## Per-issuer one `PyJWKClient`

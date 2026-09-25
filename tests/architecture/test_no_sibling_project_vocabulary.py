@@ -46,7 +46,7 @@ reads its absence as an oversight and puts it back:
     these three were not. That was wrong: at a synchrotron a beam is the most
     ordinary noun there is. `apps/reporter` had already written `beam` five
     times, as a message prefix in fixtures, and the tree stayed green only
-    because this scan is rooted at `apps/api`.
+    because this scan is rooted at `apps/keeper`.
 
 The test that scans the tree cannot tell a domain use from an innocent one, so
 the standing rule is the one those removals converge on: a word earns a place
@@ -56,7 +56,7 @@ the clearest case of it.
 
 ## What this does not reach
 
-`_scanned_files` enumerates `apps/api` and stops there. A docstring in
+`_scanned_files` enumerates `apps/keeper` and stops there. A docstring in
 `apps/reporter` or `apps/conductor` may name the sibling and nothing here
 notices, and those are the newest Python in the tree and a plausible place for
 a provenance comment to appear. Nothing does today, checked rather than

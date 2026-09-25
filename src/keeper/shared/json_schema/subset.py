@@ -1,6 +1,6 @@
 """Shared constrained JSON Schema subset checker.
 
-AROC accepts a deliberately small subset of JSON Schema Draft 2020-12
+The keeper accepts a deliberately small subset of JSON Schema Draft 2020-12
 wherever one aggregate DECLARES a schema another aggregate's values are
 validated against. Every such surface wants the same forbidden-keyword
 posture (no $ref, oneOf, allOf, conditionals), so the keyword allowlist
@@ -78,7 +78,7 @@ def check_subset(
     if forbidden:
         msg = (
             f"forbidden keyword(s) {sorted(forbidden)} at {path}; "
-            f"AROC's subset allows only {sorted(ALLOWED_SCHEMA_KEYS)}"
+            f"the keeper's subset allows only {sorted(ALLOWED_SCHEMA_KEYS)}"
         )
         raise error_class(msg)
 
@@ -118,7 +118,7 @@ def check_schema_is_subset(
     check verifies that the inner schema does not WIDEN the outer's
     contract.
 
-    Rules (v1, conservative; matches AROC's STRICT-by-default
+    Rules (v1, conservative; matches the keeper's STRICT-by-default
     posture per the schema-validated-values pattern in docs/reference/conventions.md):
       1. inner.type must equal outer.type when both are present.
          A property typed differently from the outer declaration is

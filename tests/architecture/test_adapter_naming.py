@@ -48,7 +48,7 @@ are; neither should be forced into the `<Tech><Port>` shape.
 
 
 def _adapter_modules() -> list[Path]:
-    """Every tracked module in any `adapters/` package under `aroc`."""
+    """Every tracked module in any `adapters/` package under `keeper`."""
     return sorted(
         path
         for path in tracked_python_files()

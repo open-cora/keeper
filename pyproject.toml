@@ -202,7 +202,7 @@ branch = true
 parallel = true
 source = ["src/keeper"]
 # Coverage-comment CI actions run from the repo root while pytest runs from
-# apps/api, so absolute paths in .coverage become unresolvable. Relative
+# apps/keeper, so absolute paths in .coverage become unresolvable. Relative
 # paths also make .coverage files portable across the dev/CI/container split.
 relative_files = true
 omit = [

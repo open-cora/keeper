@@ -55,7 +55,7 @@ def test_check_subset_accepts_every_allowed_keyword() -> None:
 
 @pytest.mark.parametrize("keyword", ["$ref", "oneOf", "allOf", "anyOf", "if", "not"])
 def test_check_subset_refuses_a_keyword_outside_the_allowlist(keyword: str) -> None:
-    with pytest.raises(_RefusedError, match="AROC's subset allows only"):
+    with pytest.raises(_RefusedError, match="the keeper's subset allows only"):
         _check({"$schema": DRAFT_2020_12_URI, keyword: {}})
 
 

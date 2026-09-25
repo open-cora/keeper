@@ -1,4 +1,4 @@
-"""AROC: a parallel domain-modeling effort on an event-sourced chassis."""
+"""Keeper: a parallel domain-modeling effort on an event-sourced chassis."""
 
 from importlib.metadata import PackageNotFoundError, version
 

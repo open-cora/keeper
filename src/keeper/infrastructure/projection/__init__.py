@@ -4,12 +4,12 @@ Public concepts:
 
   - `Projection` Protocol: the read-side fold a BC writes to maintain
     a `proj_<bc>_<name>` queryable table from the event stream. Per
-    BC, lives in `aroc.<bc>.projections.<name>`. Fast, batch large
+    BC, lives in `keeper.<bc>.projections.<name>`. Fast, batch large
     (`batch_size=100`), idempotent at the SQL layer.
 
   - `Reaction` Protocol: side-effecting Subscriber that emits NEW
     events (often cross-BC) or calls the outside world. No context has
-    written one; when one does it belongs in `aroc.<bc>.subscribers`.
+    written one; when one does it belongs in `keeper.<bc>.subscribers`.
     Slow, batch small (`batch_size=1`), idempotent via deterministic
     UUIDv5 stream id + ConcurrencyError-as-no-op. A wedged bookmark has
     no operator slice behind it here: recovery means advancing the

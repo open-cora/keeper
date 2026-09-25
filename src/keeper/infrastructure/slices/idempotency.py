@@ -8,7 +8,7 @@ context's wiring module, so every create-style command handler gets
 idempotency through one composition point and slices stay focused on
 domain logic.
 
-Lives at `aroc/infrastructure/` (not in any single BC) because it
+Lives at `keeper/infrastructure/` (not in any single BC) because it
 applies uniformly to every BC's command handlers and depends only on
 the IdempotencyStore port + the cross-BC handler-call convention
 (`(command, *, principal_id, correlation_id, causation_id) -> TResult`).

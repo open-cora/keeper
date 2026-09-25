@@ -19,7 +19,7 @@ a different directory, execution upward, or terminate a C string early.
 from __future__ import annotations
 
 MAX_PATH_SEGMENT_LENGTH = 255
-"""One segment's byte budget on the filesystems AROC reads (ext4, XFS,
+"""One segment's byte budget on the filesystems the keeper reads (ext4, XFS,
 NFS all cap a single name at 255). Longer is not a traversal risk, it
 just cannot name a real entry, so refusing early keeps a pointless
 round trip off the wire."""
@@ -37,7 +37,7 @@ def is_safe_path_segment(value: str) -> bool:
     `scan_005.h5` want different files, and silently picking one of
     them is how a probe reports a match for a path nobody asked about.
 
-    Backslash is refused alongside `/` even though AROC reads POSIX
+    Backslash is refused alongside `/` even though the keeper reads POSIX
     hosts only: it costs nothing, and this rule is the kind that gets
     reused somewhere it was not written for.
     """

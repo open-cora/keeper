@@ -8,7 +8,7 @@ without booting a kernel, opening a connection pool, or touching a port.
 
 Layer dependency direction: `BCs -> infrastructure -> shared`, plus
 `BCs -> shared` directly. `keeper.shared` itself depends on nothing under
-`aroc.*`, and `apps/api/tach.toml` is what enforces that: planting an
+`keeper.*`, and `apps/keeper/tach.toml` is what enforces that: planting an
 `keeper.infrastructure` import in a module here fails `tach check` and
 passes every architecture test. Run the former before trusting the
 latter on a layering question.

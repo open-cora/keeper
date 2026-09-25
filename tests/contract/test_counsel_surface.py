@@ -59,7 +59,7 @@ def _an_acquisition_of(client: TestClient, plan_id: str) -> tuple[str, str]:
     Three calls where a run took one, and all three are load bearing.
     There is no way to make a step without a procedure holding it and an
     execution dispatching that procedure, which is the whole content of
-    AROC owning the genesis.
+    the keeper owning the genesis.
     """
     defined = client.post(
         "/procedures",

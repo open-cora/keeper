@@ -1,7 +1,7 @@
 """Cross-BC builder that wraps a domain event in the persistence envelope.
 
 `to_new_event(...)` returns a `NewEvent` ready for `EventStore.append`.
-Lives at `aroc/infrastructure/` (not in any single BC) because the
+Lives at `keeper/infrastructure/` (not in any single BC) because the
 envelope shape (`event_id` + discriminator + `schema_version` +
 `occurred_at` + correlation/causation + `metadata={"command": ...}`)
 is the cross-BC persistence contract. Only the discriminator string

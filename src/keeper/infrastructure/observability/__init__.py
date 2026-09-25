@@ -10,7 +10,7 @@ Public surface for the rest of the codebase:
   based source.
 - `with_tracing(handler, *, command_name, kind)`: composition wrapper
   applied in each BC's wiring module. Adds a span around each command /
-  query handler call, sets `aroc.*` attributes, records exceptions.
+  query handler call, sets `keeper.*` attributes, records exceptions.
 - `add_trace_context`: structlog processor that injects `trace_id`
   and `span_id` into every log line emitted inside an active span.
 

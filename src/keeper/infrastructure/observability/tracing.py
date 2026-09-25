@@ -12,7 +12,7 @@ Two public entrypoints:
   libraries (asyncpg). Returns the same `teardown` callable.
 
 `instrument_app(app, settings)` attaches `FastAPIInstrumentor` to a
-specific FastAPI instance with `excluded_urls` matching AROC's
+specific FastAPI instance with `excluded_urls` matching the keeper's
 operational endpoints (probes + scrape + docs) so they don't flood
 the trace exporter under normal traffic.
 

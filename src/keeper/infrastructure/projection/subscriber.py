@@ -86,7 +86,7 @@ class Subscriber(Protocol):
 class Projection(Protocol):
     """Read-side fold of an event stream into a queryable `proj_*` table.
 
-    A BC's projection lives at `aroc.<bc>.projections.<name>` and is
+    A BC's projection lives at `keeper.<bc>.projections.<name>` and is
     registered via `register_<bc>_projections(registry, deps)`. The
     framework owns advance, bookmarking, and at-least-once delivery;
     the projection owns the `apply` logic and the schema of its

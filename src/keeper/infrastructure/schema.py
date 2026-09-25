@@ -1,7 +1,7 @@
 """Refuse to serve a database whose shape this build does not expect.
 
 Migrations are applied out of band (`make migrate-apply`), never by the
-app: `apps/api/Dockerfile` says so, and forward-only migrations mean the
+app: `apps/keeper/Dockerfile` says so, and forward-only migrations mean the
 image carries no way back. That separation is right, and it leaves one
 window open. Applying migrations and starting the process are two
 independent acts, so nothing except sequencing keeps them in step, and a
@@ -107,7 +107,7 @@ class SchemaAbsentError(SchemaVersionError):
 
     def __init__(self, expected: str) -> None:
         super().__init__(
-            f"This database has no schema. AROC needs migration {expected}.\n"
+            f"This database has no schema. The keeper needs migration {expected}.\n"
             f"\n"
             f"Nothing has been applied here yet, so this is a new database "
             f"rather than a mismatched one.\n"
@@ -122,7 +122,7 @@ class SchemaBehindError(SchemaVersionError):
 
     def __init__(self, applied: str, expected: str) -> None:
         super().__init__(
-            f"AROC will not start: the database is older than this build.\n"
+            f"the keeper will not start: the database is older than this build.\n"
             f"\n"
             f"  database is at   {applied}\n"
             f"  this build needs {expected}\n"
@@ -142,12 +142,12 @@ class SchemaAheadError(SchemaVersionError):
 
     def __init__(self, applied: str, expected: str) -> None:
         super().__init__(
-            f"AROC will not start: the database is newer than this build.\n"
+            f"the keeper will not start: the database is newer than this build.\n"
             f"\n"
             f"  database is at   {applied}\n"
             f"  this build needs {expected}\n"
             f"\n"
-            f"Applying migrations will NOT fix this. AROC's migrations are "
+            f"Applying migrations will NOT fix this. The keeper's migrations are "
             f"forward-only, so there is nothing to apply and no way back. "
             f"Something started an older image than the one this database "
             f"has been migrated for.\n"

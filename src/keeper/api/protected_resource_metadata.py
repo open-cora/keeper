@@ -7,7 +7,7 @@ discover which authorization servers issue tokens for which
 resources (per-Surface audience identifiers), what scopes are
 supported, and what token formats are accepted.
 
-AROC's RFC 9728 document is generated from
+The keeper's RFC 9728 document is generated from
 `Settings.identity_providers` + the 3 SYSTEM Surface audience
 identifiers: no DB, no auth, just config-driven JSON.
 
@@ -20,7 +20,7 @@ and discover where to obtain a fresh token.
 
   - The `authorization_servers_metadata` linked documents. Those
     live at the IdP's `/.well-known/oauth-authorization-server`,
-    which IS the IdP's responsibility per RFC 8414. AROC's RFC 9728
+    which IS the IdP's responsibility per RFC 8414. The keeper's RFC 9728
     only POINTS to them via `authorization_servers: [<issuer URL>,
     ...]`.
   - Per-tenant fan-out (different Surface IDs per tenant), deferred
@@ -74,8 +74,8 @@ def build_protected_resource_metadata(
     }
     if aud_values:
         document["aud_values_supported"] = sorted(set(aud_values))
-    # Per-Surface audience map as a non-standard but namespaced AROC
-    # extension. The `x-aroc-` prefix was considered first; per
+    # Per-Surface audience map as a non-standard but namespaced keeper
+    # extension. An `x-` prefix was considered first; per
     # RFC 6648 (2012) the `X-`/`x-` convention is deprecated across
     # IETF protocols and RFC 9728 itself doesn't reserve `x-` keys.
     # Reverse-
@@ -130,7 +130,7 @@ def register_protected_resource_metadata_route(app: FastAPI) -> None:
         # no path. Per RFC 9728 §3.1 the resource value SHOULD be the
         # canonical URL of the resource server. Honor standard reverse-
         # proxy headers (X-Forwarded-Proto + X-Forwarded-Host) because
-        # production AROC always sits behind one (Cloudflare / nginx /
+        # a production keeper always sits behind one (Cloudflare / nginx /
         # IAP). Without this, the `resource` field reads
         # `http://internal-pod-name:8000` instead of the public URL
         # and clients can't discover the auth flow correctly.

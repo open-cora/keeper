@@ -58,7 +58,7 @@ def validate_schema_declaration(
     *,
     error_class: type[ValueError],
 ) -> None:
-    """Validate that `schema` is a well-formed JSON Schema in AROC's
+    """Validate that `schema` is a well-formed JSON Schema in the keeper's
     constrained subset (declarer-side write-time check).
 
     Four failure modes, all raised as `error_class(reason)`:
@@ -80,7 +80,7 @@ def validate_schema_declaration(
     if declared != DRAFT_2020_12_URI:
         msg = (
             f"$schema must be exactly {DRAFT_2020_12_URI!r} "
-            f"(got: {declared!r}); AROC locks Draft 2020-12"
+            f"(got: {declared!r}); the keeper locks Draft 2020-12"
         )
         raise error_class(msg)
 
@@ -168,7 +168,7 @@ def _check_unit_annotation_shape(
         raise error_class(msg)
     if system not in ALLOWED_UNIT_SYSTEMS:
         msg = (
-            f"unit.system {system!r} at {path} is not in AROC's allowed "
+            f"unit.system {system!r} at {path} is not in the keeper's allowed "
             f"namespace list: {sorted(ALLOWED_UNIT_SYSTEMS)}"
         )
         raise error_class(msg)

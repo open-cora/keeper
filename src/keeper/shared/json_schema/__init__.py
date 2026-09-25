@@ -1,9 +1,9 @@
-"""The constrained JSON Schema subset AROC accepts, and the checks over it.
+"""The constrained JSON Schema subset the keeper accepts, and the checks over it.
 
 Two halves of one rule, split by which side of a write they run on:
 
   - `subset` declares the keyword allowlist and executions a submitted schema
-    against it. It answers "is this a schema AROC is willing to store".
+    against it. It answers "is this a schema the keeper is willing to store".
   - `validation` answers the two questions that follow: is a declared
     schema well formed (declarer side), and do a carrier's values conform
     to it (carrier side).

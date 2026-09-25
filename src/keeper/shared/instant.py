@@ -18,7 +18,7 @@ on whatever offset they write it in, and turning what arrives into one is
 the whole of the work here.
 
 It lives in `keeper.shared` because it is pure, imports nothing from
-`aroc`, and has three consumers across three bounded contexts. It began
+`keeper`, and has three consumers across three bounded contexts. It began
 beside the Run aggregate, where the first consumer was, and stayed there
 through the second because the rule of three in
 docs/reference/layout.md was not met. Commands that describe an act
