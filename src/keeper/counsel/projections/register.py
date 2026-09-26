@@ -13,6 +13,7 @@ package and the package is where the projections belong. See
 docs/reference/layout.md.
 """
 
+from keeper.counsel.projections.inquiry_summary import InquirySummaryProjection
 from keeper.counsel.projections.proposal_summary import ProposalSummaryProjection
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.projection.registry import ProjectionRegistry
@@ -33,6 +34,7 @@ def register_counsel_projections(registry: ProjectionRegistry, deps: Kernel) -> 
     """
     _ = deps
     registry.register(ProposalSummaryProjection())
+    registry.register(InquirySummaryProjection())
 
 
 __all__ = ["register_counsel_projections"]
