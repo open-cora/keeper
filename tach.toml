@@ -174,8 +174,12 @@ depends_on = [
 # package is the leaf, and a leaf that could import a sibling would let
 # an event class pull in another context's whole history.
 [[modules]]
+# The shared edge arrived with the Inquiry, not with the Proposal. An
+# objective is the first bounded text this context stores, so its state
+# module reaches for the same `bounded_name` decorator Equipment's does,
+# and Equipment's entry has carried this pair since it landed.
 path = "keeper.counsel.aggregates"
-depends_on = ["keeper.infrastructure"]
+depends_on = ["keeper.shared", "keeper.infrastructure"]
 
 [[modules]]
 path = "keeper.counsel"
@@ -263,11 +267,16 @@ expose = [
 ]
 visibility = ["keeper.custody"]
 
-# Counsel reads Execution three times, and the three reads are different
+# Counsel reads Execution four times, and the four reads are different
 # in kind, which is why this door is wider than Custody's.
 #
 # Making a proposal loads a plan and reads its schema, so the decision
 # needs the plan itself and a context module names the type.
+#
+# Making an inquiry loads an execution and counts the steps it was
+# dispatched with, which is the denominator of the observation boundary
+# the answer is later read against. That read names the type where the
+# take below does not, which is what put `Execution` on this door.
 #
 # Taking a proposal loads an execution and finds one step inside it,
 # which is the pair of checks Custody makes, and then follows that step's
@@ -275,7 +284,7 @@ visibility = ["keeper.custody"]
 # That last hop is what the extra names buy: the decision asks which plan
 # the step runs, and the answer lives on the definition.
 #
-# Eleven names where Custody needs three, and the difference is exactly
+# Twelve names where Custody needs three, and the difference is exactly
 # that Custody checks existence and reads nothing off what it loaded. A door
 # is sized by what the consumer imports, which is the only honest way to
 # size one, and `test_tach_edges_are_used.py` is what keeps that true.
@@ -284,7 +293,13 @@ visibility = ["keeper.custody"]
 # left it when the step stopped carrying a copied plan id: the handler
 # searches for the step and reads one field off it without ever writing
 # the type down, so keeping it would be a door held open for nobody.
-# `Execution` itself was never here for the same reason.
+#
+# `Execution` was absent for that same reason until the Inquiry arrived,
+# and it is here now because that slice does write the type down.
+# `MakeInquiryContext` declares a field of it, because the decision counts
+# the steps the execution was dispatched with rather than testing it for
+# None. That is the sizing rule doing its job in the widening direction:
+# the door grew by exactly the one name a consumer started naming.
 [[interfaces]]
 from = ["keeper.execution.aggregates"]
 expose = [
@@ -292,6 +307,7 @@ expose = [
     "plan.Plan",
     "plan.PlanNotFoundError",
     "execution.load_execution",
+    "execution.Execution",
     "execution.ExecutionNotFoundError",
     "execution.ExecutionStepNotFoundError",
     "procedure.load_procedure",
