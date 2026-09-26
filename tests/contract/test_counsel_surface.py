@@ -270,3 +270,333 @@ def test_replaying_an_idempotency_key_returns_the_first_proposal(client: TestCli
         second = client.post("/proposals", json={"plan_id": plan_id}, headers=headers)
 
     assert first.json()["proposal_id"] == second.json()["proposal_id"]
+
+
+def _an_inquiry(client: TestClient, execution_id: str, objective: str = "find the edge") -> str:
+    response = client.post(
+        "/inquiries", json={"execution_id": execution_id, "objective": objective}
+    )
+    assert response.status_code == 201, response.text
+    inquiry_id: str = response.json()["inquiry_id"]
+    return inquiry_id
+
+
+def test_posting_an_inquiry_returns_its_id(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        assert _an_inquiry(client, execution_id)
+
+
+def test_an_unanswered_inquiry_reads_back_open_with_no_conclusion(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        read = client.get(f"/inquiries/{inquiry_id}")
+
+    assert read.status_code == 200, read.text
+    body = read.json()
+    assert body["status"] == "Open"
+    assert body["conclusion"] is None
+    assert body["observed_step_count"] is None
+    assert body["execution_ended"] is None
+
+
+def test_an_inquiry_reads_back_with_the_step_count_of_its_execution(client: TestClient) -> None:
+    """Nothing in the request carries it, so a handler that stopped reading
+    the execution is visible only here and on a read."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        read = client.get(f"/inquiries/{inquiry_id}")
+
+    assert read.json()["execution_step_count"] == 2
+
+
+def test_an_inquiry_reads_back_with_an_asker_nobody_sent(client: TestClient) -> None:
+    """The asker is not a request field, so no test of the route model
+    would catch it being dropped."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        read = client.get(f"/inquiries/{inquiry_id}")
+
+    assert read.json()["actor_id"]
+
+
+def test_claiming_an_inquiry_puts_it_in_the_middle_state(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        claimed = client.post(f"/inquiries/{inquiry_id}/claim")
+        read = client.get(f"/inquiries/{inquiry_id}")
+
+    assert claimed.status_code == 204, claimed.text
+    assert read.json()["status"] == "Claimed"
+
+
+def test_claiming_one_twice_is_409(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+        assert client.post(f"/inquiries/{inquiry_id}/claim").status_code == 204
+
+        again = client.post(f"/inquiries/{inquiry_id}/claim")
+
+    assert again.status_code == 409, again.text
+
+
+def test_answering_puts_the_conclusion_and_the_boundary_on_the_read(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        answered = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Stop", "observed_step_count": 1, "execution_ended": False},
+        )
+        read = client.get(f"/inquiries/{inquiry_id}")
+
+    assert answered.status_code == 204, answered.text
+    body = read.json()
+    assert (body["status"], body["conclusion"]) == ("Answered", "Stop")
+    assert (body["observed_step_count"], body["execution_ended"]) == (1, False)
+
+
+def test_answering_without_claiming_first_is_accepted(client: TestClient) -> None:
+    """Claiming is optional, and the route pair has to agree with the
+    decider about that or a thinker handed its question cannot report."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        answered = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Abstain", "observed_step_count": 0, "execution_ended": False},
+        )
+
+    assert answered.status_code == 204, answered.text
+
+
+def test_answering_one_twice_is_409(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+        first = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Stop", "observed_step_count": 2, "execution_ended": True},
+        )
+        assert first.status_code == 204, first.text
+
+        again = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Refer", "observed_step_count": 2, "execution_ended": True},
+        )
+
+    assert again.status_code == 409, again.text
+
+
+def test_a_propose_answer_carries_the_proposal_onto_the_read(client: TestClient) -> None:
+    with client:
+        plan_id = _a_plan(client)
+        execution_id, _step_id = _an_acquisition_of(client, plan_id)
+        inquiry_id = _an_inquiry(client, execution_id)
+        proposal_id = _a_proposal(client, plan_id)
+
+        answered = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={
+                "conclusion": "Propose",
+                "observed_step_count": 2,
+                "execution_ended": True,
+                "proposal_id": proposal_id,
+            },
+        )
+        read = client.get(f"/inquiries/{inquiry_id}")
+
+    assert answered.status_code == 204, answered.text
+    assert read.json()["proposal_id"] == proposal_id
+
+
+def test_a_propose_answer_naming_no_proposal_is_400(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        refused = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Propose", "observed_step_count": 2, "execution_ended": True},
+        )
+
+    assert refused.status_code == 400, refused.text
+
+
+def test_a_stop_answer_naming_a_proposal_is_400(client: TestClient) -> None:
+    with client:
+        plan_id = _a_plan(client)
+        execution_id, _step_id = _an_acquisition_of(client, plan_id)
+        inquiry_id = _an_inquiry(client, execution_id)
+        proposal_id = _a_proposal(client, plan_id)
+
+        refused = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={
+                "conclusion": "Stop",
+                "observed_step_count": 2,
+                "execution_ended": True,
+                "proposal_id": proposal_id,
+            },
+        )
+
+    assert refused.status_code == 400, refused.text
+
+
+def test_a_propose_answer_naming_a_proposal_nobody_made_is_404(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        refused = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={
+                "conclusion": "Propose",
+                "observed_step_count": 2,
+                "execution_ended": True,
+                "proposal_id": str(uuid4()),
+            },
+        )
+
+    assert refused.status_code == 404, refused.text
+
+
+def test_seeing_more_steps_than_the_execution_has_is_400(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        refused = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Stop", "observed_step_count": 99, "execution_ended": True},
+        )
+
+    assert refused.status_code == 400, refused.text
+
+
+def test_a_fifth_conclusion_is_refused_at_the_wire(client: TestClient) -> None:
+    """The closed type on the request model, which is what keeps a word
+    this system has no meaning for from reaching a decider at all."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        refused = client.post(
+            f"/inquiries/{inquiry_id}/answer",
+            json={"conclusion": "Maybe", "observed_step_count": 1, "execution_ended": True},
+        )
+
+    assert refused.status_code == 422, refused.text
+
+
+def test_an_empty_objective_is_refused_at_the_wire(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+
+        refused = client.post("/inquiries", json={"execution_id": execution_id, "objective": ""})
+
+    assert refused.status_code == 422, refused.text
+
+
+def test_an_inquiry_about_an_execution_that_does_not_exist_is_404(client: TestClient) -> None:
+    """Execution's error class reaching a Counsel route, which is the
+    reliance no source file on either side can state."""
+    with client:
+        refused = client.post(
+            "/inquiries", json={"execution_id": str(uuid4()), "objective": "find the edge"}
+        )
+
+    assert refused.status_code == 404, refused.text
+
+
+def test_reading_an_inquiry_that_was_never_made_is_404(client: TestClient) -> None:
+    with client:
+        read = client.get(f"/inquiries/{uuid4()}")
+
+    assert read.status_code == 404, read.text
+
+
+def test_a_naive_reported_time_on_a_claim_is_400(client: TestClient) -> None:
+    """The shared timestamp helper's error, mapped by Execution and relied
+    on here."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        inquiry_id = _an_inquiry(client, execution_id)
+
+        refused = client.post(
+            f"/inquiries/{inquiry_id}/claim",
+            json={"occurred_at": "2026-09-19T09:00:00"},
+        )
+
+    assert refused.status_code == 400, refused.text
+
+
+def test_replaying_an_idempotency_key_returns_the_first_inquiry(client: TestClient) -> None:
+    """The genesis mints an id, so a retry without a key would leave two
+    records of one asking."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        body = {"execution_id": execution_id, "objective": "find the edge"}
+        headers = {"Idempotency-Key": "one-question-asked-twice"}
+
+        first = client.post("/inquiries", json=body, headers=headers)
+        second = client.post("/inquiries", json=body, headers=headers)
+
+    assert first.status_code == 201, first.text
+    assert second.json()["inquiry_id"] == first.json()["inquiry_id"]
+
+
+def test_finding_inquiries_narrows_to_the_claimed_ones(client: TestClient) -> None:
+    """The staleness question, and the reason the filter is a status
+    rather than a flag for answered."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        waiting = _an_inquiry(client, execution_id, objective="one")
+        claimed = _an_inquiry(client, execution_id, objective="two")
+        assert client.post(f"/inquiries/{claimed}/claim").status_code == 204
+
+        page = client.get("/inquiries", params={"status": "Claimed"})
+
+    assert page.status_code == 200, page.text
+    found = [item["inquiry_id"] for item in page.json()["items"]]
+    assert found == [claimed]
+    assert waiting not in found
+
+
+def test_finding_inquiries_with_no_filter_returns_every_state(client: TestClient) -> None:
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        waiting = _an_inquiry(client, execution_id, objective="one")
+        answered = _an_inquiry(client, execution_id, objective="two")
+        client.post(
+            f"/inquiries/{answered}/answer",
+            json={"conclusion": "Stop", "observed_step_count": 2, "execution_ended": True},
+        )
+
+        page = client.get("/inquiries")
+
+    assert {item["inquiry_id"] for item in page.json()["items"]} == {waiting, answered}
+
+
+def test_a_listed_inquiry_carries_the_question_itself(client: TestClient) -> None:
+    """The objective rides on the row where a proposal's parameters do
+    not, because a list of questions with the questions taken out is a
+    list of identifiers."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _a_plan(client))
+        _an_inquiry(client, execution_id, objective="is one scan enough")
+
+        page = client.get("/inquiries")
+
+    assert page.json()["items"][0]["objective"] == "is one scan enough"

@@ -1,12 +1,17 @@
-"""The three Counsel handlers, against in-process stores.
+"""The Counsel handlers, against in-process stores.
 
-One file for three handlers, because what is worth testing about them is
+One file for both aggregates, because what is worth testing about them is
 shared: each reads across into Execution, and the cases that matter are
-the ones about that read and about who the record says proposed.
+the ones about that read and about who the record says asked or advised.
 
-The split between this file and the two decider files is the usual one.
-A decider is handed its inputs; a handler is what fetches them, refuses
-a sibling that is not there, and picks which moment to stamp.
+The inquiry handlers add one read that goes sideways rather than across.
+Answering with a Propose conclusion loads the proposal it names, which is
+this context reaching for its own neighbour, and it is the only citation
+here that costs a load and no cross-context door.
+
+The split between this file and the decider files is the usual one. A
+decider is handed its inputs; a handler is what fetches them, refuses a
+sibling that is not there, and picks which moment to stamp.
 """
 
 from datetime import UTC, datetime
@@ -15,6 +20,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from keeper.counsel.aggregates.inquiry import (
+    INQUIRY_STREAM_TYPE,
+    InquiryConclusion,
+    InquiryNotFoundError,
+    load_inquiry,
+)
 from keeper.counsel.aggregates.proposal import (
     PROPOSAL_STREAM_TYPE,
     ProposalCannotBeTakenError,
@@ -22,8 +33,16 @@ from keeper.counsel.aggregates.proposal import (
     load_proposal,
 )
 from keeper.counsel.errors import UnauthorizedError
+from keeper.counsel.features.answer_inquiry import AnswerInquiry
+from keeper.counsel.features.answer_inquiry import bind as bind_answer_inquiry
+from keeper.counsel.features.claim_inquiry import ClaimInquiry
+from keeper.counsel.features.claim_inquiry import bind as bind_claim_inquiry
+from keeper.counsel.features.get_inquiry import GetInquiry
+from keeper.counsel.features.get_inquiry import bind as bind_get_inquiry
 from keeper.counsel.features.get_proposal import GetProposal
 from keeper.counsel.features.get_proposal import bind as bind_get
+from keeper.counsel.features.make_inquiry import MakeInquiry
+from keeper.counsel.features.make_inquiry import bind as bind_make_inquiry
 from keeper.counsel.features.make_proposal import MakeProposal
 from keeper.counsel.features.make_proposal import bind as bind_make
 from keeper.counsel.features.take_proposal import TakeProposal
@@ -146,6 +165,22 @@ async def _a_move_in(deps: Kernel) -> tuple[UUID, UUID]:
     execution = await load_execution(deps.event_store, execution_id)
     assert execution is not None
     return execution_id, execution.steps[0].id
+
+
+async def _an_inquiry(deps: Kernel) -> UUID:
+    """A question about a real two-step execution, ready to be answered.
+
+    The execution has to be real for the same reason the acquisition above
+    does: the handler reads the step count off it, so there is nothing to
+    fake short of dispatching something.
+    """
+    plan_id = await _a_plan(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    return await bind_make_inquiry(deps)(
+        MakeInquiry(execution_id=execution_id, objective="find the edge"),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
 
 
 async def test_making_a_proposal_writes_one_event_and_returns_its_id() -> None:
@@ -421,6 +456,247 @@ async def test_a_denied_caller_cannot_read_a_proposal() -> None:
     with pytest.raises(UnauthorizedError):
         await bind_get(deps)(
             GetProposal(proposal_id=uuid4()),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def test_making_an_inquiry_writes_one_event_and_returns_its_id() -> None:
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+
+    inquiry_id = await bind_make_inquiry(deps)(
+        MakeInquiry(execution_id=execution_id, objective="find the edge"),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    stored, _version = await deps.event_store.load(INQUIRY_STREAM_TYPE, inquiry_id)
+    assert [row.event_type for row in stored] == ["InquiryMade"]
+
+
+async def test_the_principal_becomes_the_asker_on_the_record() -> None:
+    """The one place this handler does more than plumb, and the same place
+    its sibling above does: nothing in the request names who asked."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    principal_id = uuid4()
+
+    inquiry_id = await bind_make_inquiry(deps)(
+        MakeInquiry(execution_id=execution_id, objective="find the edge"),
+        principal_id=principal_id,
+        correlation_id=uuid4(),
+    )
+
+    inquiry = await load_inquiry(deps.event_store, inquiry_id)
+    assert inquiry is not None
+    assert inquiry.actor_id == principal_id
+
+
+async def test_the_handler_reads_the_step_count_off_the_execution() -> None:
+    """The denominator is established here rather than believed from the
+    caller, which is why the handler loads an aggregate it otherwise only
+    needs for its existence."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+
+    inquiry_id = await bind_make_inquiry(deps)(
+        MakeInquiry(execution_id=execution_id, objective="find the edge"),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    inquiry = await load_inquiry(deps.event_store, inquiry_id)
+    assert inquiry is not None
+    assert inquiry.execution_step_count == 2
+
+
+async def test_an_inquiry_about_an_execution_that_does_not_exist_is_refused() -> None:
+    deps = _kernel()
+
+    with pytest.raises(ExecutionNotFoundError):
+        await bind_make_inquiry(deps)(
+            MakeInquiry(execution_id=uuid4(), objective="find the edge"),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def test_a_denied_caller_cannot_make_an_inquiry() -> None:
+    deps = _kernel(authz=_DenyAllAuthorize())
+
+    with pytest.raises(UnauthorizedError):
+        await bind_make_inquiry(deps)(
+            MakeInquiry(execution_id=uuid4(), objective="find the edge"),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def test_claiming_an_inquiry_stamps_the_moment_the_caller_reported() -> None:
+    """A thinker picks work up on its own clock, so the reported instant
+    wins over the clock's reading."""
+    deps = _kernel()
+    inquiry_id = await _an_inquiry(deps)
+
+    await bind_claim_inquiry(deps)(
+        ClaimInquiry(inquiry_id=inquiry_id, occurred_at=_REPORTED),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    stored, _version = await deps.event_store.load(INQUIRY_STREAM_TYPE, inquiry_id)
+    assert stored[1].occurred_at == _REPORTED
+
+
+async def test_claiming_an_inquiry_without_a_time_stamps_the_clock() -> None:
+    deps = _kernel()
+    inquiry_id = await _an_inquiry(deps)
+
+    await bind_claim_inquiry(deps)(
+        ClaimInquiry(inquiry_id=inquiry_id),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    stored, _version = await deps.event_store.load(INQUIRY_STREAM_TYPE, inquiry_id)
+    assert stored[1].occurred_at == _CLOCK_NOW
+
+
+async def test_claiming_an_inquiry_that_does_not_exist_is_refused() -> None:
+    deps = _kernel()
+
+    with pytest.raises(InquiryNotFoundError):
+        await bind_claim_inquiry(deps)(
+            ClaimInquiry(inquiry_id=uuid4()),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def test_answering_an_inquiry_appends_after_the_genesis() -> None:
+    deps = _kernel()
+    inquiry_id = await _an_inquiry(deps)
+
+    await bind_answer_inquiry(deps)(
+        AnswerInquiry(
+            inquiry_id=inquiry_id,
+            conclusion=InquiryConclusion.ABSTAIN,
+            observed_step_count=1,
+            execution_ended=False,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    stored, _version = await deps.event_store.load(INQUIRY_STREAM_TYPE, inquiry_id)
+    assert [row.event_type for row in stored] == ["InquiryMade", "InquiryAnswered"]
+
+
+async def test_a_propose_answer_naming_a_proposal_that_exists_is_recorded() -> None:
+    """The join this aggregate adds, and the handler's one sideways read."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    inquiry_id = await _an_inquiry(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    await bind_answer_inquiry(deps)(
+        AnswerInquiry(
+            inquiry_id=inquiry_id,
+            conclusion=InquiryConclusion.PROPOSE,
+            observed_step_count=2,
+            execution_ended=True,
+            proposal_id=proposal_id,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    inquiry = await load_inquiry(deps.event_store, inquiry_id)
+    assert inquiry is not None
+    assert inquiry.proposal_id == proposal_id
+
+
+async def test_a_propose_answer_naming_a_proposal_nobody_made_is_refused() -> None:
+    """Without this the join points at nothing, and the record claims an
+    arm it cannot show."""
+    deps = _kernel()
+    inquiry_id = await _an_inquiry(deps)
+
+    with pytest.raises(ProposalNotFoundError):
+        await bind_answer_inquiry(deps)(
+            AnswerInquiry(
+                inquiry_id=inquiry_id,
+                conclusion=InquiryConclusion.PROPOSE,
+                observed_step_count=2,
+                execution_ended=True,
+                proposal_id=uuid4(),
+            ),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def test_an_answer_that_names_no_proposal_reads_no_proposal_stream() -> None:
+    """The load is skipped rather than made against None, which is what
+    keeps three of the four conclusions free of a cross-aggregate read."""
+    deps = _kernel()
+    inquiry_id = await _an_inquiry(deps)
+
+    await bind_answer_inquiry(deps)(
+        AnswerInquiry(
+            inquiry_id=inquiry_id,
+            conclusion=InquiryConclusion.STOP,
+            observed_step_count=2,
+            execution_ended=True,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    inquiry = await load_inquiry(deps.event_store, inquiry_id)
+    assert inquiry is not None
+    assert inquiry.conclusion is InquiryConclusion.STOP
+
+
+async def test_reading_an_inquiry_back_gives_the_question_and_the_answer() -> None:
+    deps = _kernel()
+    inquiry_id = await _an_inquiry(deps)
+    await bind_answer_inquiry(deps)(
+        AnswerInquiry(
+            inquiry_id=inquiry_id,
+            conclusion=InquiryConclusion.REFER,
+            observed_step_count=1,
+            execution_ended=False,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    inquiry = await bind_get_inquiry(deps)(
+        GetInquiry(inquiry_id=inquiry_id),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    assert inquiry.objective.value == "find the edge"
+    assert inquiry.conclusion is InquiryConclusion.REFER
+    assert (inquiry.observed_step_count, inquiry.execution_step_count) == (1, 2)
+
+
+async def test_reading_an_inquiry_that_does_not_exist_is_refused() -> None:
+    deps = _kernel()
+
+    with pytest.raises(InquiryNotFoundError):
+        await bind_get_inquiry(deps)(
+            GetInquiry(inquiry_id=uuid4()),
             principal_id=uuid4(),
             correlation_id=uuid4(),
         )

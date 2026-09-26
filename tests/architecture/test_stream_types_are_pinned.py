@@ -53,6 +53,7 @@ PINNED_STREAM_TYPES: dict[str, str] = {
     "access/actor": "Actor",
     "authority/policy": "Policy",
     "execution/plan": "Plan",
+    "counsel/inquiry": "Inquiry",
     "counsel/proposal": "Proposal",
     "custody/dataset": "Dataset",
     "equipment/device": "Device",

@@ -88,6 +88,11 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "get_proposal",
         "take_proposal",
         "list_proposals",
+        "make_inquiry",
+        "claim_inquiry",
+        "answer_inquiry",
+        "get_inquiry",
+        "list_inquiries",
         "register_device",
         "fault_device",
         "recover_device",
@@ -487,6 +492,59 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         still_open = _call(client, live, "list_proposals", is_open=True)
         acted_on = _call(client, live, "list_proposals", is_open=False)
 
+        # The inquiry leg closes the loop the other way round. Counsel's
+        # other aggregate records somebody asking a thinker about an
+        # execution, and the Propose arm of the answer names the proposal
+        # that came out of it, so this leg reuses the execution the
+        # Custody leg dispatched and the proposal the leg above made.
+        #
+        # Two inquiries, because one cannot show the filter moving. The
+        # first walks the whole lifecycle; the second is answered without
+        # ever being claimed, which is the state the read side derives
+        # differently from the write side and the one a single walk would
+        # miss.
+        asked = _call(
+            client,
+            live,
+            "make_inquiry",
+            execution_id=held_execution,
+            objective="is one scan enough to see the edge",
+        )
+        inquiry_id = asked["inquiry_id"]
+        while_unanswered = _call(client, live, "get_inquiry", inquiry_id=inquiry_id)
+        waiting = _call(client, live, "list_inquiries", status="Open")
+        _call(client, live, "claim_inquiry", inquiry_id=inquiry_id)
+        being_thought_about = _call(client, live, "list_inquiries", status="Claimed")
+        _call(
+            client,
+            live,
+            "answer_inquiry",
+            inquiry_id=inquiry_id,
+            conclusion="Propose",
+            observed_step_count=1,
+            execution_ended=False,
+            proposal_id=proposal_id,
+        )
+        concluded = _call(client, live, "get_inquiry", inquiry_id=inquiry_id)
+
+        straight_to_an_answer = _call(
+            client,
+            live,
+            "make_inquiry",
+            execution_id=held_execution,
+            objective="should anything run at all",
+        )["inquiry_id"]
+        _call(
+            client,
+            live,
+            "answer_inquiry",
+            inquiry_id=straight_to_an_answer,
+            conclusion="Abstain",
+            observed_step_count=0,
+            execution_ended=False,
+        )
+        unclaimed_answer = _call(client, live, "get_inquiry", inquiry_id=straight_to_an_answer)
+
         # Equipment rides along too, and unlike the three legs above it
         # borrows nothing from them: a device is not tied to a run, so
         # this is the one context here whose execution could stand alone. It
@@ -646,6 +704,47 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
     assert (advised["execution_id"], advised["step_id"]) == (held_execution, produced_by), (
         "taking a proposal is the join this context exists for, and the read "
         "is where a caller sees that anything came of its advice"
+    )
+    assert (
+        while_unanswered["status"],
+        while_unanswered["conclusion"],
+        while_unanswered["observed_step_count"],
+    ) == ("Open", None, None), (
+        "a question nothing has answered carries no conclusion and no observation "
+        "boundary, and the three nulls are what say so"
+    )
+    assert while_unanswered["execution_step_count"] == 1, (
+        "how much there was to see is known when the question is put, because the "
+        "handler reads it off the execution rather than believing the caller"
+    )
+    assert while_unanswered["actor_id"], (
+        "an inquiry records who asked, and nothing in the request says who "
+        "that is, so a dropped principal is only visible on a read"
+    )
+    assert inquiry_id in {item["inquiry_id"] for item in waiting["items"]}
+    assert [item["inquiry_id"] for item in being_thought_about["items"]] == [inquiry_id], (
+        "a claimed inquiry has to leave the open side and appear on the middle one, "
+        "which is the state a two-valued filter could not show at all"
+    )
+    assert (
+        concluded["status"],
+        concluded["conclusion"],
+        concluded["proposal_id"],
+    ) == ("Answered", "Propose", proposal_id), (
+        "the Propose arm is the one that names a proposal, and the join from a "
+        "question to the advice it produced is what this aggregate adds"
+    )
+    assert (concluded["observed_step_count"], concluded["execution_ended"]) == (1, False), (
+        "the observation boundary survives the round trip, because a conclusion "
+        "nobody can weigh is the thing recording it was meant to prevent"
+    )
+    assert unclaimed_answer["status"] == "Answered", (
+        "claiming is not a gate on answering, so an inquiry answered straight from "
+        "open is answered rather than stuck"
+    )
+    assert unclaimed_answer["proposal_id"] is None, (
+        "only Propose names a proposal, and the other three arms have to come back "
+        "with the field empty rather than with somebody else's"
     )
     assert [item["device_id"] for item in resolved["items"]] == [device_id], (
         "resolving an address to an id is the first call any adapter makes, "

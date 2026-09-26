@@ -14,6 +14,13 @@ from datetime import datetime
 from typing import Any, Final
 from uuid import UUID, uuid4
 
+from keeper.counsel.aggregates.inquiry import (
+    INQUIRY_STREAM_TYPE,
+    InquiryAnswered,
+    InquiryClaimed,
+    InquiryMade,
+)
+from keeper.counsel.aggregates.inquiry import to_payload as inquiry_payload
 from keeper.counsel.aggregates.proposal import (
     PROPOSAL_STREAM_TYPE,
     ProposalMade,
@@ -230,6 +237,97 @@ class EventStoreProposalWriter:
         )
 
 
+class EventStoreInquiryWriter:
+    """Writes real inquiry events, the way the three handlers do.
+
+    Three verbs, and the versions they append at are the point. `claim`
+    goes at 1 and `answer` at 1 or 2, because an inquiry may be answered
+    without ever being claimed, so the writer counts what it has written
+    rather than assuming a shape. A contract that could only build claimed
+    inquiries would never exercise the state the read side most easily gets
+    wrong.
+
+    `make` takes the asker and the execution rather than minting them, for
+    the reason the proposal writer gives: a writer that chose them would
+    leave a later check unable to say which inquiries it expected back.
+    """
+
+    def __init__(self, event_store: EventStore) -> None:
+        self._event_store = event_store
+        self._principal_id = uuid4()
+        self._versions: dict[UUID, int] = {}
+
+    async def make(
+        self,
+        *,
+        inquiry_id: UUID,
+        actor_id: UUID,
+        execution_id: UUID,
+        objective: str,
+        execution_step_count: int,
+        at: datetime,
+    ) -> None:
+        event = InquiryMade(
+            inquiry_id=inquiry_id,
+            actor_id=actor_id,
+            execution_id=execution_id,
+            objective=objective,
+            execution_step_count=execution_step_count,
+            occurred_at=at,
+        )
+        await self._append(inquiry_id, event, "MakeInquiry", at)
+
+    async def claim(self, *, inquiry_id: UUID, at: datetime) -> None:
+        event = InquiryClaimed(inquiry_id=inquiry_id, occurred_at=at)
+        await self._append(inquiry_id, event, "ClaimInquiry", at)
+
+    async def answer(
+        self,
+        *,
+        inquiry_id: UUID,
+        conclusion: str,
+        observed_step_count: int,
+        execution_ended: bool,
+        proposal_id: UUID | None,
+        at: datetime,
+    ) -> None:
+        event = InquiryAnswered(
+            inquiry_id=inquiry_id,
+            conclusion=conclusion,
+            observed_step_count=observed_step_count,
+            execution_ended=execution_ended,
+            proposal_id=proposal_id,
+            occurred_at=at,
+        )
+        await self._append(inquiry_id, event, "AnswerInquiry", at)
+
+    async def _append(
+        self,
+        inquiry_id: UUID,
+        event: InquiryMade | InquiryClaimed | InquiryAnswered,
+        command_name: str,
+        at: datetime,
+    ) -> None:
+        expected_version = self._versions.get(inquiry_id, 0)
+        await self._event_store.append(
+            INQUIRY_STREAM_TYPE,
+            inquiry_id,
+            expected_version,
+            [
+                to_new_event(
+                    event_type=type(event).__name__,
+                    payload=inquiry_payload(event),
+                    occurred_at=at,
+                    event_id=uuid4(),
+                    command_name=command_name,
+                    correlation_id=uuid4(),
+                    principal_id=self._principal_id,
+                )
+            ],
+        )
+        self._versions[inquiry_id] = expected_version + 1
+
+
 class EventStoreDeviceWriter:
     """Writes real device events, the way the four handlers do.
 
@@ -368,6 +466,7 @@ class EventStoreProcedureWriter:
 __all__ = [
     "EventStoreDatasetWriter",
     "EventStoreDeviceWriter",
+    "EventStoreInquiryWriter",
     "EventStorePlanWriter",
     "EventStoreProcedureWriter",
     "EventStoreProposalWriter",

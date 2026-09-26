@@ -1,12 +1,14 @@
 # Counsel
 
-Counsel is the bounded context that answers one question: what was put forward to run next, and was it taken?
+Counsel is the bounded context of advice: what was put forward to run next and was it taken, and what somebody asked a thinker about one execution and what came back.
 
-It holds one aggregate, the Proposal, and four operations on it. Most of the argument below is about which of two neighbouring contexts each piece does NOT belong in.
+It holds two aggregates. The Proposal came first and has four operations on it; most of the argument about it is which of two neighbouring contexts each piece does NOT belong in. The Inquiry came second and has five, and the argument about it is mostly about where it stops: it records the asking and the answer, and nothing about the thinking.
 
 **This page was written before the code and then corrected against it.** That is the reverse of every other page under this heading, and two things it claimed turned out to be wrong when the code was written: the cross-context door is seven names wide rather than two, and the refusals on a take needed a discriminator the design had not named. Both are fixed below. Where a sentence is still about something unbuilt, it says so.
 
-**It was then corrected a second time, when the shape of Execution changed.** A proposal used to cite the run that took it. Work is now composed in [Execution](execution.md) as a Procedure, dispatched whole, and driven step by step, so what takes a proposal is one acquisition step of one execution. The Run aggregate has since been retired outright. The sections below say the new shape and keep the arguments that survived it, which is most of them.
+**It was then corrected a third time, when the Inquiry landed.** That aggregate was designed in conversation and written against the design rather than the other way round, which is this page's habit; what the code found is noted in its sections below. The Proposal sections are unchanged by it.
+
+**It was corrected a second time, when the shape of Execution changed.** A proposal used to cite the run that took it. Work is now composed in [Execution](execution.md) as a Procedure, dispatched whole, and driven step by step, so what takes a proposal is one acquisition step of one execution. The Run aggregate has since been retired outright. The sections below say the new shape and keep the arguments that survived it, which is most of them.
 
 ## What a Proposal is
 
@@ -225,6 +227,114 @@ Its three causes share a class and a status because the caller's next move is th
 
 **The third cause arrived with the step reference.** A run was always a run, so there were two ways to be refused. A step is a move or an acquisition, so a caller can now name something real that could never take a proposal, and that is worth a message of its own: told only that the plan did not match, a caller goes looking for a closer acquisition when what it needs is to stop looking.
 
+## What an Inquiry is
+
+An inquiry is a question put to a thinker about one execution, and what came back.
+
+```
+   Inquiry
+     id                    a UUID minted when the question is written
+     actor_id              the actor that asked
+     execution_id          the execution the question is about
+     objective             what the asker wanted to know
+     execution_step_count  how many steps that execution had when they asked
+     status                Open, Claimed or Answered, derived in the fold
+     conclusion            one of four words, once something answers
+     observed_step_count   how many steps the thinker had an outcome for
+     execution_ended       whether the record was closed when it read
+     proposal_id           the proposal the Propose arm wrote, and no other
+```
+
+A thinker reads an execution back, pairs what the procedure asked for with what became of it, and concludes one of four things: propose a run, stop, abstain, or refer it to a person. Only the first of those writes anything anywhere else. Before this aggregate existed the other three reached nothing at all, so the only thinking this system could see was the arm that happened to produce advice, and a thinker that looked carefully and concluded "nothing further is worth running" was indistinguishable from one that never ran.
+
+## Why the Inquiry is here and not in Execution
+
+An execution is one traversal of a procedure, and its stream is what became of that traversal. A question somebody asked about it afterwards is not something that became of it.
+
+The [output-of-record test](../reference/modeling.md#choosing-where-an-act-is-recorded) settles it the same way it settles the Proposal. An inquiry's output of record is a conclusion, which no step produced and no engine reported. And an inquiry that concluded nothing worth running would sit in every count of how far its execution got, which is the failure that test exists to prevent.
+
+It sits beside the Proposal rather than in a context of its own because the two share a language and one door. Both are advice, one put forward and one asked for; the Propose arm of an answer writes a proposal and names it, so a separate context would have opened a second cross-context door to reach its own neighbour, and this tree has already measured what those cost.
+
+## The observation boundary
+
+An inquiry may name an execution that is still walking. That is deliberate, and it is the case the aggregate is most useful for: somebody part way through a long procedure asking whether it is worth finishing.
+
+It has a cost, and the record pays it rather than hiding it. A conclusion drawn from two reported steps of six is a weaker claim than the same conclusion drawn from six of six, and nothing downstream can tell them apart after the fact, because by the time anybody reads the inquiry the execution has moved on. So what the thinker could see is written down beside what it concluded.
+
+```
+   execution_step_count   captured when the question is put, from the execution
+   observed_step_count    reported with the answer, by whatever read it
+   execution_ended        reported with the answer, by whatever read it
+```
+
+**The denominator is captured and the numerator is reported, and the split is not arbitrary.** How many steps an execution has is fixed at its genesis and can never drift, so this system reads it off the execution itself rather than believing a caller who could make a partial reading look complete. How much of it a thinker actually saw is a fact about a reading that is over, and nothing here can check it. What the decider can check is that it is not impossible, and it does: seeing more steps than the execution has is refused.
+
+**Two facts rather than one, because they answer two questions.** An execution can be closed with steps nobody reported on, and one with an outcome against every step has not necessarily been closed. A single number would collapse them, and both are ordinary.
+
+None of the three is a quality score. They say how much was visible, never whether the conclusion was good. That is the same refusal that keeps a confidence off this record: a number a thinker assigns its own answer reads as measurement and is assertion.
+
+## Three states, and why this one has a status
+
+The Proposal derives its two states from a nullable reference and has no status field, because a two-valued enum beside a nullable field would be one fact written twice. The Inquiry has three, and no single field carries them.
+
+```
+   Open       the question exists and nothing is thinking about it
+   Claimed    a thinker said it has this one
+   Answered   a conclusion is on the record, and nothing further can land
+```
+
+Derived in the fold from which events the stream carries, never stored on a payload, for the reason an execution's status is: a status written onto an event could contradict the event it rode in on.
+
+There is no running state between claimed and answered. An execution reaches one when a step is reported, and a thinking has no steps to report: it reads, concludes, and the record hears about it once.
+
+The read model spells the same three states differently, out of two nullable timestamps and no status column, because there a column would be the second spelling this context refuses. That the two derivations agree is not visible in either one, so the port contract suite carries the case that separates them: an inquiry answered without ever being claimed.
+
+## Where the claim sits, and what it is worth
+
+Between the asking and the answer, refused from anything but open, and not a gate on answering.
+
+A thinker handed its question never claims one, and answering from open moves the inquiry straight to answered. That is `claim_execution`'s posture and it is held for the same reason: a claim says who has the work, and refusing the answer would lose a conclusion this system was told in order to enforce an ordering the log does not have.
+
+The claim is worth less here than it is on an execution, and the difference is worth stating. There, two drivers each believing they own one traversal both move a motor. Here, two thinkers reading one execution cost two inference calls and possibly two proposals for one question. Real, but not dangerous. So the claim exists for the case where something goes looking for work it was not handed, and `list_inquiries` with the status set to Open is what that something reads.
+
+**Nothing expires a claim.** A thinker that dies holding one leaves a row that stays Claimed, and the listing narrowed to that status, with the time it was claimed on every row, is how an operator sees it. That is deliberately a view rather than a rule: a claim that timed itself out would release work this system cannot prove was abandoned. It is the same answer an orphaned execution gets, and for the same reason.
+
+## Answered, and why the four conclusions are one event
+
+An execution's four step outcomes are four event classes, because a field can be set wrong and a class cannot. The four conclusions are one event carrying a closed enum, and the divergence is deliberate.
+
+Those four arrive from different reporting paths and carry different fields, so four classes make four wrong states unrepresentable. These four arrive from one call and three of them carry nothing at all, so the difference between them is one bit, whether advice came out of it, rather than four shapes. Four classes would also force four commands, and `abstain_inquiry` is not English.
+
+What that trades away is a field that can be set wrong, and the decider is where it is caught: a Propose must name a proposal and the other three must not. The two refusals are opposite mistakes and share a class, so the class carries which one arrived, which is a lesson this context paid for once already.
+
+The four words are spelled the same on both sides of the wire, because they are the thinker's own. There is no shared package holding them, which is the same arrangement the conductor has with this system.
+
+## The five operations on an Inquiry
+
+| What it does | HTTP | MCP tool | On success |
+| --- | --- | --- | --- |
+| Put a question | `POST /inquiries` | `make_inquiry` | `201` with the new id |
+| Take one up | `POST /inquiries/{inquiry_id}/claim` | `claim_inquiry` | `204` |
+| Record what was concluded | `POST /inquiries/{inquiry_id}/answer` | `answer_inquiry` | `204` |
+| Read one back | `GET /inquiries/{inquiry_id}` | `get_inquiry` | `200` with the inquiry |
+| Find them | `GET /inquiries` | `list_inquiries` | `200` with a page |
+
+R8 runs between the first and the other two writes, the way it runs between this context's other pair. Asking is a speech act, so `make_inquiry` takes no `occurred_at` and this system is the authority for the moment. A thinker takes work up and concludes on its own clock somewhere else, so both of those accept one.
+
+## The one free text in this context
+
+A proposer's rationale was refused here: unbounded self-justification that will eventually quote a person, written into a table nobody can edit afterwards. An objective is allowed, and the distinction is which direction it points.
+
+A rationale is the record defending itself. An objective is the input the answer is relative to, and a conclusion recorded without the question it answers cannot be read at all, let alone checked. It is bounded and trimmed, so it cannot grow into the reasoning this context still declines to hold, and the bound is also what lets it ride on a summary row: a list of questions with the questions taken out is a list of identifiers.
+
+## What an Inquiry does not hold
+
+**The case.** The thinker pairs a procedure with a record and hands the whole pairing to whatever does the thinking. None of it is copied here. `execution_id` reaches all of it, which makes this the one record in the tree that can point at its own basis rather than restating it, and it is the nearest thing to the basis this context has otherwise deferred.
+
+**The reasoning, and any confidence.** What the thinker said, and how sure it was, are both assertions this system did not witness. Recording either would claim the cognition, which is the objection that kept the Proposal from being called a Decision.
+
+**Which model, or which thinker beyond the principal.** An actor is whoever authenticated, and Access holds no marker saying whether that was a person or a piece of software. A field here would be a copy of a fact another context does not have.
+
 ## What it reaches across for
 
 Execution, in one direction, for seven names. Nothing in Execution reaches back.
@@ -259,6 +369,8 @@ The step, and not the execution around it. The execution is what makes the step 
    apps/keeper/src/keeper/counsel/
      aggregates/proposal/       state, events, the fold, its two read paths, and
                                 the summary a list shows with the port over it
+     aggregates/inquiry/        the same five modules, for the question and
+                                the answer
      adapters/                  the two ways to read a summary: the projection
                                 table, or a fold when there is no database
      projections/               what keeps the table in step with the log,
@@ -269,6 +381,11 @@ The step, and not the execution around it. The execution is what makes the step 
        get_proposal/            a query slice, so no decider
        take_proposal/           and a context module, for the step it checks
        list_proposals/          the query a fold cannot serve
+       make_inquiry/            and a context module, for the execution it counts
+       claim_inquiry/           optional in the lifecycle, and refused from two states
+       answer_inquiry/          the conclusion and the observation boundary
+       get_inquiry/             a query slice, so no decider
+       list_inquiries/          the query a fold cannot serve, filtered by status
      routes.py                  HTTP mounting and the error-to-status mapping
      tools.py                   MCP tool registration
      wire.py                    which handler gets idempotency, which gets tracing
@@ -287,6 +404,8 @@ Two commits, and the split was where the database work starts. Both have landed.
 The first commit moved `EXPECTED_BC_COUNT` to 5, `EXPECTED_AGGREGATE_COUNT` to 6 and `EXPECTED_SLICE_COUNT` to 25 in `test_fitness_scope.py`, and the count block on the [documentation home page](../index.md) is compared against those integers by `test_docs_match_code_constants.py`, so the page and the pins move together or the suite says so. It also added one entry to each of three other pinned sets: the stream types, the published OpenAPI paths, and the MCP tools a client should see. The second moved the slice pin again, added the migration's timestamp to `EXPECTED_SCHEMA_VERSION`, and added the list tool to the MCP walk, which pins tools by calling them rather than by listing them.
 
 Two stemmers grew by one word between them, both in the test tier. `made` is the past participle of `make` and no suffix rule reaches it, so the command-to-event derivation and the event-name shape check each needed telling. Extending those maps is what their own docstrings ask for, and the alternative, loosening a suffix rule, is how a stemmer starts matching unrelated words.
+
+**The third** was the Inquiry: the aggregate, its five slices, a second projection with its own table and bookmark, and a second port contract suite. It moved `EXPECTED_AGGREGATE_COUNT` to 9 and `EXPECTED_SLICE_COUNT` to 39, added one stream type, four OpenAPI paths and five MCP tools to their pinned sets, and moved `EXPECTED_SCHEMA_VERSION` to its migration's timestamp. No stemmer grew: `made` was already there from the Proposal, and `claimed` and `answered` are regular.
 
 ## What is not here yet
 
