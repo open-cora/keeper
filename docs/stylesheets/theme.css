@@ -1,15 +1,21 @@
-/* Material palette for keeper, drawn from its own plate: the deep red of the table carpet.
+/* Material palette for keeper, drawn from its own plate: crimson, the red of the table carpet.
    Matte on purpose. The header should read as the same surface as the
-   painting below it, not as a band of product colour sitting on top. */
+   painting below it, not as a band of product colour sitting on top.
+
+   The four hues are pushed apart on purpose. Measured, three of the plates
+   sit inside one warm band from 7 to 52 degrees, because varnish does that
+   to an old painting, and the fourth has no chroma at all. Sampling alone
+   would have produced four browns, so each takes the note it genuinely owns
+   and the greyscale plate takes the cool gap. */
 :root > * {
-  --md-primary-fg-color:        #271816;
-  --md-primary-fg-color--light: #3f2927;
-  --md-primary-fg-color--dark:  #1b100e;
-  --md-accent-fg-color:         #ac736c;
-  --md-accent-fg-color--transparent: #ac736c1a;
+  --md-primary-fg-color:        #291614;
+  --md-primary-fg-color--light: #422624;
+  --md-primary-fg-color--dark:  #1c0e0d;
+  --md-accent-fg-color:         #b36a65;
+  --md-accent-fg-color--transparent: #b36a651a;
 }
 
 [data-md-color-scheme="slate"] {
-  --md-default-bg-color: #110e0d;
-  --md-typeset-a-color:  #ac736c;
+  --md-default-bg-color: #120d0c;
+  --md-typeset-a-color:  #b36a65;
 }
