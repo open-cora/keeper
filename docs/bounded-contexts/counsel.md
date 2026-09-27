@@ -492,6 +492,10 @@ Execution, in one direction, for seven names. Nothing in Execution reaches back.
 
 This is the third cross-context door in the tree, and the doors are declared in `apps/keeper/tach.toml`.
 
+**A second door, onto the feature layer.** Adopting a proposal is the one read here that writes, and it is the only place in the tree where a context reaches a sibling's slices rather than its aggregates. Six names: two commands, the two contexts they are decided against, and the two deciders. It calls the pure half of each slice and not its handler, because a handler appends on its own and three appends are not the single one that slice exists to make.
+
+That reach was ungated for as long as it existed. The module edge granted it and no interface sized it, so tach exposed the whole of `keeper.execution`, every slice beside those two included. The sizing rule this page states twice is only true where something counts the imports, and nothing was counting that half. It has a door of its own now. The six stay six rather than collapsing behind a helper in Execution, because there is one consumer and the rule of three in [Patterns](../reference/patterns.md) is what holds a shape where it is until a second one arrives.
+
 `make_proposal` needs a context module holding the loaded plan, exactly as `define_procedure` does, because the decision reads a schema that lives on another stream and a decision function never reads from a store.
 
 `load_execution` is doing more here than it does next door. In Custody the two checks establish that the step exists and the decision needs nothing from it, which is why that slice has no context module. Here the decision compares plan ids, so the step is state a decider reads and it travels across in a context module too. That is the same split [Patterns](../reference/patterns.md#cross-aggregate-validation) draws between a 404 and a refusal, landing on the other side of it than it did for a dataset.
@@ -546,7 +550,7 @@ Two stemmers grew by one word between them, both in the test tier. `made` is the
 
 **The third** was the Inquiry: the aggregate, its five slices, a second projection with its own table and bookmark, and a second port contract suite. It moved `EXPECTED_AGGREGATE_COUNT` to 9 and `EXPECTED_SLICE_COUNT` to 39, added one stream type, four OpenAPI paths and five MCP tools to their pinned sets, and moved `EXPECTED_SCHEMA_VERSION` to its migration's timestamp. No stemmer grew: `made` was already there from the Proposal, and `claimed` and `answered` are regular.
 
-**The fourth** was adoption: `ProposalAdopted`, a `ProposalStatus` derived in the fold, an `adopted_at` column added to the summary rather than the table being rebuilt, and the `adopt_proposal` slice. It moved `EXPECTED_SLICE_COUNT` to 40, added an OpenAPI path and an MCP tool, and widened this context's door onto Execution from twelve names to eighteen, six of them reaching its feature layer for the first time.
+**The fourth** was adoption: `ProposalAdopted`, a `ProposalStatus` derived in the fold, an `adopted_at` column added to the summary rather than the table being rebuilt, and the `adopt_proposal` slice. It moved `EXPECTED_SLICE_COUNT` to 40, added an OpenAPI path and an MCP tool, and widened this context's door onto Execution's aggregates from twelve names to eighteen. It also reached that context's feature layer for the first time, which is the second door described above.
 
 ## What is not here yet
 

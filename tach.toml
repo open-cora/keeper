@@ -350,3 +350,39 @@ expose = [
     "procedure.runs_plan",
 ]
 visibility = ["keeper.counsel"]
+
+# The same consumer, and the other half of the same edge. Counsel reaches
+# Execution's feature layer once, in the slice that adopts a proposal.
+#
+# Until this block, that reach was ungated. The module edge granted it and
+# no interface sized it, so tach exposed the whole package: every slice
+# under `features/`, and `routes`, `tools`, `wire`, the projections and the
+# adapters beside them. The comment above argues that the width next door
+# is honest because a door is sized by what the consumer imports, and that
+# argument was only ever true of the half of the edge something counted.
+#
+# Six names, and they are the composition. Two commands, the two contexts
+# they are decided against, and the two deciders. Adopting calls the pure
+# half of each slice rather than its handler, because a handler appends on
+# its own and three appends are not the single one that slice exists to
+# make.
+#
+# Six stays six rather than collapsing behind a helper in Execution,
+# because there is one consumer, and the rule of three in
+# docs/reference/patterns.md is what holds a shape where it is until a
+# second one arrives. What would move it is something else needing to
+# dispatch one run of one plan alongside a write of its own, and that
+# caller is the one that could say what the helper wants to look like.
+# Until then the reach is real, written down, and counted by
+# `test_tach_edges_are_used.py` like every other.
+[[interfaces]]
+from = ["keeper.execution"]
+expose = [
+    "features.define_procedure.DefineProcedure",
+    "features.define_procedure.DefineProcedureContext",
+    "features.define_procedure.decide",
+    "features.dispatch_execution.DispatchExecution",
+    "features.dispatch_execution.DispatchExecutionContext",
+    "features.dispatch_execution.decide",
+]
+visibility = ["keeper.counsel"]
