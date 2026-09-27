@@ -1,6 +1,6 @@
 # Keeper
 
-*Themis, goddess of order and justice*
+*Everything is written down, and not everyone may write.*
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
