@@ -47,29 +47,11 @@ from keeper.custody.adapters import (
 from keeper.custody.aggregates.dataset.summary import DatasetSummaryLookup
 from keeper.custody.features import get_dataset, list_datasets, register_dataset
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
-from keeper.infrastructure.kernel import Kernel
+from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
 
 _BC = "custody"
-
-
-class UnreadableSummariesError(RuntimeError):
-    """Startup found no way to read this context's summaries.
-
-    Raised when there is neither a connection pool nor the in-memory event
-    store, which is a combination no supported environment produces and a
-    new adapter could. Failing here rather than at the first request is
-    the point: a deployment that cannot answer a query should not finish
-    booting and look healthy.
-    """
-
-    def __init__(self, event_store: str) -> None:
-        super().__init__(
-            f"No pool and no in-memory event store ({event_store}), so nothing "
-            "can answer a summary query"
-        )
-        self.event_store = event_store
 
 
 @dataclass(frozen=True)
@@ -124,4 +106,4 @@ def wire_custody(deps: Kernel) -> CustodyHandlers:
     )
 
 
-__all__ = ["CustodyHandlers", "UnreadableSummariesError", "wire_custody"]
+__all__ = ["CustodyHandlers", "wire_custody"]

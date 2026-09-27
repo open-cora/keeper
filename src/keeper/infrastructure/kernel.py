@@ -60,6 +60,37 @@ from keeper.infrastructure.schema import SchemaPosture
 from keeper.infrastructure.settings import Settings
 
 
+class UnreadableSummariesError(RuntimeError):
+    """Startup found no way to read some context's summaries.
+
+    Raised when there is neither a connection pool nor the in-memory event
+    store, which is a combination no supported environment produces and a
+    new adapter could. Failing here rather than at the first request is
+    the point: a deployment that cannot answer a query should not finish
+    booting and look healthy.
+
+    Four contexts declared this class, one each, and the copies had begun
+    to differ: same behaviour and same message, but rewrapped prose and,
+    in one of them, a paragraph noting that the hoist was overdue. Nobody
+    decided they should diverge. They diverged because four landings
+    wrote the same paragraph on four days.
+
+    It lives here rather than in `keeper.shared`, unlike the refusal that
+    moved in the commit before it. That one is a word about a caller and
+    belongs with the vocabulary. This one is about the kernel failing to
+    supply a reader: everything it names, the pool and the event store,
+    is this module's, and every `wire_<bc>` that raises it already
+    imports `Kernel` from here.
+    """
+
+    def __init__(self, event_store: str) -> None:
+        super().__init__(
+            f"No pool and no in-memory event store ({event_store}), so nothing "
+            "can answer a summary query"
+        )
+        self.event_store = event_store
+
+
 @dataclass(frozen=True)
 class Kernel:
     """Process-wide dependencies. Immutable after construction.

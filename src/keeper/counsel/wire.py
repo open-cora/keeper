@@ -58,36 +58,11 @@ from keeper.counsel.features import (
     take_proposal,
 )
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
-from keeper.infrastructure.kernel import Kernel
+from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
 
 _BC = "counsel"
-
-
-class UnreadableSummariesError(RuntimeError):
-    """Startup found no way to read this context's summaries.
-
-    Raised when there is neither a connection pool nor the in-memory event
-    store, which is a combination no supported environment produces and a
-    new adapter could. Failing here rather than at the first request is the
-    point: a deployment that cannot answer a query should not finish
-    booting and look healthy.
-
-    The third class with this name and this body, one per context that has
-    a read model. Its siblings said the next one to need it is the trigger
-    to hoist, and this is that one. Still not hoisted here, for the reason
-    they gave: a landing that adds a read model should not also reshape the
-    two beside it. The move is its own commit, and it is now overdue
-    alongside `UnauthorizedError`.
-    """
-
-    def __init__(self, event_store: str) -> None:
-        super().__init__(
-            f"No pool and no in-memory event store ({event_store}), so nothing "
-            "can answer a summary query"
-        )
-        self.event_store = event_store
 
 
 @dataclass(frozen=True)
@@ -214,4 +189,4 @@ def wire_counsel(deps: Kernel) -> CounselHandlers:
     )
 
 
-__all__ = ["CounselHandlers", "UnreadableSummariesError", "wire_counsel"]
+__all__ = ["CounselHandlers", "wire_counsel"]
