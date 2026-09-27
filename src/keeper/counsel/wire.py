@@ -15,12 +15,18 @@ Wrapping order, innermost first:
 Idempotency wraps inside tracing on purpose: a cache hit is still a call
 somebody made and should still appear in a trace.
 
-Only the two genesis slices take the middle layer. Making a proposal and
-making an inquiry both mint an id on the server, so a retry with no key
-would leave a second record of one act. Every transition goes without,
-because a replayed one is already refused by the domain and the wrapper
-would buy a friendlier status code rather than prevent a duplicate. The
-reads go without because there is nothing in a read to make idempotent.
+Three slices take the middle layer, and the third is not a genesis.
+Making a proposal and making an inquiry both mint an id on the server, so
+a retry with no key would leave a second record of one act. Adopting
+takes it for a sharper reason: a retry that the domain refuses would
+already have dispatched an execution on the first attempt, and the caller
+that could not tell whether its request landed needs the same execution
+id back rather than a 409 it has to go and interpret.
+
+Every other transition goes without, because a replayed one is refused by
+the domain and the wrapper would buy a friendlier status code rather than
+prevent a duplicate. The reads go without because there is nothing in a
+read to make idempotent.
 
 Two slices take more than the kernel. Each listing reads a projection,
 which the kernel cannot hold because the kernel is declared in
@@ -40,6 +46,7 @@ from keeper.counsel.adapters import (
 from keeper.counsel.aggregates.inquiry.summary import InquirySummaryLookup
 from keeper.counsel.aggregates.proposal.summary import ProposalSummaryLookup
 from keeper.counsel.features import (
+    adopt_proposal,
     answer_inquiry,
     claim_inquiry,
     get_inquiry,
@@ -51,36 +58,11 @@ from keeper.counsel.features import (
     take_proposal,
 )
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
-from keeper.infrastructure.kernel import Kernel
+from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
 
 _BC = "counsel"
-
-
-class UnreadableSummariesError(RuntimeError):
-    """Startup found no way to read this context's summaries.
-
-    Raised when there is neither a connection pool nor the in-memory event
-    store, which is a combination no supported environment produces and a
-    new adapter could. Failing here rather than at the first request is the
-    point: a deployment that cannot answer a query should not finish
-    booting and look healthy.
-
-    The third class with this name and this body, one per context that has
-    a read model. Its siblings said the next one to need it is the trigger
-    to hoist, and this is that one. Still not hoisted here, for the reason
-    they gave: a landing that adds a read model should not also reshape the
-    two beside it. The move is its own commit, and it is now overdue
-    alongside `UnauthorizedError`.
-    """
-
-    def __init__(self, event_store: str) -> None:
-        super().__init__(
-            f"No pool and no in-memory event store ({event_store}), so nothing "
-            "can answer a summary query"
-        )
-        self.event_store = event_store
 
 
 @dataclass(frozen=True)
@@ -90,6 +72,7 @@ class CounselHandlers:
     make_proposal: make_proposal.IdempotentHandler
     get_proposal: get_proposal.Handler
     take_proposal: take_proposal.Handler
+    adopt_proposal: adopt_proposal.IdempotentHandler
     list_proposals: list_proposals.Handler
     make_inquiry: make_inquiry.IdempotentHandler
     claim_inquiry: claim_inquiry.Handler
@@ -154,6 +137,18 @@ def wire_counsel(deps: Kernel) -> CounselHandlers:
             command_name="TakeProposal",
             bc=_BC,
         ),
+        adopt_proposal=with_tracing(
+            with_idempotency(
+                adopt_proposal.bind(deps),
+                deps.idempotency_store,
+                command_name="AdoptProposal",
+                serialize_result=str,
+                deserialize_result=lambda raw: UUID(str(raw)),
+                lock_stale_seconds=deps.settings.idempotency_lock_stale_seconds,
+            ),
+            command_name="AdoptProposal",
+            bc=_BC,
+        ),
         list_proposals=with_tracing(
             list_proposals.bind(deps, _proposal_summary_lookup(deps)),
             command_name="ListProposals",
@@ -194,4 +189,4 @@ def wire_counsel(deps: Kernel) -> CounselHandlers:
     )
 
 
-__all__ = ["CounselHandlers", "UnreadableSummariesError", "wire_counsel"]
+__all__ = ["CounselHandlers", "wire_counsel"]

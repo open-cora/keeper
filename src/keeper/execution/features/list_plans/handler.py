@@ -13,12 +13,12 @@ from typing import Protocol
 from uuid import UUID
 
 from keeper.execution.aggregates.plan.summary import PlanSummaryLookup, PlanSummaryPage
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.features.list_plans.query import MAX_PAGE_SIZE, ListPlans
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "ListPlans"
 

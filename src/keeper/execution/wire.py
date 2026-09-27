@@ -72,29 +72,11 @@ from keeper.execution.features import (
     report_step_run,
 )
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
-from keeper.infrastructure.kernel import Kernel
+from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
 
 _BC = "execution"
-
-
-class UnreadableSummariesError(RuntimeError):
-    """Startup found no way to read this context's summaries.
-
-    Raised when there is neither a connection pool nor the in-memory event
-    store, which is a combination no supported environment produces and a
-    new adapter could. Failing here rather than at the first request is
-    the point: a deployment that cannot answer a query should not finish
-    booting and look healthy.
-    """
-
-    def __init__(self, event_store: str) -> None:
-        super().__init__(
-            f"No pool and no in-memory event store ({event_store}), so nothing "
-            "can answer a summary query"
-        )
-        self.event_store = event_store
 
 
 @dataclass(frozen=True)
@@ -246,4 +228,4 @@ def wire_execution(deps: Kernel) -> ExecutionHandlers:
     )
 
 
-__all__ = ["ExecutionHandlers", "UnreadableSummariesError", "wire_execution"]
+__all__ = ["ExecutionHandlers", "wire_execution"]

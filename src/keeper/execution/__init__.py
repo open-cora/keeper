@@ -43,7 +43,6 @@ kind of unbacked claim this tree refuses everywhere else.
 
 from keeper.execution.aggregates.execution import Execution, load_execution
 from keeper.execution.aggregates.plan import Plan, load_plan
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.projections import register_execution_projections
 from keeper.execution.routes import register_execution_routes
 from keeper.execution.tools import register_execution_tools
@@ -53,7 +52,6 @@ __all__ = [
     "Execution",
     "ExecutionHandlers",
     "Plan",
-    "UnauthorizedError",
     "load_execution",
     "load_plan",
     "register_execution_projections",

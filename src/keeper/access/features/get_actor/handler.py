@@ -19,12 +19,12 @@ from typing import Protocol
 from uuid import UUID
 
 from keeper.access.aggregates.actor import Actor, ActorNotFoundError, load_actor
-from keeper.access.errors import UnauthorizedError
 from keeper.access.features.get_actor.query import GetActor
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "GetActor"
 

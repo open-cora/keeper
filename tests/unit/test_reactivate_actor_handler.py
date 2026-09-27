@@ -32,7 +32,6 @@ from keeper.access.aggregates.actor.events import (
     ActorReactivated,
     ActorRegistered,
 )
-from keeper.access.errors import UnauthorizedError
 from keeper.access.features.deactivate_actor import DeactivateActor
 from keeper.access.features.deactivate_actor import bind as bind_deactivate
 from keeper.access.features.reactivate_actor import ReactivateActor, bind
@@ -45,6 +44,7 @@ from keeper.infrastructure.ports.event_store import NewEvent
 from keeper.infrastructure.settings import Settings
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

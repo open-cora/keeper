@@ -21,6 +21,7 @@ from uuid import UUID
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel
 
+from keeper.counsel.aggregates.proposal import ProposalStatus
 from keeper.counsel.features.list_proposals.handler import Handler
 from keeper.counsel.features.list_proposals.query import (
     DEFAULT_PAGE_SIZE,
@@ -37,10 +38,12 @@ class ProposalSummaryOutput(BaseModel):
     proposal_id: UUID
     actor_id: UUID
     plan_id: UUID
+    status: ProposalStatus
     execution_id: UUID | None
     step_id: UUID | None
     created_at: datetime
     taken_at: datetime | None
+    adopted_at: datetime | None
 
 
 class ListProposalsOutput(BaseModel):
@@ -83,8 +86,10 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
                     plan_id=summary.plan_id,
                     execution_id=summary.execution_id,
                     step_id=summary.step_id,
+                    status=summary.status,
                     created_at=summary.created_at,
                     taken_at=summary.taken_at,
+                    adopted_at=summary.adopted_at,
                 )
                 for summary in page.items
             ],

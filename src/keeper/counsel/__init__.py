@@ -64,7 +64,6 @@ up and concludes on its own clock, somewhere this system was not.
 
 from keeper.counsel.aggregates.inquiry import Inquiry, load_inquiry
 from keeper.counsel.aggregates.proposal import Proposal, load_proposal
-from keeper.counsel.errors import UnauthorizedError
 from keeper.counsel.projections import register_counsel_projections
 from keeper.counsel.routes import register_counsel_routes
 from keeper.counsel.tools import register_counsel_tools
@@ -74,7 +73,6 @@ __all__ = [
     "CounselHandlers",
     "Inquiry",
     "Proposal",
-    "UnauthorizedError",
     "load_inquiry",
     "load_proposal",
     "register_counsel_projections",

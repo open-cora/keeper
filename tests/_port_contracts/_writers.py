@@ -23,6 +23,7 @@ from keeper.counsel.aggregates.inquiry import (
 from keeper.counsel.aggregates.inquiry import to_payload as inquiry_payload
 from keeper.counsel.aggregates.proposal import (
     PROPOSAL_STREAM_TYPE,
+    ProposalAdopted,
     ProposalMade,
     ProposalTaken,
 )
@@ -165,13 +166,12 @@ class EventStoreDatasetWriter:
 
 
 class EventStoreProposalWriter:
-    """Writes real proposal events, the way the two handlers do.
+    """Writes real proposal events, the way the three handlers do.
 
-    Two verbs, unlike the three writers above, because this is the first
-    aggregate a contract suite drives that has a second event. `take`
-    appends at version 1, which is what the genesis left behind, so a
-    take against a proposal that was never made fails here the way it
-    would in the application rather than writing an orphan row.
+    Three verbs, and two of them close a proposal. Both append at
+    version 1, which is what the genesis left behind, so either against
+    a proposal that was never made fails here the way it would in the
+    application rather than writing an orphan row.
 
     `make` takes the actor and the plan rather than minting them. The
     contract does not filter on either today, and a writer that chose
@@ -211,11 +211,22 @@ class EventStoreProposalWriter:
         )
         await self._append(proposal_id, 1, event, "TakeProposal", at)
 
+    async def adopt(
+        self, *, proposal_id: UUID, execution_id: UUID, step_id: UUID, at: datetime
+    ) -> None:
+        event = ProposalAdopted(
+            proposal_id=proposal_id,
+            execution_id=execution_id,
+            step_id=step_id,
+            occurred_at=at,
+        )
+        await self._append(proposal_id, 1, event, "AdoptProposal", at)
+
     async def _append(
         self,
         proposal_id: UUID,
         expected_version: int,
-        event: ProposalMade | ProposalTaken,
+        event: ProposalMade | ProposalTaken | ProposalAdopted,
         command_name: str,
         at: datetime,
     ) -> None:

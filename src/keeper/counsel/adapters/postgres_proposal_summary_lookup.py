@@ -40,6 +40,16 @@ absence makes impossible.
 The root is tested rather than the step, and either would do: the two
 columns are written by one statement from one event, so a row with one
 of them set is not a row this projection can produce.
+
+## Which of the two closed it, and where that is worked out
+
+`_status_of` below, from the two timestamps, because the table holds no
+word for it and deliberately does not. The in-memory adapter reaches the
+same three states off the fold instead, which reads it from which event
+landed. Two unrelated derivations of one rule, and the port contract is
+the only thing that makes them agree: the case that separates them is a
+proposal closed by adoption, where a reader testing `taken_at` first
+reports Open and passes everything else.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
@@ -48,12 +58,14 @@ from typing import Any
 
 import asyncpg
 
+from keeper.counsel.aggregates.proposal.state import ProposalStatus
 from keeper.counsel.aggregates.proposal.summary import ProposalSummary, ProposalSummaryPage
 from keeper.counsel.projections.proposal_summary import PROJECTION_NAME
 from keeper.infrastructure.projection.cursor import decode_cursor, encode_cursor
 
 _SELECT_SQL = f"""
-SELECT proposal_id, actor_id, plan_id, execution_id, step_id, created_at, taken_at
+SELECT proposal_id, actor_id, plan_id, execution_id, step_id, created_at,
+       taken_at, adopted_at
 FROM {PROJECTION_NAME}
 WHERE ($1::boolean IS NULL
        OR ($1 IS TRUE AND execution_id IS NULL)
@@ -97,15 +109,33 @@ class PostgresProposalSummaryLookup:
         return ProposalSummaryPage(items=items, next_cursor=next_cursor)
 
 
+def _status_of(taken_at: Any, adopted_at: Any) -> ProposalStatus:
+    """Derive the status the fold would have produced, from the two stamps.
+
+    Neither wins over the other, because neither can follow the first:
+    the decider refuses a second closing whichever way the proposal
+    closed, so a row holding both is one this projection cannot write.
+    The order below is therefore arbitrary and the absence of a tiebreak
+    is the point.
+    """
+    if adopted_at is not None:
+        return ProposalStatus.ADOPTED
+    if taken_at is not None:
+        return ProposalStatus.TAKEN
+    return ProposalStatus.OPEN
+
+
 def _to_summary(row: Any) -> ProposalSummary:
     return ProposalSummary(
         proposal_id=row["proposal_id"],
         actor_id=row["actor_id"],
         plan_id=row["plan_id"],
+        status=_status_of(row["taken_at"], row["adopted_at"]),
         execution_id=row["execution_id"],
         step_id=row["step_id"],
         created_at=row["created_at"],
         taken_at=row["taken_at"],
+        adopted_at=row["adopted_at"],
     )
 
 

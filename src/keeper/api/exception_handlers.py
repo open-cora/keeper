@@ -28,6 +28,12 @@ happened to be mounted.
 Registered once from `create_app`, alongside the auth handlers, rather
 than from any `register_<bc>_routes`.
 
+`UnauthorizedError` arrived here by the same route and later. Six
+contexts each declared their own copy of one class and each registered
+one mapping for it, which was six spellings of "the caller is known and
+refused" kept in step by hand. The class is now `keeper.shared`'s and the
+mapping is one line here.
+
 `InvalidCursorError` arrived with the first list endpoint and was already
 documented as a 422 before anything raised it, which meant a malformed
 cursor was a 500 for as long as nobody could send one. The rejection
@@ -46,6 +52,16 @@ from keeper.infrastructure.ports import (
 )
 from keeper.infrastructure.projection import InvalidCursorError
 from keeper.infrastructure.slices.idempotency import classify_error_status
+from keeper.shared.unauthorized import UnauthorizedError
+
+
+async def _handle_forbidden(request: Request, exc: Exception) -> JSONResponse:
+    """A known caller, refused.
+
+    A different fact from 401, where we do not know who is asking.
+    """
+    _ = request
+    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
 
 
 async def _handle_conflict(request: Request, exc: Exception) -> JSONResponse:
@@ -89,6 +105,7 @@ def register_shared_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(IdempotencyConflictError, _handle_unprocessable)
     app.add_exception_handler(CachedHandlerError, _handle_cached_failure)
     app.add_exception_handler(InvalidCursorError, _handle_unprocessable)
+    app.add_exception_handler(UnauthorizedError, _handle_forbidden)
 
 
 __all__ = ["register_shared_exception_handlers"]

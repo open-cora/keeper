@@ -25,13 +25,19 @@ consistent and this is immediate, so a test that passes here says nothing
 about a caller reading too soon. That is the integration tier's job, and
 `drain_projections` is how it asks the question without sleeping.
 
-## Where the two timestamps come from
+## Where the three timestamps come from
 
-`created_at` is the envelope of the first event and `taken_at` the
-envelope of the take, which is what the projection's two statements
-write. Reading them off the envelope rather than the payload keeps this
-adapter agreeing with the other one about which value is which, since
-the projection has no access to anything else either.
+`created_at` is the envelope of the first event, and `taken_at` and
+`adopted_at` the envelopes of whichever closing event landed, which is
+what the projection's statements write. Reading them off the envelope
+rather than the payload keeps this adapter agreeing with the other one
+about which value is which, since the projection has no access to
+anything else either.
+
+The status is the place the two could most easily drift. Here it comes
+off the fold, which reads it from which event landed; over there it is
+derived from two nullable columns. Both spell the same rule and neither
+can see the other.
 """
 
 from keeper.counsel.aggregates.proposal.events import from_stored
@@ -42,6 +48,7 @@ from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventSt
 from keeper.infrastructure.projection.cursor import decode_cursor, encode_cursor
 
 _TAKEN_EVENT_TYPE = "ProposalTaken"
+_ADOPTED_EVENT_TYPE = "ProposalAdopted"
 
 
 class InMemoryProposalSummaryLookup:
@@ -100,15 +107,21 @@ class InMemoryProposalSummaryLookup:
                 (row.occurred_at for row in stored if row.event_type == _TAKEN_EVENT_TYPE),
                 None,
             )
+            adopted_at = next(
+                (row.occurred_at for row in stored if row.event_type == _ADOPTED_EVENT_TYPE),
+                None,
+            )
             summaries.append(
                 ProposalSummary(
                     proposal_id=proposal.id,
                     actor_id=proposal.actor_id,
                     plan_id=proposal.plan_id,
+                    status=proposal.status,
                     execution_id=proposal.execution_id,
                     step_id=proposal.step_id,
                     created_at=stored[0].occurred_at,
                     taken_at=taken_at,
+                    adopted_at=adopted_at,
                 )
             )
         return summaries

@@ -24,12 +24,12 @@ from keeper.custody.aggregates.dataset import (
     DatasetNotFoundError,
     load_dataset,
 )
-from keeper.custody.errors import UnauthorizedError
 from keeper.custody.features.get_dataset.query import GetDataset
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "GetDataset"
 

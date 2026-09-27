@@ -27,7 +27,6 @@ that defines the first policy is running under no policy at all.
 
 from keeper.authority.adapters import PolicyAuthorize, build_authorize
 from keeper.authority.aggregates.policy import Permission, Policy, load_policy
-from keeper.authority.errors import UnauthorizedError
 from keeper.authority.routes import register_authority_routes
 from keeper.authority.tools import register_authority_tools
 from keeper.authority.wire import AuthorityHandlers, wire_authority
@@ -37,7 +36,6 @@ __all__ = [
     "Permission",
     "Policy",
     "PolicyAuthorize",
-    "UnauthorizedError",
     "build_authorize",
     "load_policy",
     "register_authority_routes",

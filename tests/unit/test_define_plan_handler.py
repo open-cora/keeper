@@ -18,7 +18,6 @@ from keeper.execution.aggregates.plan import (
     PlanName,
     load_plan,
 )
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.features.define_plan import DefinePlan, bind
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.deps import make_inmemory_kernel
@@ -27,6 +26,7 @@ from keeper.infrastructure.ports import AllowAllAuthorize, Deny
 from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

@@ -52,7 +52,6 @@ from keeper.counsel.aggregates.proposal import (
     load_proposal_with_version,
     to_payload,
 )
-from keeper.counsel.errors import UnauthorizedError
 from keeper.counsel.features.take_proposal.command import TakeProposal
 from keeper.counsel.features.take_proposal.context import TakeProposalContext
 from keeper.counsel.features.take_proposal.decider import decide
@@ -71,6 +70,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "TakeProposal"
 

@@ -25,7 +25,6 @@ from keeper.authority.aggregates.policy import (
     load_policy_with_version,
     to_payload,
 )
-from keeper.authority.errors import UnauthorizedError
 from keeper.authority.features.revoke_permission.command import RevokePolicyPermission
 from keeper.authority.features.revoke_permission.decider import decide
 from keeper.infrastructure.kernel import Kernel
@@ -33,6 +32,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "RevokePolicyPermission"
 

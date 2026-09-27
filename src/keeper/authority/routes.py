@@ -8,7 +8,9 @@ Five shapes:
 
     403  UnauthorizedError
              the caller is known and refused, which is a different fact
-             from 401, where we do not know who is asking
+             from 401, where we do not know who is asking. Registered in
+             `keeper.api.exception_handlers` rather than here: the class
+             is shared by every context, so one mapping serves them all
 
     404  PolicyNotFoundError
              the id names no policy this system has a record of
@@ -44,7 +46,6 @@ from keeper.authority.aggregates.policy import (
     PolicyWouldBeUngovernableError,
     SystemPrincipalCannotBeGrantedError,
 )
-from keeper.authority.errors import UnauthorizedError
 from keeper.authority.features import (
     define_policy,
     get_policy,
@@ -57,12 +58,6 @@ async def _handle_not_found(request: Request, exc: Exception) -> JSONResponse:
     """The id names nothing this system has a record of."""
     _ = request
     return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
-
-
-async def _handle_unauthorized(request: Request, exc: Exception) -> JSONResponse:
-    """A known caller, refused."""
-    _ = request
-    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
 
 
 async def _handle_conflict(request: Request, exc: Exception) -> JSONResponse:
@@ -92,7 +87,6 @@ def register_authority_routes(app: FastAPI) -> None:
     app.include_router(get_policy.router)
 
     app.add_exception_handler(PolicyNotFoundError, _handle_not_found)
-    app.add_exception_handler(UnauthorizedError, _handle_unauthorized)
     app.add_exception_handler(PolicyAlreadyExistsError, _handle_conflict)
     app.add_exception_handler(PolicyCannotGrantPermissionError, _handle_conflict)
     app.add_exception_handler(PolicyCannotRevokePermissionError, _handle_conflict)

@@ -26,7 +26,6 @@ from keeper.execution.aggregates.execution import (
     load_execution,
 )
 from keeper.execution.aggregates.procedure import MoveStep, ProcedureNotFoundError
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.features.claim_execution import ClaimExecution
 from keeper.execution.features.claim_execution import bind as bind_claim
 from keeper.execution.features.define_procedure import DefineProcedure
@@ -44,6 +43,7 @@ from keeper.infrastructure.ports import AllowAllAuthorize, Deny
 from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

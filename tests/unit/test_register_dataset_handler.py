@@ -13,7 +13,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from keeper.custody.aggregates.dataset import DATASET_STREAM_TYPE, load_dataset
-from keeper.custody.errors import UnauthorizedError
 from keeper.custody.features.register_dataset import RegisterDataset, bind
 from keeper.execution.aggregates.execution import (
     ExecutionNotFoundError,
@@ -35,6 +34,7 @@ from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.identifier import Identifier
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

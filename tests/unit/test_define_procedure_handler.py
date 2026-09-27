@@ -20,7 +20,6 @@ from keeper.execution.aggregates.procedure import (
     ProcedureName,
     load_procedure,
 )
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.features.define_plan import DefinePlan
 from keeper.execution.features.define_plan import bind as bind_define_plan
 from keeper.execution.features.define_procedure import DefineProcedure, bind
@@ -31,6 +30,7 @@ from keeper.infrastructure.ports import AllowAllAuthorize, Deny
 from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

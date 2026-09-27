@@ -44,16 +44,20 @@ what comes before composing.
 And a proposal nothing came of would be a step nobody drove, sitting in
 every count of how far its execution got.
 
-## Why there is no status field
+## Why there is a status field now, when there was not
 
-`execution_id is None` is the whole of it. An execution derives a
-four-valued status in its fold because no single field carries it; here
-a two-valued enum beside a nullable field would be the same fact written
-twice.
+`execution_id is None` used to be the whole of it, and this page said an
+enum would arrive at the third state. Adoption is that third state.
 
-An enum arrives at the third state. Withdrawing and superseding are the
-two candidates, and the first to land is what stops the answer being
-readable off one field.
+Two ways a proposal can stop being open, and the null test cannot tell
+them apart: this system chose it and committed work, or something
+outside ran what it proposed and said so afterwards. Both set the same
+two fields. The status is what carries the difference, and it is derived
+in the fold from which event landed rather than stored, because a status
+written onto a payload could contradict the event it rode in on.
+
+Withdrawing and superseding are still the two foreseeable members after
+these three.
 
 Open is the honest default and stays honest the way Dispatched does: it
 says only that nothing has been recorded against this proposal. A
@@ -62,8 +66,52 @@ something watching rather than another value.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
+
+
+class ProposalStatus(StrEnum):
+    """What became of the advice, as one word.
+
+    Values are PascalCase strings so a log line or a response body reads
+    without a mapping step, which is `ExecutionStatus`'s choice and
+    `InquiryStatus`'s beside it.
+
+    Derived in the fold from which event landed, never stored.
+
+    Two of the three close the proposal and they are not the same fact.
+    `ADOPTED` says this system chose the proposal, chose a beamline and a
+    bound for it, and committed the facility: a decision made here, at
+    the moment it is written. `TAKEN` says nobody here decided, and a
+    step exists somewhere that ran what was proposed.
+
+    There is no terminal property. Unlike an execution or an inquiry,
+    nothing further is expected on this stream after either of the two,
+    so a reader asking whether more can land is asking a question with
+    one answer.
+    """
+
+    OPEN = "Open"
+    ADOPTED = "Adopted"
+    TAKEN = "Taken"
+
+
+class ProposalCannotBeAdoptedError(Exception):
+    """Adoption was attempted on a proposal that was not open.
+
+    Per verb rather than collapsed onto a shared transition error, which
+    is R6 in docs/reference/naming.md, and the status is on it because
+    the two refusals mean different things. Already adopted is the
+    facility committed twice to one piece of advice; already taken is
+    advice something else acted on, where composing more work would run
+    it a second time.
+    """
+
+    def __init__(self, proposal_id: UUID, status: "ProposalStatus") -> None:
+        super().__init__(f"Proposal {proposal_id} cannot be adopted while {status}")
+        self.proposal_id = proposal_id
+        self.status = status
 
 
 class ProposalNotFoundError(Exception):
@@ -211,12 +259,19 @@ class Proposal:
     actor_id: UUID
     plan_id: UUID
     parameters: dict[str, Any]
+    status: ProposalStatus = ProposalStatus.OPEN
     execution_id: UUID | None = None
     step_id: UUID | None = None
 
     @property
     def is_taken(self) -> bool:
-        """Whether an acquisition has been recorded against this proposal.
+        """Whether anything has come of this proposal, either way.
+
+        True for an adoption as well as for a take, because what this
+        answers is whether the proposal is still open and both close it.
+        The word is the one the read side has always used for that bit
+        and is left alone; which of the two closed it is the status's to
+        say.
 
         A property rather than a stored flag, for the reason an
         execution's status is derived: a field a writer can set is a
@@ -234,6 +289,8 @@ __all__ = [
     "InvalidProposalParametersError",
     "Proposal",
     "ProposalAlreadyExistsError",
+    "ProposalCannotBeAdoptedError",
     "ProposalCannotBeTakenError",
     "ProposalNotFoundError",
+    "ProposalStatus",
 ]

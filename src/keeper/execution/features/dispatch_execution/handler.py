@@ -18,7 +18,6 @@ from uuid import UUID
 
 from keeper.execution.aggregates.execution import EXECUTION_STREAM_TYPE, to_payload
 from keeper.execution.aggregates.procedure import ProcedureNotFoundError, load_procedure
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.features.dispatch_execution.command import DispatchExecution
 from keeper.execution.features.dispatch_execution.context import DispatchExecutionContext
 from keeper.execution.features.dispatch_execution.decider import decide
@@ -27,6 +26,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "DispatchExecution"
 

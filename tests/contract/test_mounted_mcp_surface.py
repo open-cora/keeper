@@ -87,6 +87,7 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "make_proposal",
         "get_proposal",
         "take_proposal",
+        "adopt_proposal",
         "list_proposals",
         "make_inquiry",
         "claim_inquiry",
@@ -527,6 +528,31 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         )
         concluded = _call(client, live, "get_inquiry", inquiry_id=inquiry_id)
 
+        # Adoption is the loop closing. The Propose answer above put a run
+        # forward; this takes it, composes a one-step procedure for it and
+        # dispatches an execution that something will walk. It is the only
+        # tool in this file that commits a beamline to anything, and the
+        # only one whose three writes span two contexts in one transaction.
+        # Its own proposal, because the one above is already taken. That
+        # is the pair worth seeing side by side: one proposal closed by a
+        # report of something that ran elsewhere, one closed by this
+        # system deciding to run it.
+        to_adopt = _call(client, live, "make_proposal", plan_id=plan_id, parameters={})[
+            "proposal_id"
+        ]
+        adopted = _call(
+            client,
+            live,
+            "adopt_proposal",
+            proposal_id=to_adopt,
+            beamline="2-bm",
+            scopes=["2bmb:det:"],
+        )
+        adopted_execution = _call(
+            client, live, "get_execution", execution_id=adopted["execution_id"]
+        )
+        after_adoption = _call(client, live, "get_proposal", proposal_id=to_adopt)
+
         straight_to_an_answer = _call(
             client,
             live,
@@ -741,6 +767,30 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
     assert unclaimed_answer["status"] == "Answered", (
         "claiming is not a gate on answering, so an inquiry answered straight from "
         "open is answered rather than stuck"
+    )
+    assert adopted["proposal_id"] == to_adopt, (
+        "the tool echoes the proposal it was given beside the execution it made, "
+        "because one bare id reads as ambiguous to a caller holding both"
+    )
+    assert adopted_execution["status"] == "Dispatched", (
+        "an adopted proposal becomes an execution waiting to be taken up, which "
+        "is how it reaches a conductor without the conductor knowing what a "
+        "proposal is"
+    )
+    assert [step["describes"] for step in adopted_execution["steps"]] == [
+        f"acquire {plan_id} over 2bmb:det:"
+    ], (
+        "one proposal is one run of one plan, so the procedure composed for it "
+        "has exactly one step, running that plan over the devices the adoption "
+        "declared"
+    )
+    assert (after_adoption["execution_id"], after_adoption["step_id"]) == (
+        adopted_execution["execution_id"],
+        adopted_execution["steps"][0]["step_id"],
+    ), (
+        "the proposal points at the acquisition that was composed for it, which "
+        "is the join this context exists to hold, written in the same "
+        "transaction that created the step"
     )
     assert unclaimed_answer["proposal_id"] is None, (
         "only Propose names a proposal, and the other three arms have to come back "

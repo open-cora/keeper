@@ -36,7 +36,6 @@ from typing import Protocol
 from uuid import UUID
 
 from keeper.custody.aggregates.dataset import DATASET_STREAM_TYPE, to_payload
-from keeper.custody.errors import UnauthorizedError
 from keeper.custody.features.register_dataset.command import RegisterDataset
 from keeper.custody.features.register_dataset.decider import decide
 from keeper.execution.aggregates.execution import (
@@ -49,6 +48,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "RegisterDataset"
 

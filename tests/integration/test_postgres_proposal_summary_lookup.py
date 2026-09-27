@@ -65,6 +65,14 @@ class _DrainingProposalWriter:
         )
         await self._drain()
 
+    async def adopt(
+        self, *, proposal_id: UUID, execution_id: UUID, step_id: UUID, at: datetime
+    ) -> None:
+        await self._writer.adopt(
+            proposal_id=proposal_id, execution_id=execution_id, step_id=step_id, at=at
+        )
+        await self._drain()
+
     async def _drain(self) -> None:
         while await advance_subscriber_once(self._pool, self._projection):
             pass
