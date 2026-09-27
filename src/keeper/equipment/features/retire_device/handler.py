@@ -25,7 +25,6 @@ from keeper.equipment.aggregates.device import (
     load_device_with_version,
     to_payload,
 )
-from keeper.equipment.errors import UnauthorizedError
 from keeper.equipment.features.retire_device.command import RetireDevice
 from keeper.equipment.features.retire_device.decider import decide
 from keeper.infrastructure.kernel import Kernel
@@ -33,6 +32,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "RetireDevice"
 

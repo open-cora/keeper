@@ -34,7 +34,6 @@ from keeper.counsel.aggregates.proposal import (
     ProposalStatus,
     load_proposal,
 )
-from keeper.counsel.errors import UnauthorizedError
 from keeper.counsel.features.adopt_proposal import AdoptProposal
 from keeper.counsel.features.adopt_proposal import bind as bind_adopt
 from keeper.counsel.features.answer_inquiry import AnswerInquiry
@@ -78,6 +77,7 @@ from keeper.infrastructure.ports import AllowAllAuthorize, Deny
 from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

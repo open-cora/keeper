@@ -26,7 +26,6 @@ from keeper.access.aggregates.actor import (
     load_actor_with_version,
     to_payload,
 )
-from keeper.access.errors import UnauthorizedError
 from keeper.access.features.deactivate_actor.command import DeactivateActor
 from keeper.access.features.deactivate_actor.decider import decide
 from keeper.infrastructure.kernel import Kernel
@@ -34,6 +33,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "DeactivateActor"
 

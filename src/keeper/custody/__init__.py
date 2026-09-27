@@ -49,7 +49,6 @@ consumer arrived and met the rule of three.
 """
 
 from keeper.custody.aggregates.dataset import Dataset, load_dataset
-from keeper.custody.errors import UnauthorizedError
 from keeper.custody.projections import register_custody_projections
 from keeper.custody.routes import register_custody_routes
 from keeper.custody.tools import register_custody_tools
@@ -58,7 +57,6 @@ from keeper.custody.wire import CustodyHandlers, wire_custody
 __all__ = [
     "CustodyHandlers",
     "Dataset",
-    "UnauthorizedError",
     "load_dataset",
     "register_custody_projections",
     "register_custody_routes",

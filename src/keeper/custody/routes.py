@@ -8,7 +8,9 @@ Three shapes, and the interesting part is which ones are absent:
 
     403  UnauthorizedError
              the caller is known and refused, which is a different fact
-             from 401, where we do not know who is asking
+             from 401, where we do not know who is asking. Registered in
+             `keeper.api.exception_handlers` rather than here: the class
+             is shared by every context, so one mapping serves them all
 
     404  DatasetNotFoundError
              the id names no dataset this system has a record of
@@ -46,14 +48,7 @@ from keeper.custody.aggregates.dataset import (
     DatasetAlreadyExistsError,
     DatasetNotFoundError,
 )
-from keeper.custody.errors import UnauthorizedError
 from keeper.custody.features import get_dataset, list_datasets, register_dataset
-
-
-async def _handle_unauthorized(request: Request, exc: Exception) -> JSONResponse:
-    """A known caller, refused."""
-    _ = request
-    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
 
 
 async def _handle_not_found(request: Request, exc: Exception) -> JSONResponse:
@@ -74,7 +69,6 @@ def register_custody_routes(app: FastAPI) -> None:
     app.include_router(get_dataset.router)
     app.include_router(list_datasets.router)
 
-    app.add_exception_handler(UnauthorizedError, _handle_unauthorized)
     app.add_exception_handler(DatasetNotFoundError, _handle_not_found)
     app.add_exception_handler(DatasetAlreadyExistsError, _handle_conflict)
 

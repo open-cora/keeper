@@ -19,7 +19,6 @@ from keeper.authority.aggregates.policy import (
     Policy,
     load_policy,
 )
-from keeper.authority.errors import UnauthorizedError
 from keeper.authority.features.define_policy import DefinePolicy, bind
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.deps import make_inmemory_kernel
@@ -28,6 +27,7 @@ from keeper.infrastructure.ports import AllowAllAuthorize, Deny
 from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID, SYSTEM_PRINCIPAL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

@@ -14,7 +14,6 @@ from keeper.execution.aggregates.execution import (
     load_execution_with_version,
     to_payload,
 )
-from keeper.execution.errors import UnauthorizedError
 from keeper.execution.features.report_step.command import ReportExecutionStep
 from keeper.execution.features.report_step.decider import decide
 from keeper.infrastructure.kernel import Kernel
@@ -22,6 +21,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "ReportExecutionStep"
 

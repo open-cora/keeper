@@ -21,7 +21,6 @@ from typing import Protocol
 from uuid import UUID
 
 from keeper.authority.aggregates.policy import POLICY_STREAM_TYPE, to_payload
-from keeper.authority.errors import UnauthorizedError
 from keeper.authority.features.define_policy.command import DefinePolicy
 from keeper.authority.features.define_policy.decider import decide
 from keeper.infrastructure.kernel import Kernel
@@ -29,6 +28,7 @@ from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "DefinePolicy"
 

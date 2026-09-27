@@ -18,7 +18,6 @@ principal is who did it, and an id in the payload is who it was done to.
 """
 
 from keeper.access.aggregates.actor import Actor, load_actor
-from keeper.access.errors import UnauthorizedError
 from keeper.access.routes import register_access_routes
 from keeper.access.tools import register_access_tools
 from keeper.access.wire import AccessHandlers, wire_access
@@ -26,7 +25,6 @@ from keeper.access.wire import AccessHandlers, wire_access
 __all__ = [
     "AccessHandlers",
     "Actor",
-    "UnauthorizedError",
     "load_actor",
     "register_access_routes",
     "register_access_tools",

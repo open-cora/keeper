@@ -56,7 +56,6 @@ from keeper.counsel.aggregates.proposal import (
     load_proposal_with_version,
     to_payload,
 )
-from keeper.counsel.errors import UnauthorizedError
 from keeper.counsel.features.adopt_proposal.command import AdoptProposal
 from keeper.counsel.features.adopt_proposal.decider import decide
 from keeper.execution.aggregates.execution import EXECUTION_STREAM_TYPE
@@ -86,6 +85,7 @@ from keeper.infrastructure.ports import Deny
 from keeper.infrastructure.ports.event_store import NewEvent, StreamAppend
 from keeper.infrastructure.slices.envelope import to_new_event
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 _COMMAND_NAME = "AdoptProposal"
 

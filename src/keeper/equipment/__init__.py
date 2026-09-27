@@ -49,7 +49,6 @@ ask, with a join it writes itself.
 """
 
 from keeper.equipment.aggregates.device import Device, load_device
-from keeper.equipment.errors import UnauthorizedError
 from keeper.equipment.projections import register_equipment_projections
 from keeper.equipment.routes import register_equipment_routes
 from keeper.equipment.tools import register_equipment_tools
@@ -58,7 +57,6 @@ from keeper.equipment.wire import EquipmentHandlers, wire_equipment
 __all__ = [
     "Device",
     "EquipmentHandlers",
-    "UnauthorizedError",
     "load_device",
     "register_equipment_projections",
     "register_equipment_routes",

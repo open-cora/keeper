@@ -12,7 +12,6 @@ from uuid import UUID, uuid4
 import pytest
 
 from keeper.custody.aggregates.dataset import DatasetNotFoundError
-from keeper.custody.errors import UnauthorizedError
 from keeper.custody.features.get_dataset import GetDataset
 from keeper.custody.features.get_dataset import bind as bind_get_dataset
 from keeper.custody.features.register_dataset import RegisterDataset
@@ -33,6 +32,7 @@ from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.shared.identifier import Identifier
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

@@ -19,7 +19,6 @@ from keeper.authority.aggregates.policy import (
     Permission,
     PolicyNotFoundError,
 )
-from keeper.authority.errors import UnauthorizedError
 from keeper.authority.features.define_policy import DefinePolicy
 from keeper.authority.features.define_policy import bind as bind_define
 from keeper.authority.features.get_policy import GetPolicy
@@ -37,6 +36,7 @@ from keeper.infrastructure.ports.event_store import EventStore
 from keeper.infrastructure.ports.id_generator import UUIDv7Generator
 from keeper.infrastructure.settings import Settings
 from keeper.shared.reserved_ids import NIL_SENTINEL_ID
+from keeper.shared.unauthorized import UnauthorizedError
 
 pytestmark = pytest.mark.unit
 

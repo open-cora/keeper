@@ -18,7 +18,9 @@ much as which are here:
 
     403  UnauthorizedError
              the caller is known and refused, which is a different fact
-             from 401, where we do not know who is asking
+             from 401, where we do not know who is asking. Registered in
+             `keeper.api.exception_handlers` rather than here: the class
+             is shared by every context, so one mapping serves them all
 
     404  ProposalNotFoundError
              the id names no proposal this system has a record of
@@ -76,7 +78,6 @@ from keeper.counsel.aggregates.proposal import (
     ProposalCannotBeTakenError,
     ProposalNotFoundError,
 )
-from keeper.counsel.errors import UnauthorizedError
 from keeper.counsel.features import (
     adopt_proposal,
     answer_inquiry,
@@ -95,12 +96,6 @@ async def _handle_bad_request(request: Request, exc: Exception) -> JSONResponse:
     """The caller sent something this context can see is wrong."""
     _ = request
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
-
-
-async def _handle_unauthorized(request: Request, exc: Exception) -> JSONResponse:
-    """A known caller, refused."""
-    _ = request
-    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
 
 
 async def _handle_not_found(request: Request, exc: Exception) -> JSONResponse:
@@ -135,7 +130,6 @@ def register_counsel_routes(app: FastAPI) -> None:
         InvalidInquiryConclusionError,
     ):
         app.add_exception_handler(bad_request_cls, _handle_bad_request)
-    app.add_exception_handler(UnauthorizedError, _handle_unauthorized)
     app.add_exception_handler(ProposalNotFoundError, _handle_not_found)
     app.add_exception_handler(InquiryNotFoundError, _handle_not_found)
     for conflict_cls in (
