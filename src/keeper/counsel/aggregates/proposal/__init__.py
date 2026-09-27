@@ -1,6 +1,7 @@
 """The Proposal aggregate: state, events, evolver, and its two read paths."""
 
 from keeper.counsel.aggregates.proposal.events import (
+    ProposalAdopted,
     ProposalEvent,
     ProposalMade,
     ProposalTaken,
@@ -17,8 +18,10 @@ from keeper.counsel.aggregates.proposal.state import (
     InvalidProposalParametersError,
     Proposal,
     ProposalAlreadyExistsError,
+    ProposalCannotBeAdoptedError,
     ProposalCannotBeTakenError,
     ProposalNotFoundError,
+    ProposalStatus,
 )
 from keeper.counsel.aggregates.proposal.summary import (
     ProposalSummary,
@@ -30,11 +33,14 @@ __all__ = [
     "PROPOSAL_STREAM_TYPE",
     "InvalidProposalParametersError",
     "Proposal",
+    "ProposalAdopted",
     "ProposalAlreadyExistsError",
+    "ProposalCannotBeAdoptedError",
     "ProposalCannotBeTakenError",
     "ProposalEvent",
     "ProposalMade",
     "ProposalNotFoundError",
+    "ProposalStatus",
     "ProposalSummary",
     "ProposalSummaryLookup",
     "ProposalSummaryPage",

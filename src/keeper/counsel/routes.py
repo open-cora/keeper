@@ -30,6 +30,8 @@ much as which are here:
              a genesis event was asked for on a live stream
          ProposalCannotBeTakenError
              it already has a run, or the run ran a different plan
+         ProposalCannotBeAdoptedError
+             it is no longer open, either way it closed
          InquiryCannotBeClaimedError
              it is not open
          InquiryCannotBeAnsweredError
@@ -70,11 +72,13 @@ from keeper.counsel.aggregates.inquiry import (
 from keeper.counsel.aggregates.proposal import (
     InvalidProposalParametersError,
     ProposalAlreadyExistsError,
+    ProposalCannotBeAdoptedError,
     ProposalCannotBeTakenError,
     ProposalNotFoundError,
 )
 from keeper.counsel.errors import UnauthorizedError
 from keeper.counsel.features import (
+    adopt_proposal,
     answer_inquiry,
     claim_inquiry,
     get_inquiry,
@@ -116,6 +120,7 @@ def register_counsel_routes(app: FastAPI) -> None:
     app.include_router(make_proposal.router)
     app.include_router(get_proposal.router)
     app.include_router(take_proposal.router)
+    app.include_router(adopt_proposal.router)
     app.include_router(list_proposals.router)
     app.include_router(make_inquiry.router)
     app.include_router(claim_inquiry.router)
@@ -136,6 +141,7 @@ def register_counsel_routes(app: FastAPI) -> None:
     for conflict_cls in (
         ProposalAlreadyExistsError,
         ProposalCannotBeTakenError,
+        ProposalCannotBeAdoptedError,
         InquiryAlreadyExistsError,
         InquiryCannotBeClaimedError,
         InquiryCannotBeAnsweredError,

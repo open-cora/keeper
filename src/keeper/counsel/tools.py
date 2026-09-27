@@ -19,6 +19,7 @@ from collections.abc import Callable
 
 from mcp.server.fastmcp import FastMCP
 
+from keeper.counsel.features.adopt_proposal import tool as adopt_proposal_tool
 from keeper.counsel.features.answer_inquiry import tool as answer_inquiry_tool
 from keeper.counsel.features.claim_inquiry import tool as claim_inquiry_tool
 from keeper.counsel.features.get_inquiry import tool as get_inquiry_tool
@@ -48,6 +49,10 @@ def register_counsel_tools(
     take_proposal_tool.register(
         mcp,
         get_handler=lambda: get_handlers().take_proposal,
+    )
+    adopt_proposal_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().adopt_proposal,
     )
     list_proposals_tool.register(
         mcp,

@@ -2,7 +2,7 @@
 
 Counsel is the bounded context of advice: what was put forward to run next and was it taken, and what somebody asked a thinker about one execution and what came back.
 
-It holds two aggregates. The Proposal came first and has four operations on it; most of the argument about it is which of two neighbouring contexts each piece does NOT belong in. The Inquiry came second and has five, and the argument about it is mostly about where it stops: it records the asking and the answer, and nothing about the thinking.
+It holds two aggregates. The Proposal came first and has five operations on it; most of the argument about it is which of two neighbouring contexts each piece does NOT belong in. The Inquiry came second and has five, and the argument about it is mostly about where it stops: it records the asking and the answer, and nothing about the thinking.
 
 **This page was written before the code and then corrected against it.** That is the reverse of every other page under this heading, and two things it claimed turned out to be wrong when the code was written: the cross-context door is seven names wide rather than two, and the refusals on a take needed a discriminator the design had not named. Both are fixed below. Where a sentence is still about something unbuilt, it says so.
 
@@ -36,6 +36,142 @@ That makes a proposal and an acquisition step the same two fields, and the diffe
 That is not a missing field, it is the whole distinction: a proposal is the one record in this tree that refers to no act at all.
 
 **Two fields for the reference, and never one without the other.** A step is an entity inside the Execution aggregate rather than a stream of its own, so the step id alone names something no reader can fetch. The root comes first and the step qualifies it, which is the order [Custody](custody.md) reads in too. They are written by one event, so a record holding one of them is not one this system can produce.
+
+## Adopting one, which is how advice becomes work
+
+A proposal put forward and never acted on is where this context used to
+stop. Adopting is the other end: somebody chooses the proposal, says where
+it will run and what it may touch, and this system composes a one-step
+procedure for it and dispatches an execution.
+
+That execution is an ordinary dispatched execution, which is the whole
+trick. A conductor polls for those already and knows nothing about
+proposals, so adoption adds an entrance to the path that exists rather than
+a path of its own. Nothing in `apps/conductor` changed for it.
+
+### What a proposal does not say, and why the caller must
+
+A proposal cites a plan and carries values. A procedure needs a name, a
+beamline and, on an acquisition, the devices the step may touch. Two of
+those three this system refuses to invent, and says so where it refuses
+them:
+
+```
+   beamline   define_procedure: "nothing here can derive it. The steps
+              imply it, in a prefix this system deliberately does not
+              parse, so the composer states it."
+
+   scopes     "an acquisition declaring no devices; nothing here can
+              derive them from the plan, and a step believed to touch
+              nothing is one that can run beside another over the same
+              motor."
+```
+
+So both are arguments to the adoption. The tempting alternative is to read
+them off the execution the proposal came from, through the inquiry that
+produced it: same plan, same devices, same beamline, and exact rather than
+guessed. It is still refused. Scopes are the bound that stops two steps
+driving one motor, and a bound the system inferred is one nobody decided.
+
+The third, the procedure's name, is taken from the plan. One proposal is
+one run of one plan, so the routine composed for it is named after what it
+runs, and a caller naming it would be naming something it did not compose.
+
+### Three streams, one transaction
+
+Adoption writes a procedure, an execution and the adoption itself. It
+writes them in one append, all or nothing, and this is the first slice in
+the tree to use `EventStore.append_streams`, whose own docstring had been
+waiting for a consumer.
+
+```
+   +-----------------------------------------------------------+
+   |  Procedure  proc-N   ProcedureDefined                      |
+   |  Execution  exec-N   ExecutionDispatched                   |
+   |  Proposal   prop-1   ProposalAdopted(exec-N, step-id)      |
+   +-----------------------------------------------------------+
+```
+
+The failure it removes is specific. Two callers adopting one proposal both
+fold the same open state and both decide a whole procedure and a whole
+execution; the loser finds out only when the store rejects its
+`expected_version`. Appended one at a time it would already have dispatched
+by then, and a conductor polling that beamline would walk work no proposal
+points at, for advice that was also about to run under the winner.
+
+That is the one failure that happens between the writes rather than before
+them, which makes it the only one that tests the transaction. Both of the
+other refusals, an empty bound and a proposal that is no longer open, are
+decided before anything is appended and would pass under either shape.
+`tests/integration/test_adopting_a_proposal_is_atomic_postgres.py` carries
+all three and says which is which.
+
+### Why the slice lives in Counsel, and what that costs
+
+Because the dependency cannot point the other way. Counsel may read
+Execution and does; Execution knows nothing of Counsel and must not, so a
+slice over there that loaded a proposal would be a cycle rather than an
+edge.
+
+The price is the only edge in this tree that reaches another context's
+feature layer. Composing and dispatching are Execution's decisions and are
+made by Execution's own deciders, which are pure functions this handler
+calls; only the append moves. Going through their handlers instead would be
+three appends, which is the window the slice exists to remove.
+
+## Why the aggregate has a status now
+
+This page used to say a proposal needed none, because `execution_id is
+None` carried the whole of it, and that an enum would arrive at the third
+state. Adoption is that third state.
+
+```
+   Open      nothing has come of this advice
+   Adopted   this system chose it and committed work to it
+   Taken     something outside ran it and said so
+```
+
+Derived in the fold from which event landed, never stored, which is
+`InquiryStatus`'s arrangement next door and `ExecutionStatus`'s before it.
+
+The read model spells the same three states out of two nullable timestamps
+and no status column, because a word beside them would be one fact written
+twice. That the two derivations agree is not visible in either, so the port
+contract carries the case that separates them: a proposal closed by
+adoption, where a reader testing `taken_at` first reports it Open and
+passes everything else.
+
+The filter is still `is_open`, and deliberately. Adding a status parameter
+needs somebody who wants to ask which of the two closed a proposal, and
+there is not one yet. That is a parameter and an index the day there is.
+
+## Two words for one stream, and why neither is the other
+
+### Taken, adopted, and the accepted spelling still held back
+
+```
+   ProposalMade       an actor put a run forward
+   ProposalAccepted   reserved: a person says yes, and it may still never run
+   ProposalAdopted    this system composed work for it and dispatched it
+   ProposalTaken      something outside ran it and said so
+```
+
+Two of those four close a proposal and in ordinary English they are near
+synonyms, so the distinction has to be said rather than assumed. It is not
+the act, it is the author of the commitment. Adopting means somebody
+weighed this proposal, chose it, chose where it would run and what it could
+touch. Taking means nobody here did: a step exists that ran what was
+proposed, and whoever composed the procedure holding it may never have read
+the proposal at all.
+
+`accepted` stays reserved through both. Approval by a person is a real
+future event on this stream, distinct from adoption and prior to it,
+because an operator can approve something that is then never adopted.
+
+`naming.md` predicted this pair before either existed: a verb that
+describes today may need to drive tomorrow, and the rule is to prefix the
+driving side and leave the bare imperative to the one that reports. Adopt
+drives, take reports.
 
 ## Why this is not a status on an Execution
 
@@ -94,6 +230,7 @@ An Agent aggregate earns its place when something needs to ask a question about 
 | Put one forward | `POST /proposals` | `make_proposal` | `201` with the new id |
 | Read one back | `GET /proposals/{proposal_id}` | `get_proposal` | `200` with the proposal |
 | Record that an acquisition took it | `POST /proposals/{proposal_id}/take` | `take_proposal` | `204` |
+| Adopt one, and dispatch the work | `POST /proposals/{proposal_id}/adopt` | `adopt_proposal` | `201` with the execution |
 | Find them | `GET /proposals` | `list_proposals` | `200` with a page |
 
 All four are published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `apps/keeper/src/keeper/counsel/routes.py`.
@@ -380,6 +517,8 @@ The step, and not the execution around it. The execution is what makes the step 
                                 and a context module, for the plan it reads
        get_proposal/            a query slice, so no decider
        take_proposal/           and a context module, for the step it checks
+       adopt_proposal/          composes, dispatches and records, in one append
+                                across three streams and two contexts
        list_proposals/          the query a fold cannot serve
        make_inquiry/            and a context module, for the execution it counts
        claim_inquiry/           optional in the lifecycle, and refused from two states
@@ -406,6 +545,8 @@ The first commit moved `EXPECTED_BC_COUNT` to 5, `EXPECTED_AGGREGATE_COUNT` to 6
 Two stemmers grew by one word between them, both in the test tier. `made` is the past participle of `make` and no suffix rule reaches it, so the command-to-event derivation and the event-name shape check each needed telling. Extending those maps is what their own docstrings ask for, and the alternative, loosening a suffix rule, is how a stemmer starts matching unrelated words.
 
 **The third** was the Inquiry: the aggregate, its five slices, a second projection with its own table and bookmark, and a second port contract suite. It moved `EXPECTED_AGGREGATE_COUNT` to 9 and `EXPECTED_SLICE_COUNT` to 39, added one stream type, four OpenAPI paths and five MCP tools to their pinned sets, and moved `EXPECTED_SCHEMA_VERSION` to its migration's timestamp. No stemmer grew: `made` was already there from the Proposal, and `claimed` and `answered` are regular.
+
+**The fourth** was adoption: `ProposalAdopted`, a `ProposalStatus` derived in the fold, an `adopted_at` column added to the summary rather than the table being rebuilt, and the `adopt_proposal` slice. It moved `EXPECTED_SLICE_COUNT` to 40, added an OpenAPI path and an MCP tool, and widened this context's door onto Execution from twelve names to eighteen, six of them reaching its feature layer for the first time.
 
 ## What is not here yet
 

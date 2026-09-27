@@ -28,11 +28,15 @@ from keeper.counsel.aggregates.inquiry import (
 )
 from keeper.counsel.aggregates.proposal import (
     PROPOSAL_STREAM_TYPE,
+    ProposalCannotBeAdoptedError,
     ProposalCannotBeTakenError,
     ProposalNotFoundError,
+    ProposalStatus,
     load_proposal,
 )
 from keeper.counsel.errors import UnauthorizedError
+from keeper.counsel.features.adopt_proposal import AdoptProposal
+from keeper.counsel.features.adopt_proposal import bind as bind_adopt
 from keeper.counsel.features.answer_inquiry import AnswerInquiry
 from keeper.counsel.features.answer_inquiry import bind as bind_answer_inquiry
 from keeper.counsel.features.claim_inquiry import ClaimInquiry
@@ -48,12 +52,19 @@ from keeper.counsel.features.make_proposal import bind as bind_make
 from keeper.counsel.features.take_proposal import TakeProposal
 from keeper.counsel.features.take_proposal import bind as bind_take
 from keeper.execution.aggregates.execution import (
+    EXECUTION_STREAM_TYPE,
     ExecutionNotFoundError,
+    ExecutionStatus,
     ExecutionStepNotFoundError,
     load_execution,
 )
 from keeper.execution.aggregates.plan import PlanNotFoundError
-from keeper.execution.aggregates.procedure import AcquireStep, MoveStep
+from keeper.execution.aggregates.procedure import (
+    AcquireStep,
+    InvalidProcedureStepsError,
+    MoveStep,
+    load_procedure,
+)
 from keeper.execution.features.define_plan import DefinePlan
 from keeper.execution.features.define_plan import bind as bind_define_plan
 from keeper.execution.features.define_procedure import DefineProcedure
@@ -697,6 +708,196 @@ async def test_reading_an_inquiry_that_does_not_exist_is_refused() -> None:
     with pytest.raises(InquiryNotFoundError):
         await bind_get_inquiry(deps)(
             GetInquiry(inquiry_id=uuid4()),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+def _streams(deps: Kernel, stream_type: str) -> list[UUID]:
+    """How many streams of a type the in-memory store holds.
+
+    Narrowed here rather than at each call site, because enumerating
+    streams is not something the `EventStore` port offers and should not
+    become something it offers: it exists so a fold-everything adapter
+    can work in a process with no database, and a test counting what an
+    append did is the same kind of caller.
+    """
+    store = deps.event_store
+    assert isinstance(store, InMemoryEventStore)
+    return list(store.stream_ids(stream_type))
+
+
+async def test_adopting_a_proposal_dispatches_an_execution_that_runs_it() -> None:
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution_id = await bind_adopt(deps)(
+        AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=("2bmb:det:",)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution = await load_execution(deps.event_store, execution_id)
+    assert execution is not None
+    assert execution.status is ExecutionStatus.DISPATCHED
+    assert len(execution.steps) == 1
+
+
+async def test_adopting_composes_a_procedure_named_after_the_plan() -> None:
+    """One proposal is one run of one plan, so the routine composed for
+    it is named after the plan it runs and nobody has to name it."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution_id = await bind_adopt(deps)(
+        AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=("2bmb:det:",)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution = await load_execution(deps.event_store, execution_id)
+    assert execution is not None
+    procedure = await load_procedure(deps.event_store, execution.procedure_id)
+    assert procedure is not None
+    assert procedure.name.value == "count"
+    assert procedure.beamline.value == "2-bm"
+
+
+async def test_adopting_puts_the_declared_devices_on_the_composed_step() -> None:
+    """The bound the caller stated, which is the reason the command takes
+    one: nothing here can derive what a plan touches."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution_id = await bind_adopt(deps)(
+        AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=("2bmb:det:", "2bmb:m1")),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution = await load_execution(deps.event_store, execution_id)
+    assert execution is not None
+    procedure = await load_procedure(deps.event_store, execution.procedure_id)
+    assert procedure is not None
+    composed = procedure.steps[0].step
+    assert isinstance(composed, AcquireStep)
+    assert composed.scopes == ("2bmb:det:", "2bmb:m1")
+
+
+async def test_adopting_points_the_proposal_at_the_step_it_composed() -> None:
+    """The join, written in the same transaction that created the step,
+    which is what a caller reads to see that its advice became work."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    execution_id = await bind_adopt(deps)(
+        AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=("2bmb:det:",)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    proposal = await load_proposal(deps.event_store, proposal_id)
+    execution = await load_execution(deps.event_store, execution_id)
+    assert proposal is not None
+    assert execution is not None
+    assert proposal.status is ProposalStatus.ADOPTED
+    assert (proposal.execution_id, proposal.step_id) == (execution_id, execution.steps[0].id)
+
+
+async def test_a_refused_adoption_dispatches_nothing_at_all() -> None:
+    """The property the whole slice exists for, at the in-memory tier.
+
+    The second adoption is refused by the decider, which runs after the
+    procedure and the execution have been decided but before anything is
+    appended. If those two were appended separately this would leave a
+    beamline committed to work no proposal knows about.
+    """
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    await bind_adopt(deps)(
+        AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=("2bmb:det:",)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    before = len(_streams(deps, EXECUTION_STREAM_TYPE))
+
+    with pytest.raises(ProposalCannotBeAdoptedError):
+        await bind_adopt(deps)(
+            AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=("2bmb:det:",)),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+    assert len(_streams(deps, EXECUTION_STREAM_TYPE)) == before
+
+
+async def test_an_adoption_with_no_devices_writes_nothing_anywhere() -> None:
+    """The refusal comes from Execution, deep inside composing, and it
+    still has to leave the proposal untouched. Nothing is appended until
+    all three decisions have been made."""
+    deps = _kernel()
+    plan_id = await _a_plan(deps)
+    proposal_id = await bind_make(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    with pytest.raises(InvalidProcedureStepsError):
+        await bind_adopt(deps)(
+            AdoptProposal(proposal_id=proposal_id, beamline="2-bm", scopes=()),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+    proposal = await load_proposal(deps.event_store, proposal_id)
+    assert proposal is not None
+    assert proposal.status is ProposalStatus.OPEN
+    assert _streams(deps, EXECUTION_STREAM_TYPE) == []
+
+
+async def test_adopting_a_proposal_that_does_not_exist_is_refused() -> None:
+    deps = _kernel()
+
+    with pytest.raises(ProposalNotFoundError):
+        await bind_adopt(deps)(
+            AdoptProposal(proposal_id=uuid4(), beamline="2-bm", scopes=("2bmb:det:",)),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def test_a_denied_caller_cannot_adopt_a_proposal() -> None:
+    deps = _kernel(authz=_DenyAllAuthorize())
+
+    with pytest.raises(UnauthorizedError):
+        await bind_adopt(deps)(
+            AdoptProposal(proposal_id=uuid4(), beamline="2-bm", scopes=("2bmb:det:",)),
             principal_id=uuid4(),
             correlation_id=uuid4(),
         )

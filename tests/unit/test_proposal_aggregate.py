@@ -14,7 +14,9 @@ import pytest
 
 from keeper.counsel.aggregates.proposal import (
     Proposal,
+    ProposalAdopted,
     ProposalMade,
+    ProposalStatus,
     ProposalTaken,
     evolve,
     fold,
@@ -52,7 +54,7 @@ def _taken(proposal_id: object, **overrides: object) -> ProposalTaken:
     return ProposalTaken(**fields)  # pyright: ignore[reportArgumentType]
 
 
-def _stored(event: ProposalMade | ProposalTaken) -> StoredEvent:
+def _stored(event: ProposalMade | ProposalTaken | ProposalAdopted) -> StoredEvent:
     return StoredEvent(
         position=1,
         event_id=uuid4(),
@@ -207,3 +209,69 @@ def test_a_malformed_payload_names_the_event_and_not_the_field() -> None:
 
     with pytest.raises(ValueError, match="Malformed ProposalMade"):
         from_stored(broken)
+
+
+def _adopted(proposal_id: object, **overrides: object) -> ProposalAdopted:
+    fields: dict[str, object] = {
+        "proposal_id": proposal_id,
+        "execution_id": uuid4(),
+        "step_id": uuid4(),
+        "occurred_at": _WHEN,
+    }
+    fields.update(overrides)
+    return ProposalAdopted(**fields)  # pyright: ignore[reportArgumentType]
+
+
+def test_a_proposal_nothing_came_of_reads_as_open() -> None:
+    assert fold([_made()]).status is ProposalStatus.OPEN  # pyright: ignore[reportOptionalMemberAccess]
+
+
+def test_folding_an_adoption_records_the_acquisition_it_was_composed_into() -> None:
+    made = _made()
+    adopted = _adopted(made.proposal_id)
+
+    state = fold([made, adopted])
+
+    assert state is not None
+    assert (state.execution_id, state.step_id) == (adopted.execution_id, adopted.step_id)
+
+
+def test_an_adopted_proposal_and_a_taken_one_differ_only_in_the_status() -> None:
+    """Both close the proposal and both write the same two ids. The word
+    is the only thing that says which way it closed, which is why it is
+    derived from the event rather than read off a payload."""
+    made = _made()
+    execution_id, step_id = uuid4(), uuid4()
+
+    adopted = fold([made, _adopted(made.proposal_id, execution_id=execution_id, step_id=step_id)])
+    taken = fold([made, _taken(made.proposal_id, execution_id=execution_id, step_id=step_id)])
+
+    assert adopted is not None
+    assert taken is not None
+    assert adopted.status is ProposalStatus.ADOPTED
+    assert taken.status is ProposalStatus.TAKEN
+    assert (adopted.execution_id, adopted.step_id) == (taken.execution_id, taken.step_id)
+
+
+def test_an_adopted_proposal_is_no_longer_open() -> None:
+    """`is_taken` answers whether anything came of it, either way, which
+    is the bit the read side has always filtered on."""
+    made = _made()
+
+    state = fold([made, _adopted(made.proposal_id)])
+
+    assert state is not None
+    assert state.is_taken is True
+
+
+def test_an_adoption_survives_the_round_trip_through_the_log() -> None:
+    made = _made()
+    adopted = _adopted(made.proposal_id)
+
+    assert from_stored(_stored(adopted)) == adopted
+    assert fold([from_stored(_stored(event)) for event in (made, adopted)]) == fold([made, adopted])
+
+
+def test_adopting_a_proposal_that_was_never_made_is_refused() -> None:
+    with pytest.raises(ValueError, match="ProposalAdopted"):
+        evolve(None, _adopted(uuid4()))

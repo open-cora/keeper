@@ -11,6 +11,13 @@ Two things are new here.
 than two, so a check that only exercised true and false would leave the
 unfiltered case, the default, untested on both sides.
 
+**A proposal now closes two ways, and the row does not say which in a
+column.** The status is derived, once from the fold and once from two
+nullable timestamps, by two pieces of code that cannot see each other.
+The check for an adopted proposal is what holds them together: it is
+the state where a reader testing the wrong column first still passes
+everything else.
+
 **The aggregate has a second event.** Every other summary in this tree
 is written once and never changes, or changes only a status word. This
 one gains three columns when an acquisition takes the proposal, and the two
@@ -28,6 +35,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from keeper.counsel.aggregates.proposal.state import ProposalStatus
 from keeper.counsel.aggregates.proposal.summary import ProposalSummaryLookup
 from keeper.infrastructure.projection.cursor import InvalidCursorError, encode_cursor
 
@@ -50,6 +58,12 @@ class ProposalWriter(Protocol):
         self, *, proposal_id: UUID, execution_id: UUID, step_id: UUID, at: datetime
     ) -> None:
         """Record that one acquisition took it."""
+        ...
+
+    async def adopt(
+        self, *, proposal_id: UUID, execution_id: UUID, step_id: UUID, at: datetime
+    ) -> None:
+        """Record that this system chose it and dispatched work for it."""
         ...
 
 
@@ -344,10 +358,124 @@ async def check_a_cursor_past_the_end_returns_an_empty_page(
     assert page.next_cursor is None
 
 
+async def check_a_new_proposal_is_open(
+    lookup: ProposalSummaryLookup, writer: ProposalWriter
+) -> None:
+    await _one_proposal(writer, minute=0)
+
+    page = await lookup.list_proposals(is_open=None, limit=_PAGE, cursor=None)
+
+    assert page.items[0].status is ProposalStatus.OPEN
+
+
+async def check_a_taken_proposal_reads_as_taken(
+    lookup: ProposalSummaryLookup, writer: ProposalWriter
+) -> None:
+    proposal_id = await _one_proposal(writer, minute=0)
+    await writer.take(
+        proposal_id=proposal_id,
+        execution_id=uuid4(),
+        step_id=uuid4(),
+        at=_EPOCH + timedelta(minutes=1),
+    )
+
+    page = await lookup.list_proposals(is_open=None, limit=_PAGE, cursor=None)
+
+    (summary,) = page.items
+    assert summary.status is ProposalStatus.TAKEN
+    assert summary.adopted_at is None
+
+
+async def check_an_adopted_proposal_reads_as_adopted(
+    lookup: ProposalSummaryLookup, writer: ProposalWriter
+) -> None:
+    """The case that separates the two derivations of the status.
+
+    One side reads it off the fold and the other computes it from two
+    nullable columns. An adopted proposal has `taken_at` null, so a
+    reader that tests that column first calls this Open and passes every
+    other check in this file.
+    """
+    proposal_id = await _one_proposal(writer, minute=0)
+    adopted_at = _EPOCH + timedelta(minutes=1)
+    await writer.adopt(
+        proposal_id=proposal_id, execution_id=uuid4(), step_id=uuid4(), at=adopted_at
+    )
+
+    page = await lookup.list_proposals(is_open=None, limit=_PAGE, cursor=None)
+
+    (summary,) = page.items
+    assert summary.status is ProposalStatus.ADOPTED
+    assert summary.adopted_at == adopted_at
+    assert summary.taken_at is None
+
+
+async def check_an_adopted_proposal_carries_the_acquisition_it_was_composed_into(
+    lookup: ProposalSummaryLookup, writer: ProposalWriter
+) -> None:
+    """Both halves of the reference, as with a take. The step was
+    composed in the same transaction that wrote this, so a row holding
+    one without the other is not one the write side can produce."""
+    proposal_id = await _one_proposal(writer, minute=0)
+    execution_id, step_id = uuid4(), uuid4()
+    await writer.adopt(
+        proposal_id=proposal_id,
+        execution_id=execution_id,
+        step_id=step_id,
+        at=_EPOCH + timedelta(minutes=1),
+    )
+
+    page = await lookup.list_proposals(is_open=None, limit=_PAGE, cursor=None)
+
+    assert (page.items[0].execution_id, page.items[0].step_id) == (execution_id, step_id)
+
+
+async def check_an_adopted_proposal_leaves_the_open_side(
+    lookup: ProposalSummaryLookup, writer: ProposalWriter
+) -> None:
+    """Adoption closes a proposal as surely as a take does, so the filter
+    the context exists for has to see both."""
+    proposal_id = await _one_proposal(writer, minute=0)
+    await writer.adopt(
+        proposal_id=proposal_id,
+        execution_id=uuid4(),
+        step_id=uuid4(),
+        at=_EPOCH + timedelta(minutes=1),
+    )
+
+    still_open = await lookup.list_proposals(is_open=True, limit=_PAGE, cursor=None)
+    acted_on = await lookup.list_proposals(is_open=False, limit=_PAGE, cursor=None)
+
+    assert still_open.items == []
+    assert [summary.proposal_id for summary in acted_on.items] == [proposal_id]
+
+
+async def check_adopting_does_not_move_when_the_proposal_was_made(
+    lookup: ProposalSummaryLookup, writer: ProposalWriter
+) -> None:
+    proposal_id = await _one_proposal(writer, minute=0)
+    await writer.adopt(
+        proposal_id=proposal_id,
+        execution_id=uuid4(),
+        step_id=uuid4(),
+        at=_EPOCH + timedelta(minutes=5),
+    )
+
+    page = await lookup.list_proposals(is_open=None, limit=_PAGE, cursor=None)
+
+    assert page.items[0].created_at == _EPOCH
+
+
 CHECKS: tuple[Check, ...] = (
     check_an_empty_read_model_returns_an_empty_page,
     check_a_new_proposal_shows_with_its_proposer_plan_and_time,
     check_a_new_proposal_has_no_acquisition_and_no_taken_time,
+    check_a_new_proposal_is_open,
+    check_a_taken_proposal_reads_as_taken,
+    check_an_adopted_proposal_reads_as_adopted,
+    check_an_adopted_proposal_carries_the_acquisition_it_was_composed_into,
+    check_an_adopted_proposal_leaves_the_open_side,
+    check_adopting_does_not_move_when_the_proposal_was_made,
     check_a_taken_proposal_carries_the_acquisition_and_when_it_took_it,
     check_taking_a_proposal_does_not_move_when_it_was_made,
     check_the_open_filter_returns_only_proposals_nothing_took,

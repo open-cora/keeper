@@ -182,12 +182,28 @@ path = "keeper.counsel.aggregates"
 depends_on = ["keeper.shared", "keeper.infrastructure"]
 
 [[modules]]
+# The second Execution edge is the price of adopting a proposal, and it
+# is the only edge in this tree that reaches another context's FEATURE
+# layer rather than its aggregates.
+#
+# Adopting composes a procedure and dispatches an execution in the same
+# transaction that records the adoption, so that a crash cannot leave a
+# beamline running work no proposal knows about. Those two decisions
+# belong to Execution and are made by Execution's own deciders, which
+# are pure functions this handler calls; only the append moves here.
+# Going through their handlers instead would be three appends, which is
+# the window the whole slice exists to remove.
+#
+# The dependency cannot point the other way. Execution knows nothing of
+# Counsel and must not, so a slice over there that loaded a proposal
+# would be a cycle rather than an edge.
 path = "keeper.counsel"
 depends_on = [
     "keeper.shared",
     "keeper.infrastructure",
     "keeper.counsel.aggregates",
     "keeper.execution.aggregates",
+    "keeper.execution",
 ]
 
 # Equipment reaches into no sibling at all, and it is the first context
@@ -267,7 +283,7 @@ expose = [
 ]
 visibility = ["keeper.custody"]
 
-# Counsel reads Execution four times, and the four reads are different
+# Counsel reads Execution five times, and the five reads are different
 # in kind, which is why this door is wider than Custody's.
 #
 # Making a proposal loads a plan and reads its schema, so the decision
@@ -284,7 +300,18 @@ visibility = ["keeper.custody"]
 # That last hop is what the extra names buy: the decision asks which plan
 # the step runs, and the answer lives on the definition.
 #
-# Twelve names where Custody needs three, and the difference is exactly
+# Adopting a proposal is the fifth and the only one that writes. It
+# needs the two stream types and the two payload renderers, because the
+# events it appends belong to Execution's aggregates, and it needs
+# `AcquireStep` to compose one and `fold` to turn the procedure it just
+# decided into the value the dispatch decider takes as context.
+#
+# That is six names for one slice, and they are here rather than behind
+# some narrower helper because a door is sized by what the consumer
+# imports and pretending otherwise would only move the width somewhere
+# a test cannot see it.
+#
+# Eighteen names where Custody needs three, and the difference is exactly
 # that Custody checks existence and reads nothing off what it loaded. A door
 # is sized by what the consumer imports, which is the only honest way to
 # size one, and `test_tach_edges_are_used.py` is what keeps that true.
@@ -310,7 +337,13 @@ expose = [
     "execution.Execution",
     "execution.ExecutionNotFoundError",
     "execution.ExecutionStepNotFoundError",
+    "execution.EXECUTION_STREAM_TYPE",
+    "execution.to_payload",
     "procedure.load_procedure",
+    "procedure.PROCEDURE_STREAM_TYPE",
+    "procedure.AcquireStep",
+    "procedure.fold",
+    "procedure.to_payload",
     "procedure.ComposedStep",
     "procedure.ProcedureNotFoundError",
     "procedure.ProcedureStepNotFoundError",

@@ -39,10 +39,10 @@ A page on the Authority context, which holds the Policy aggregate and the four s
                              Equipment
    aggregates          9     Actor, Policy, Plan, Procedure, Execution,
                              Dataset, Proposal, Inquiry, Device
-   slices             39     four on Actor, four on Policy,
+   slices             40     four on Actor, four on Policy,
                              three on Plan, three on Procedure,
                              seven on Execution, three on Dataset,
-                             four on Proposal, five on Inquiry,
+                             five on Proposal, five on Inquiry,
                              six on Device
 ```
 

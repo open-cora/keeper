@@ -47,6 +47,8 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from keeper.counsel.aggregates.proposal.state import ProposalStatus
+
 
 @dataclass(frozen=True)
 class ProposalSummary:
@@ -60,19 +62,29 @@ class ProposalSummary:
     never a caller's claim: making one is an act this system performs, so
     the envelope's domain time is this system's own clock reading.
 
-    `taken_at` is when an acquisition took it, and None while it is
-    open. This is the caller's claim, because the step was driven
-    somewhere else, so the two timestamps on one row come from different
-    authorities. That is the R8 split showing up on the read side.
+    `taken_at` is when an acquisition took it, and None unless that is
+    how it closed. This is the caller's claim, because the step was
+    driven somewhere else. `adopted_at` is when this system chose it and
+    dispatched work, and can only ever be this system's own clock
+    reading. Three timestamps on one row from two authorities, which is
+    the R8 split showing up on the read side.
+
+    `status` says which of the two closed it, and is derived rather than
+    stored: the table holds the timestamps and nothing else, because a
+    word beside them would be one fact written twice. Both adapters
+    spell that derivation, one from the columns and one from the fold,
+    and the port contract is what keeps them agreeing.
     """
 
     proposal_id: UUID
     actor_id: UUID
     plan_id: UUID
+    status: ProposalStatus
     execution_id: UUID | None
     step_id: UUID | None
     created_at: datetime
     taken_at: datetime | None
+    adopted_at: datetime | None
 
 
 @dataclass(frozen=True)

@@ -4,12 +4,16 @@ Events live with the aggregate rather than with the slice that emits
 them, because they are facts about the aggregate's history. A slice
 decides when one happens; the history is not the slice's to own.
 
-Two members, and between them they carry the whole of R8. `ProposalMade`
-records an act performed here, so the command that produces it accepts
-no timestamp and the handler supplies the clock's reading.
-`ProposalTaken` records a step that was driven somewhere else, so its
-command does accept one. Everywhere else in this tree that split runs between
-contexts; here it runs between two commands on one stream.
+Three members, and between them they carry the whole of R8.
+`ProposalMade` and `ProposalAdopted` record acts performed here, so the
+commands that produce them accept no timestamp and the handler supplies
+the clock's reading. `ProposalTaken` records a step that was driven
+somewhere else, so its command does accept one. Everywhere else in this
+tree that split runs between contexts; here it runs within one stream.
+
+Two of the three close a proposal, and the difference between them is
+who decided. That distinction is argued at each of the two rather than
+here, because a reader meets them one at a time.
 
 Both carry `occurred_at` all the same. Every event does: what differs is
 who is allowed to say what it holds.
@@ -77,6 +81,18 @@ class ProposalTaken:
     something that then never runs, and spending the word here would
     leave that event nothing to be called.
 
+    **Taken rather than adopted, which is the second word withheld.**
+    Adopting says somebody weighed this proposal against the others,
+    chose it, chose where it would run and what it could touch, and
+    committed the facility. Nothing of the sort need have happened here:
+    this event is a report that a step exists which ran what was
+    proposed, and whoever composed the procedure holding it may never
+    have read the proposal at all.
+
+    The two are near-synonyms in ordinary English and are kept apart on
+    purpose. What separates them is not the act but its author, and this
+    is the arm where the author is somewhere else.
+
     Carries both ids because a step is an entity inside an execution
     rather than a stream of its own, so the step id alone names
     something no reader can reach.
@@ -91,12 +107,60 @@ class ProposalTaken:
     occurred_at: datetime
 
 
-ProposalEvent = ProposalMade | ProposalTaken
+@dataclass(frozen=True)
+class ProposalAdopted:
+    """The proposal was chosen here, and work was committed to it.
+
+    Adopted rather than enacted, and rather than accepted, and the two
+    words left alone are each left alone for their own reason.
+
+    Enacting names what happens elsewhere: a procedure composed and an
+    execution dispatched, both of which are Execution's business. This
+    context is named for what it keeps rather than for what happens
+    elsewhere, and its events should be too. What happened to the advice
+    is that it was adopted.
+
+    Accepting is reserved, and `ProposalTaken` reserved it: approval by
+    a person is a real future event on this stream, distinct from this
+    one and prior to it, because an operator can approve something that
+    is then never adopted. Spending the word here would leave that event
+    nothing to be called.
+
+    **This event claims a decision, and that is the difference from
+    `ProposalTaken`.** Somebody called for this proposal to run, named
+    the beamline it would run at and the devices it may touch, and this
+    system composed and dispatched accordingly. The sibling event claims
+    no decision at all.
+
+    Carries both ids for the reason its sibling does: a step is an
+    entity inside an execution rather than a stream of its own.
+
+    No `occurred_at`. Adopting is an act this system performs and the
+    call is the performing, so there is no earlier moment out in the
+    world for the record to be late to. That is R8 on the makes side,
+    beside `ProposalMade` rather than beside `ProposalTaken`.
+
+    No actor, where the genesis has one. Who advised is the substance of
+    a proposal; who adopted it is carried by the envelope, and a second
+    copy here could disagree with it.
+
+    Nothing here names the procedure. It is reachable through the
+    execution, which cites the procedure it was dispatched from, and a
+    copy would be a third place for one fact.
+    """
+
+    proposal_id: UUID
+    execution_id: UUID
+    step_id: UUID
+    occurred_at: datetime
+
+
+ProposalEvent = ProposalMade | ProposalTaken | ProposalAdopted
 """Every event that can appear on a Proposal stream.
 
 A new member is a new class added here and to this alias, never a field
-bolted onto an event already in the log. Withdrawing and superseding are
-the two foreseeable ones. Adding one without teaching the evolver about
+bolted onto an event already in the log. Withdrawing, superseding and a
+person's approval are the three foreseeable ones. Adding one without teaching the evolver about
 it is a type error, because the wildcard arm there calls `assert_never`.
 """
 
@@ -112,7 +176,7 @@ def to_payload(event: ProposalEvent) -> dict[str, Any]:
                 "parameters": dict(event.parameters),
                 "occurred_at": event.occurred_at.isoformat(),
             }
-        case ProposalTaken():
+        case ProposalTaken() | ProposalAdopted():
             return {
                 "proposal_id": str(event.proposal_id),
                 "execution_id": str(event.execution_id),
@@ -145,6 +209,17 @@ def from_stored(stored: StoredEvent) -> ProposalEvent:
                 ),
                 extra=(ValueError,),
             )
+        case "ProposalAdopted":
+            return deserialize_or_raise(
+                "ProposalAdopted",
+                lambda: ProposalAdopted(
+                    proposal_id=UUID(payload["proposal_id"]),
+                    execution_id=UUID(payload["execution_id"]),
+                    step_id=UUID(payload["step_id"]),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
         case "ProposalTaken":
             return deserialize_or_raise(
                 "ProposalTaken",
@@ -162,6 +237,7 @@ def from_stored(stored: StoredEvent) -> ProposalEvent:
 
 
 __all__ = [
+    "ProposalAdopted",
     "ProposalEvent",
     "ProposalMade",
     "ProposalTaken",

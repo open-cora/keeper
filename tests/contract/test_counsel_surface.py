@@ -600,3 +600,163 @@ def test_a_listed_inquiry_carries_the_question_itself(client: TestClient) -> Non
         page = client.get("/inquiries")
 
     assert page.json()["items"][0]["objective"] == "is one scan enough"
+
+
+def _adopt(client: TestClient, proposal_id: str, **overrides: Any) -> Any:
+    body: dict[str, Any] = {"beamline": "2-bm", "scopes": ["2bmb:det:"]}
+    body.update(overrides)
+    return client.post(f"/proposals/{proposal_id}/adopt", json=body)
+
+
+def test_adopting_a_proposal_returns_the_execution_it_dispatched(client: TestClient) -> None:
+    """The one thing a caller cannot work out for itself, and the thing
+    it will watch next."""
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+
+        adopted = _adopt(client, proposal_id)
+
+    assert adopted.status_code == 201, adopted.text
+    assert adopted.json()["execution_id"]
+
+
+def test_an_adopted_proposal_reads_back_pointing_at_its_acquisition(
+    client: TestClient,
+) -> None:
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+        execution_id = _adopt(client, proposal_id).json()["execution_id"]
+
+        proposal = client.get(f"/proposals/{proposal_id}").json()
+        execution = client.get(f"/executions/{execution_id}").json()
+
+    assert proposal["execution_id"] == execution_id
+    assert proposal["step_id"] == execution["steps"][0]["step_id"]
+
+
+def test_the_adopted_execution_is_waiting_for_a_driver(client: TestClient) -> None:
+    """How an adopted proposal reaches a conductor: it becomes an
+    ordinary dispatched execution, and the conductor knows nothing about
+    proposals at all."""
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+        execution_id = _adopt(client, proposal_id).json()["execution_id"]
+
+        execution = client.get(f"/executions/{execution_id}").json()
+
+    assert execution["status"] == "Dispatched"
+    assert execution["beamline"] == "2-bm"
+
+
+def test_adopting_the_same_proposal_twice_is_409(client: TestClient) -> None:
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+        assert _adopt(client, proposal_id).status_code == 201
+
+        again = _adopt(client, proposal_id)
+
+    assert again.status_code == 409, again.text
+
+
+def test_adopting_a_proposal_an_acquisition_already_took_is_409(client: TestClient) -> None:
+    """Composing more work for advice something else already acted on
+    would run it twice."""
+    with client:
+        plan_id = _a_plan(client)
+        proposal_id = _a_proposal(client, plan_id)
+        acquisition = _an_acquisition_of(client, plan_id)
+        taken = client.post(f"/proposals/{proposal_id}/take", json=_body(acquisition))
+        assert taken.status_code == 204, taken.text
+
+        refused = _adopt(client, proposal_id)
+
+    assert refused.status_code == 409, refused.text
+
+
+def test_adopting_with_no_devices_is_refused_at_the_wire(client: TestClient) -> None:
+    """A step believed to touch nothing can run beside another over the
+    same motor, so an empty bound never reaches a decider."""
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+
+        refused = _adopt(client, proposal_id, scopes=[])
+
+    assert refused.status_code == 422, refused.text
+
+
+def test_a_refused_adoption_leaves_the_proposal_open(client: TestClient) -> None:
+    """Nothing is written until all three decisions are made, so a
+    refusal anywhere in the slice leaves every stream as it was."""
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+        refused = _adopt(client, proposal_id, beamline="")
+
+        proposal = client.get(f"/proposals/{proposal_id}").json()
+        open_ones = client.get("/proposals", params={"is_open": True}).json()
+
+    assert refused.status_code in {400, 422}, refused.text
+    assert proposal["execution_id"] is None
+    assert proposal_id in {item["proposal_id"] for item in open_ones["items"]}
+
+
+def test_adopting_a_proposal_that_was_never_made_is_404(client: TestClient) -> None:
+    with client:
+        refused = _adopt(client, str(uuid4()))
+
+    assert refused.status_code == 404, refused.text
+
+
+def test_a_listed_proposal_says_which_way_it_closed(client: TestClient) -> None:
+    """The status the third state earned. A null test can say that
+    something came of a proposal and not which of the two ways."""
+    with client:
+        plan_id = _a_plan(client)
+        adopted_id = _a_proposal(client, plan_id)
+        _adopt(client, adopted_id)
+        taken_id = _a_proposal(client, plan_id)
+        client.post(f"/proposals/{taken_id}/take", json=_body(_an_acquisition_of(client, plan_id)))
+        open_id = _a_proposal(client, plan_id)
+
+        listed = client.get("/proposals").json()["items"]
+
+    by_id = {item["proposal_id"]: item["status"] for item in listed}
+    assert by_id[adopted_id] == "Adopted"
+    assert by_id[taken_id] == "Taken"
+    assert by_id[open_id] == "Open"
+
+
+def test_replaying_an_idempotency_key_returns_the_first_execution(client: TestClient) -> None:
+    """A retry the domain would refuse has already dispatched something.
+    The caller that could not tell whether its request landed needs the
+    same execution back, not a 409 it has to go and interpret."""
+    with client:
+        proposal_id = _a_proposal(client, _a_plan(client))
+        headers = {"Idempotency-Key": "one-adoption-sent-twice"}
+        body = {"beamline": "2-bm", "scopes": ["2bmb:det:"]}
+
+        first = client.post(f"/proposals/{proposal_id}/adopt", json=body, headers=headers)
+        second = client.post(f"/proposals/{proposal_id}/adopt", json=body, headers=headers)
+
+    assert first.status_code == 201, first.text
+    assert second.json()["execution_id"] == first.json()["execution_id"]
+
+
+def test_reading_one_proposal_says_which_way_it_closed(client: TestClient) -> None:
+    """The single read carries the status, not only the listing.
+
+    A live run found this missing after the listing had it: a caller
+    holding one id could see that something came of its advice and not
+    which of the two ways, which is the whole distinction the status
+    was added to carry.
+    """
+    with client:
+        plan_id = _a_plan(client)
+        adopted_id = _a_proposal(client, plan_id)
+        _adopt(client, adopted_id)
+        open_id = _a_proposal(client, plan_id)
+
+        adopted = client.get(f"/proposals/{adopted_id}").json()
+        still_open = client.get(f"/proposals/{open_id}").json()
+
+    assert adopted["status"] == "Adopted"
+    assert still_open["status"] == "Open"

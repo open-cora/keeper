@@ -1,9 +1,9 @@
 """Keep `proj_counsel_proposal_summary` in step with the proposal streams.
 
-Two arms, one per event, which is the middle of the three projections in
-this tree: simpler than an execution's, which maps many event types onto
-a status and a set, and less trivial than a dataset's, which has one
-INSERT and no transitions.
+Three arms, one per event. The two closing arms write the same step
+reference into the same columns and differ only in which timestamp they
+stamp, which is what lets the read side tell an adoption from a take
+without the table holding a word for it.
 
 ## The name is three things at once
 
@@ -19,18 +19,18 @@ Delivery is at-least-once. The worker advances its bookmark in the same
 transaction as the writes, so a crash between the two replays the batch,
 and a replayed batch has to leave the table where the first pass left it.
 
-The genesis takes `ON CONFLICT (proposal_id) DO NOTHING`. The take is
-idempotent for a different reason and it is worth being explicit: it
-writes the same two values every time, derived entirely from the event
-rather than from what the row currently holds, so applying it twice is
-applying it once. A projection arm that incremented or appended could not
-say that.
+The genesis takes `ON CONFLICT (proposal_id) DO NOTHING`. The two
+closing arms are idempotent for a different reason and it is worth being
+explicit: each writes the same values every time, derived entirely from
+the event rather than from what the row currently holds, so applying one
+twice is applying it once. A projection arm that incremented or appended
+could not say that.
 
-## Why the update is not conditional
+## Why the updates are not conditional
 
-The take writes the step reference and `taken_at` over whatever is
-there, without checking that the row is still open. The decider already refuses a second
-take, so a stream carrying two is a stream that could not have been
+Neither closing arm checks that the row is still open. The decider
+already refuses a second take and refuses a take on an adopted proposal,
+so a stream carrying two closings is a stream that could not have been
 written, and an arm defending against it would be defending against a
 state the write side makes impossible.
 
@@ -43,9 +43,10 @@ warning naming it is what an operator needs to rebuild.
 
 ## Why there is no status column
 
-The table stores the step reference nullable and nothing else. Openness
-is the null test, on the read side and here, so there is no second
-spelling of one bit for these two arms to write inconsistently.
+The table stores the step reference and two nullable timestamps, and the
+read side derives all three states from them. A word beside them would
+be the same fact written twice, and two spellings are two things these
+arms could write inconsistently.
 """
 
 from typing import Any
@@ -65,17 +66,25 @@ reads the bookmark, and the adapter that queries the rows.
 
 _GENESIS_EVENT_TYPE = "ProposalMade"
 _TAKEN_EVENT_TYPE = "ProposalTaken"
+_ADOPTED_EVENT_TYPE = "ProposalAdopted"
 
 _INSERT_SQL = f"""
 INSERT INTO {PROJECTION_NAME} (
-    proposal_id, actor_id, plan_id, execution_id, step_id, created_at, taken_at
-) VALUES ($1, $2, $3, NULL, NULL, $4, NULL)
+    proposal_id, actor_id, plan_id, execution_id, step_id, created_at,
+    taken_at, adopted_at
+) VALUES ($1, $2, $3, NULL, NULL, $4, NULL, NULL)
 ON CONFLICT (proposal_id) DO NOTHING
 """
 
 _TAKE_SQL = f"""
 UPDATE {PROJECTION_NAME}
 SET execution_id = $2, step_id = $3, taken_at = $4
+WHERE proposal_id = $1
+"""
+
+_ADOPT_SQL = f"""
+UPDATE {PROJECTION_NAME}
+SET execution_id = $2, step_id = $3, adopted_at = $4
 WHERE proposal_id = $1
 """
 
@@ -86,7 +95,9 @@ class ProposalSummaryProjection:
     """Folds proposal events into one row per proposal."""
 
     name = PROJECTION_NAME
-    subscribed_event_types = frozenset({_GENESIS_EVENT_TYPE, _TAKEN_EVENT_TYPE})
+    subscribed_event_types = frozenset(
+        {_GENESIS_EVENT_TYPE, _TAKEN_EVENT_TYPE, _ADOPTED_EVENT_TYPE}
+    )
 
     async def apply(self, event: StoredEvent, conn: ConnectionLike) -> None:
         """Write one event into the table, inside the worker's transaction.
@@ -99,7 +110,10 @@ class ProposalSummaryProjection:
         if event.event_type == _GENESIS_EVENT_TYPE:
             await self._insert(event, conn)
             return
-        await self._take(event, conn)
+        if event.event_type == _ADOPTED_EVENT_TYPE:
+            await self._close(event, conn, _ADOPT_SQL, arm="adopt")
+            return
+        await self._close(event, conn, _TAKE_SQL, arm="take")
 
     async def _insert(self, event: StoredEvent, conn: ConnectionLike) -> None:
         """Write the genesis row, open.
@@ -124,17 +138,25 @@ class ProposalSummaryProjection:
             event.occurred_at,
         )
 
-    async def _take(self, event: StoredEvent, conn: ConnectionLike) -> None:
-        """Put the acquisition on an existing row, or say so when there is none.
+    async def _close(
+        self, event: StoredEvent, conn: ConnectionLike, statement: str, *, arm: str
+    ) -> None:
+        """Put the step reference on an existing row, or say so when there is none.
 
-        `taken_at` is the envelope's domain time, which for this event
-        may be a caller's claim rather than a clock reading, because the
-        step was driven somewhere else. Two timestamps on one row from
-        two authorities is R8 reaching the read side.
+        One method for both closing arms, because the two differ only in
+        which timestamp column the statement stamps. The step reference
+        is identical, and writing it twice in two nearly identical
+        methods is how the two would eventually disagree.
+
+        The timestamp is the envelope's domain time. For a take that may
+        be a caller's claim, because the step was driven somewhere else;
+        for an adoption it can only be this system's own clock reading,
+        because adopting is an act performed here. Two authorities on one
+        row is R8 reaching the read side.
         """
         payload: dict[str, Any] = event.payload
         result = await conn.execute(
-            _TAKE_SQL,
+            statement,
             event.stream_id,
             UUID(payload["execution_id"]),
             UUID(payload["step_id"]),
@@ -142,8 +164,9 @@ class ProposalSummaryProjection:
         )
         if isinstance(result, str) and result.endswith(" 0"):
             _log.warning(
-                "proposal_summary.take_without_row",
+                "proposal_summary.closing_without_row",
                 projection=PROJECTION_NAME,
+                arm=arm,
                 proposal_id=str(event.stream_id),
                 position=event.position,
             )

@@ -30,6 +30,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel
 
+from keeper.counsel.aggregates.proposal import ProposalStatus
 from keeper.counsel.features.get_proposal.handler import Handler
 from keeper.counsel.features.get_proposal.query import GetProposal
 from keeper.infrastructure.request import (
@@ -47,6 +48,7 @@ class GetProposalResponse(BaseModel):
     actor_id: UUID
     plan_id: UUID
     parameters: dict[str, Any]
+    status: ProposalStatus
     execution_id: UUID | None
     step_id: UUID | None
 
@@ -92,6 +94,7 @@ async def get_proposal(
         actor_id=proposal.actor_id,
         plan_id=proposal.plan_id,
         parameters=proposal.parameters,
+        status=proposal.status,
         execution_id=proposal.execution_id,
         step_id=proposal.step_id,
     )
