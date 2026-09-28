@@ -36,7 +36,7 @@ class ListProposals:
     third word for it, and a query parameter absent from a URL is the
     ordinary spelling of "do not narrow on this".
 
-    The filter is the only one. Narrowing by proposer, by plan or by date
+    The filter is the only one. Narrowing by proposer, by operation or by date
     is each a parameter and an index, and none has a caller: an agent
     holds the ids of its own proposals, and an operator asking what
     nobody acted on is asking exactly what this answers.

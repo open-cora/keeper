@@ -15,7 +15,7 @@ The rule in docs/reference/modeling.md is primitives on events, and its
 narrower carve-out is what applies here: a `dict`-typed field is opaque
 as a whole, so a carrier mixing closed leaves with open ones loses the
 closed ones too. A step list is exactly that mix. An acquisition's
-`plan_id` is a reference to a sibling stream and its `parameters` are
+`operation_id` is a reference to a sibling stream and its `parameters` are
 freeform, and flattening the list to `list[dict[str, Any]]` would make
 the reference as unreadable as the freeform half.
 
@@ -63,7 +63,7 @@ _ACQUIRE_KIND = "acquire"
 class ProcedureDefined:
     """A routine was composed here, in this order, over these devices.
 
-        Defined rather than registered, the way a plan is: nothing anywhere
+        Defined rather than registered, the way an operation is: nothing anywhere
         holds this sequence until this event says so, and the record IS the
         procedure.
 
@@ -111,7 +111,7 @@ def _step_to_payload(composed: ComposedStep) -> dict[str, Any]:
         case AcquireStep():
             body = {
                 "kind": _ACQUIRE_KIND,
-                "plan_id": str(step.plan_id),
+                "operation_id": str(step.operation_id),
                 "parameters": step.parameters,
                 "scopes": list(step.scopes),
             }
@@ -136,7 +136,7 @@ def _step_from_payload(raw: dict[str, Any]) -> ComposedStep:
             step = SetStep(record=raw["record"], to=float(raw["to"]))
         case "acquire":
             step = AcquireStep(
-                plan_id=UUID(raw["plan_id"]),
+                operation_id=UUID(raw["operation_id"]),
                 parameters=dict(raw["parameters"]),
                 scopes=tuple(raw["scopes"]),
             )
@@ -171,9 +171,9 @@ def from_stored(stored: StoredEvent) -> ProcedureEvent:
     than the event.
 
     The parameters come back as whatever the row holds, with no check
-    against the plan's schema as it stands today. They were checked when
+    against the operation's schema as it stands today. They were checked when
     they were written and the row cannot have changed since; re-checking
-    here would mean a plan that later grew stricter could stop an old
+    here would mean an operation that later grew stricter could stop an old
     procedure from loading at all.
     """
     payload = stored.payload

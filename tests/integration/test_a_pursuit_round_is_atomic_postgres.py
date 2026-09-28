@@ -62,8 +62,8 @@ from keeper.execution.aggregates.execution import (
     load_execution,
 )
 from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, SetStep, load_procedure
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -261,13 +261,13 @@ async def test_a_round_past_the_budget_writes_neither_stream(
 
 
 async def _a_proposal(deps: Kernel) -> UUID:
-    plan_id = await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
     return await bind_make_proposal(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )

@@ -52,7 +52,7 @@ from keeper.counsel.aggregates.proposal import (
 )
 from keeper.counsel.features.adopt_proposal.command import AdoptProposal
 from keeper.counsel.features.adopt_proposal.decider import decide
-from keeper.execution.aggregates.plan import PlanNotFoundError, load_plan
+from keeper.execution.aggregates.operation import OperationNotFoundError, load_operation
 from keeper.execution.composing import compose_one_run
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
@@ -130,9 +130,9 @@ def bind(deps: Kernel) -> Handler:
         proposal, version = await load_proposal_with_version(deps.event_store, command.proposal_id)
         if proposal is None:
             raise ProposalNotFoundError(command.proposal_id)
-        plan = await load_plan(deps.event_store, proposal.plan_id)
-        if plan is None:
-            raise PlanNotFoundError(proposal.plan_id)
+        operation = await load_operation(deps.event_store, proposal.operation_id)
+        if operation is None:
+            raise OperationNotFoundError(proposal.operation_id)
 
         now = deps.clock.now()
 
@@ -149,7 +149,7 @@ def bind(deps: Kernel) -> Handler:
             )
 
         run = compose_one_run(
-            plan=plan,
+            operation=operation,
             parameters=proposal.parameters,
             beamline=command.beamline,
             scopes=command.scopes,

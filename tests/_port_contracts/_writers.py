@@ -50,10 +50,10 @@ from keeper.execution.aggregates.execution.events import (
 from keeper.execution.aggregates.execution.events import to_payload as walk_payload
 from keeper.execution.aggregates.execution.read import EXECUTION_STREAM_TYPE
 from keeper.execution.aggregates.execution.state import DispatchedStep
-from keeper.execution.aggregates.plan.events import PlanDefined
-from keeper.execution.aggregates.plan.events import to_payload as plan_payload
-from keeper.execution.aggregates.plan.read import PLAN_STREAM_TYPE
-from keeper.execution.aggregates.plan.state import PlanName
+from keeper.execution.aggregates.operation.events import OperationDefined
+from keeper.execution.aggregates.operation.events import to_payload as plan_payload
+from keeper.execution.aggregates.operation.read import OPERATION_STREAM_TYPE
+from keeper.execution.aggregates.operation.state import OperationName
 from keeper.execution.aggregates.procedure.events import ProcedureDefined
 from keeper.execution.aggregates.procedure.events import to_payload as procedure_payload
 from keeper.execution.aggregates.procedure.read import PROCEDURE_STREAM_TYPE
@@ -86,16 +86,16 @@ _EMPTY_SCHEMA: Final[dict[str, Any]] = {
 }
 """The emptiest schema the stored subset will take.
 
-This contract is about finding a plan, not about what one constrains, and
+This contract is about finding an operation, not about what one constrains, and
 a schema large enough to be interesting would only make the rows harder
 to read.
 """
 
 
-class EventStorePlanWriter:
-    """Writes real plan events, the way the defining handler does.
+class EventStoreOperationWriter:
+    """Writes real operation events, the way the defining handler does.
 
-    The shortest of these writers, because a plan has one event and so
+    The shortest of these writers, because an operation has one event and so
     one verb.
     """
 
@@ -103,16 +103,16 @@ class EventStorePlanWriter:
         self._event_store = event_store
         self._principal_id = uuid4()
 
-    async def define(self, *, plan_id: UUID, name: PlanName, at: datetime) -> None:
-        event = PlanDefined(
-            plan_id=plan_id,
-            plan_name=name.value,
+    async def define(self, *, operation_id: UUID, name: OperationName, at: datetime) -> None:
+        event = OperationDefined(
+            operation_id=operation_id,
+            operation_name=name.value,
             parameters_schema=dict(_EMPTY_SCHEMA),
             occurred_at=at,
         )
         await self._event_store.append(
-            PLAN_STREAM_TYPE,
-            plan_id,
+            OPERATION_STREAM_TYPE,
+            operation_id,
             0,
             [
                 to_new_event(
@@ -120,7 +120,7 @@ class EventStorePlanWriter:
                     payload=plan_payload(event),
                     occurred_at=at,
                     event_id=uuid4(),
-                    command_name="DefinePlan",
+                    command_name="DefineOperation",
                     correlation_id=uuid4(),
                     principal_id=self._principal_id,
                 )
@@ -131,7 +131,7 @@ class EventStorePlanWriter:
 class EventStoreDatasetWriter:
     """Writes real dataset events, the way the registering handler does.
 
-    One verb, like the plan writer, because a dataset has one event. It
+    One verb, like the operation writer, because a dataset has one event. It
     takes the execution and step ids rather than minting them, because the step is the
     thing the contract's filter selects on and a writer choosing it would
     leave every check unable to say which datasets it expected back.
@@ -184,7 +184,7 @@ class EventStoreProposalWriter:
     a proposal that was never made fails here the way it would in the
     application rather than writing an orphan row.
 
-    `make` takes the actor and the plan rather than minting them. The
+    `make` takes the actor and the operation rather than minting them. The
     contract does not filter on either today, and a writer that chose
     them would leave a later check unable to say which proposals it
     expected back.
@@ -199,13 +199,13 @@ class EventStoreProposalWriter:
         *,
         proposal_id: UUID,
         actor_id: UUID,
-        plan_id: UUID,
+        operation_id: UUID,
         at: datetime,
     ) -> None:
         event = ProposalMade(
             proposal_id=proposal_id,
             actor_id=actor_id,
-            plan_id=plan_id,
+            operation_id=operation_id,
             parameters={},
             occurred_at=at,
         )
@@ -436,10 +436,10 @@ class EventStoreDeviceWriter:
 class EventStoreProcedureWriter:
     """Writes real procedure events, the way the defining handler does.
 
-    One verb, like the plan writer, because a procedure has one event.
+    One verb, like the operation writer, because a procedure has one event.
 
     The steps are moves and nothing else. A summary records how many
-    there are and not what they do, so an acquisition would add a plan
+    there are and not what they do, so an acquisition would add an operation
     stream this writer would then have to create for the parameters check
     it is not exercising.
     """
@@ -489,7 +489,7 @@ __all__ = [
     "EventStoreDatasetWriter",
     "EventStoreDeviceWriter",
     "EventStoreInquiryWriter",
-    "EventStorePlanWriter",
+    "EventStoreOperationWriter",
     "EventStoreProcedureWriter",
     "EventStoreProposalWriter",
     "EventStorePursuitWriter",

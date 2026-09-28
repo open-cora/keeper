@@ -45,7 +45,7 @@ def _live(*, taken: bool = False, adopted: bool = False) -> Proposal:
         ProposalMade(
             proposal_id=_ID,
             actor_id=_ACTOR_ID,
-            plan_id=_PLAN_ID,
+            operation_id=_PLAN_ID,
             parameters={},
             occurred_at=_NOW,
         )

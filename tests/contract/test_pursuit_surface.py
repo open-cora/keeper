@@ -456,15 +456,17 @@ def _an_answered_round(client: TestClient, pursuit_id: str, **answer: Any) -> in
 
 
 def _a_proposal(client: TestClient) -> str:
-    plan = client.post(
-        "/plans",
+    operation = client.post(
+        "/operations",
         json={
             "name": "count",
             "parameters_schema": {"$schema": "https://json-schema.org/draft/2020-12/schema"},
         },
     )
-    assert plan.status_code == 201, plan.text
-    proposed = client.post("/proposals", json={"plan_id": plan.json()["plan_id"], "parameters": {}})
+    assert operation.status_code == 201, operation.text
+    proposed = client.post(
+        "/proposals", json={"operation_id": operation.json()["operation_id"], "parameters": {}}
+    )
     assert proposed.status_code == 201, proposed.text
     proposal_id: str = proposed.json()["proposal_id"]
     return proposal_id

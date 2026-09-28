@@ -141,7 +141,7 @@ class ExecutionDispatched:
     the length of the step list has to be here for the outcomes to have
     anywhere to land.
 
-    What a step copies is its rendered sentence and the plan it runs,
+    What a step copies is its rendered sentence and the operation it runs,
     which is the whole of what a step is to anything outside this
     aggregate. The procedure keeps the rest, and the record cites it.
 

@@ -61,7 +61,7 @@ router = APIRouter(tags=["counsel"])
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
             "description": "The beamline or the devices fall outside what a procedure "
-            "stores, or the proposal's values no longer satisfy its plan's schema.",
+            "stores, or the proposal's values no longer satisfy its operation's schema.",
         },
         status.HTTP_403_FORBIDDEN: {
             "model": ErrorResponse,
@@ -69,7 +69,7 @@ router = APIRouter(tags=["counsel"])
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "No proposal has that id, or its plan is gone.",
+            "description": "No proposal has that id, or its operation is gone.",
         },
         status.HTTP_409_CONFLICT: {
             "model": ErrorResponse,

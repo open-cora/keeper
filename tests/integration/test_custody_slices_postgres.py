@@ -44,7 +44,7 @@ from keeper.custody.features.register_dataset import RegisterDataset
 from keeper.execution import wire_execution
 from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
 from keeper.execution.aggregates.procedure import AcquireStep
-from keeper.execution.features.define_plan import DefinePlan
+from keeper.execution.features.define_operation import DefineOperation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
 from keeper.infrastructure.deps import make_postgres_kernel
@@ -82,8 +82,8 @@ async def _an_acquisition(deps: Kernel) -> tuple[UUID, UUID]:
     registering handler's check to have anything to find.
     """
     handlers = wire_execution(deps)
-    plan_id = await handlers.define_plan(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await handlers.define_operation(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -91,7 +91,7 @@ async def _an_acquisition(deps: Kernel) -> tuple[UUID, UUID]:
         DefineProcedure(
             name="one_scan",
             beamline="2-bm",
-            steps=(AcquireStep(plan_id=plan_id, parameters={}, scopes=("2bmb:det:",)),),
+            steps=(AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),

@@ -8,7 +8,7 @@ Four shapes across two aggregates, and which ones are absent matters as
 much as which are here:
 
     400  InvalidProposalParametersError
-             the values do not satisfy the plan's schema
+             the values do not satisfy the operation's schema
          InvalidInquiryObjectiveError
              the question is empty after trimming, or too long
          InvalidInquiryObservationError
@@ -31,7 +31,7 @@ much as which are here:
          InquiryAlreadyExistsError
              a genesis event was asked for on a live stream
          ProposalCannotBeTakenError
-             it already has a run, or the run ran a different plan
+             it already has a run, or the run ran a different operation
          ProposalCannotBeAdoptedError
              it is no longer open, either way it closed
          InquiryCannotBeClaimedError
@@ -45,7 +45,7 @@ when a Propose answer names a proposal nobody made, so the mapping that
 already existed for the read path covers the write path too.
 
 Four are absent and all four belong to somebody else.
-`PlanNotFoundError`, `ExecutionNotFoundError` and
+`OperationNotFoundError`, `ExecutionNotFoundError` and
 `ExecutionStepNotFoundError` are Execution's, raised by this context's
 handlers and mapped by Execution's registration.
 `InvalidOccurredAtError` is the shared timestamp helper's, and is also

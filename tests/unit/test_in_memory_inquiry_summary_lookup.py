@@ -57,11 +57,11 @@ async def test_a_proposal_stream_in_the_same_store_is_not_read_as_an_inquiry() -
     enumerates it. Enumerating by stream type is what keeps a proposal out of
     a list of inquiries, and the Postgres side gets that for free from
     subscribing to inquiry event types only. The sibling check next door uses
-    a plan for this; a proposal is the sharper case, because the two streams
+    an operation for this; a proposal is the sharper case, because the two streams
     are one context apart rather than two."""
     event_store = InMemoryEventStore()
     await EventStoreProposalWriter(event_store).make(
-        proposal_id=uuid4(), actor_id=uuid4(), plan_id=uuid4(), at=datetime.now(tz=UTC)
+        proposal_id=uuid4(), actor_id=uuid4(), operation_id=uuid4(), at=datetime.now(tz=UTC)
     )
     await EventStoreInquiryWriter(event_store).make(
         inquiry_id=uuid4(),

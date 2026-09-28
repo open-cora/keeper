@@ -4,12 +4,12 @@ Every other test of this context runs on `InMemoryEventStore`, which
 hands back the very objects it was given. The parameters schema is the
 reason that is not good enough here. In state it is a Python dict; in a
 row it is a JSONB document that went out through a serialiser and came
-back through a codec. A plan that folds correctly from a dict it never
+back through a codec. An operation that folds correctly from a dict it never
 serialised proves nothing about the one the deployed system reads back,
 and the schema is the field a caller validates its own requests against.
 
-The queries below spell `"Plan"` as a literal rather than using
-`PLAN_STREAM_TYPE`. That is the only independent side these tests have:
+The queries below spell `"Operation"` as a literal rather than using
+`OPERATION_STREAM_TYPE`. That is the only independent side these tests have:
 a query built from the writer's own constant agrees with the writer
 however wrong the constant is.
 
@@ -41,20 +41,24 @@ from keeper.execution.aggregates.execution import (
     StepRunCannotBeReportedError,
     load_execution,
 )
-from keeper.execution.aggregates.plan import PlanName, PlanNotFoundError, load_plan
+from keeper.execution.aggregates.operation import (
+    OperationName,
+    OperationNotFoundError,
+    load_operation,
+)
 from keeper.execution.aggregates.procedure import (
     AcquireStep,
     SetStep,
     load_procedure,
-    runs_plan,
+    runs_operation,
 )
 from keeper.execution.features.claim_execution import ClaimExecution
-from keeper.execution.features.define_plan import DefinePlan
+from keeper.execution.features.define_operation import DefineOperation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
 from keeper.execution.features.end_execution import EndExecution
 from keeper.execution.features.get_execution import GetExecution
-from keeper.execution.features.get_plan import GetPlan
+from keeper.execution.features.get_operation import GetOperation
 from keeper.execution.features.get_procedure import GetProcedure
 from keeper.execution.features.report_step import ReportExecutionStep
 from keeper.execution.features.report_step_run import ReportStepRun
@@ -102,13 +106,13 @@ def handlers(db_pool: asyncpg.Pool) -> ExecutionHandlers:
 
 
 async def _a_procedure(handlers: ExecutionHandlers) -> UUID:
-    """A plan and a procedure acquiring with it, through the wired handlers.
+    """An operation and a procedure acquiring with it, through the wired handlers.
 
     Two steps, a move then an acquisition, so a test naming a step by
     index or by position is naming one of two rather than the only one.
     """
-    plan_id = await handlers.define_plan(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await handlers.define_operation(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -119,7 +123,7 @@ async def _a_procedure(handlers: ExecutionHandlers) -> UUID:
             steps=(
                 SetStep(record="2bmb:m1", to=0.0),
                 AcquireStep(
-                    plan_id=plan_id,
+                    operation_id=operation_id,
                     parameters={"exposure_seconds": 0.25, "detector": "eiger"},
                     scopes=("2bmb:det:",),
                 ),
@@ -143,19 +147,19 @@ async def test_a_plan_survives_a_round_trip_through_jsonb(
     handlers: ExecutionHandlers, db_pool: asyncpg.Pool
 ) -> None:
     """Fold what Postgres gives back, not what was handed to the store."""
-    plan_id = await handlers.define_plan(
-        DefinePlan(name="grid_scan", parameters_schema=_SCHEMA),
+    operation_id = await handlers.define_operation(
+        DefineOperation(name="grid_scan", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
 
     store = PostgresEventStore(db_pool)
-    plan = await load_plan(store, plan_id)
+    operation = await load_operation(store, operation_id)
 
-    assert plan is not None
-    assert plan.id == plan_id
-    assert plan.name == PlanName("grid_scan")
-    assert plan.parameters_schema == _SCHEMA
+    assert operation is not None
+    assert operation.id == operation_id
+    assert operation.name == OperationName("grid_scan")
+    assert operation.parameters_schema == _SCHEMA
 
 
 async def test_the_stored_row_holds_the_schema_under_the_pinned_stream_type(
@@ -168,8 +172,8 @@ async def test_the_stored_row_holds_the_schema_under_the_pinned_stream_type(
     contract with every future reader of this table, so it is checked
     directly rather than through the reader that wrote it.
     """
-    plan_id = await handlers.define_plan(
-        DefinePlan(name="grid_scan", parameters_schema=_SCHEMA),
+    operation_id = await handlers.define_operation(
+        DefineOperation(name="grid_scan", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -180,14 +184,14 @@ async def test_the_stored_row_holds_the_schema_under_the_pinned_stream_type(
     row = await db_pool.fetchrow(
         "SELECT event_type, payload::text AS payload FROM events "
         "WHERE stream_type = $1 AND stream_id = $2",
-        "Plan",
-        plan_id,
+        "Operation",
+        operation_id,
     )
 
     assert row is not None
-    assert row["event_type"] == "PlanDefined"
+    assert row["event_type"] == "OperationDefined"
     payload = json.loads(row["payload"])
-    assert payload["plan_name"] == "grid_scan"
+    assert payload["operation_name"] == "grid_scan"
     assert payload["parameters_schema"] == _SCHEMA
     assert "name" not in payload, "the bare key is what the personal-data rule refuses"
 
@@ -196,35 +200,35 @@ async def test_the_read_slice_answers_from_a_real_stream(
     handlers: ExecutionHandlers,
 ) -> None:
     """Both slices through one pool, which is how the application runs them."""
-    plan_id = await handlers.define_plan(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await handlers.define_operation(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
 
-    plan = await handlers.get_plan(
-        GetPlan(plan_id=plan_id), principal_id=uuid4(), correlation_id=uuid4()
+    operation = await handlers.get_operation(
+        GetOperation(operation_id=operation_id), principal_id=uuid4(), correlation_id=uuid4()
     )
 
-    assert plan.id == plan_id
-    assert plan.name == PlanName("count")
+    assert operation.id == operation_id
+    assert operation.name == OperationName("count")
 
 
-async def test_reading_a_plan_that_was_never_defined_is_refused(
+async def test_reading_an_operation_that_was_never_defined_is_refused(
     handlers: ExecutionHandlers,
 ) -> None:
-    with pytest.raises(PlanNotFoundError):
-        await handlers.get_plan(
-            GetPlan(plan_id=uuid4()), principal_id=uuid4(), correlation_id=uuid4()
+    with pytest.raises(OperationNotFoundError):
+        await handlers.get_operation(
+            GetOperation(operation_id=uuid4()), principal_id=uuid4(), correlation_id=uuid4()
         )
 
 
 async def _the_acquisition(handlers: ExecutionHandlers, execution_id: UUID) -> UUID:
-    """The id of the one step of that execution that runs a plan.
+    """The id of the one step of that execution that runs an operation.
 
     Two reads, because the execution does not say which of its steps is
     an acquisition. It says which composed step each one came from, and
-    the procedure is what says which of those runs a plan. That is the
+    the procedure is what says which of those runs an operation. That is the
     join every outside caller makes, so it is worth making here rather
     than reaching past it.
     """
@@ -237,7 +241,7 @@ async def _the_acquisition(handlers: ExecutionHandlers, execution_id: UUID) -> U
         correlation_id=uuid4(),
     )
     acquisitions = {
-        composed.id for composed in procedure.steps if runs_plan(composed.step) is not None
+        composed.id for composed in procedure.steps if runs_operation(composed.step) is not None
     }
     return next(step.id for step in execution.steps if step.procedure_step_id in acquisitions)
 
@@ -247,7 +251,7 @@ async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
 ) -> None:
     """The second JSONB carrier in this context, and the harder one.
 
-    A plan's schema is a document this system stores and never reads
+    An operation's schema is a document this system stores and never reads
     back into types. A procedure's steps are a discriminated union: they
     go out as dictionaries and have to come back as `SetStep` and
     `AcquireStep` with their floats still floats and their ids still
@@ -313,7 +317,7 @@ async def test_the_three_aggregates_are_filed_under_different_stream_types(
     )
 
     assert [(r["stream_type"], r["event_type"]) for r in rows] == [
-        ("Plan", "PlanDefined"),
+        ("Operation", "OperationDefined"),
         ("Procedure", "ProcedureDefined"),
         ("Execution", "ExecutionDispatched"),
     ]
@@ -323,12 +327,12 @@ async def test_the_three_aggregates_are_filed_under_different_stream_types(
 async def test_composing_against_a_plan_that_does_not_exist_is_refused(
     handlers: ExecutionHandlers,
 ) -> None:
-    with pytest.raises(PlanNotFoundError):
+    with pytest.raises(OperationNotFoundError):
         await handlers.define_procedure(
             DefineProcedure(
                 name="one_scan",
                 beamline="2-bm",
-                steps=(AcquireStep(plan_id=uuid4(), parameters={}, scopes=("2bmb:det:",)),),
+                steps=(AcquireStep(operation_id=uuid4(), parameters={}, scopes=("2bmb:det:",)),),
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),
@@ -583,20 +587,20 @@ async def test_replaying_an_idempotency_key_writes_one_stream(
     The unit tests call the bare handler, which has no wrapper at all,
     and the contract test checks the two ids match. Neither looks at the
     table. A wrapper that returned the cached id while still appending
-    would pass both and leave a second plan behind.
+    would pass both and leave a second operation behind.
     """
-    command = DefinePlan(name="count", parameters_schema=_SCHEMA)
+    command = DefineOperation(name="count", parameters_schema=_SCHEMA)
     caller = uuid4()
 
-    first = await handlers.define_plan(
+    first = await handlers.define_operation(
         command, principal_id=caller, correlation_id=uuid4(), idempotency_key="a-retried-request"
     )
-    second = await handlers.define_plan(
+    second = await handlers.define_operation(
         command, principal_id=caller, correlation_id=uuid4(), idempotency_key="a-retried-request"
     )
 
     assert first == second
     written = await db_pool.fetchval(
-        "SELECT count(*) FROM events WHERE stream_type = $1 AND stream_id = $2", "Plan", first
+        "SELECT count(*) FROM events WHERE stream_type = $1 AND stream_id = $2", "Operation", first
     )
     assert written == 1

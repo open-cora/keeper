@@ -55,7 +55,7 @@ def decide(
         -> InvalidProcedureBeamlineError
       - The step list must be non-empty, within the length bound, and
         every step storable -> InvalidProcedureStepsError
-      - Every acquisition's parameters must satisfy the schema its plan
+      - Every acquisition's parameters must satisfy the schema its operation
         declares -> InvalidProcedureParametersError
 
     The order is deliberate and runs cheapest first. The stream check
@@ -66,11 +66,11 @@ def decide(
     malformed step hears about that rather than about a schema failure
     caused by it.
 
-    That a cited plan exists is NOT checked here. It needs a store, and
+    That a cited operation exists is NOT checked here. It needs a store, and
     the handler has already refused a procedure citing one that does not.
 
     An acquisition supplying no parameters at all is accepted whatever
-    its plan requires, because the shared validator defers `required` to
+    its operation requires, because the shared validator defers `required` to
     the point the values are acted on. Reporting a step's run has the
     same gap and for the same reason: the check here is carrier-side,
     and the thing finally resolving the values is the engine.
@@ -97,7 +97,7 @@ def decide(
         try:
             validate_values_against_schema(
                 step.parameters,
-                context.plans[step.plan_id].parameters_schema,
+                context.operations[step.operation_id].parameters_schema,
                 error_class=_ParametersRejectedError,
             )
         except _ParametersRejectedError as rejected:

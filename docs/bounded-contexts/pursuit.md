@@ -6,6 +6,26 @@ It holds one aggregate. A pursuit is a bounded, goal-oriented, autonomous loop: 
 
 It is the newest context here, and the second whose subject is a permission rather than a thing. Authority holds the rulebook, which says which principals may call which commands and is general, standing and about the system. A pursuit is one person's authorization of one goal, bounded and revocable and about a stretch of time. The rulebook says an agent may adopt proposals at all; a pursuit is why one particular adoption at one particular beamline is allowed to happen with nobody watching.
 
+## What a Pursuit is
+
+One person's standing permission for a machine to chase one goal, with limits on how far it may get.
+
+```
+   Pursuit
+     id          a UUID minted when the pursuit is started
+     actor_id    who authorized it
+     goal        what it is chasing, in words
+     beamline    the one place its work may run
+     scopes      the equipment it may drive
+     budget      the limits, in one or more dimensions
+     status      Running, Held or Stopped
+     rounds      what it has asked and what came back, in order
+     charged     what it has spent so far
+     stopped_by  who took it back, if anybody did
+```
+
+Two of those fields are the reason the whole context exists. The beamline and the scopes say where a machine may work and what it may touch, and a person states both once here rather than every time something acts. Everything else is the record of what that permission went on to cause.
+
 ## The two facts that may not be inferred
 
 The whole context follows from one gap, and the gap is in [Counsel](counsel.md#what-a-proposal-does-not-say-and-why-the-caller-must).
@@ -245,6 +265,51 @@ Rounds are a subcollection rather than a verb, because opening one creates somet
 The single read carries the whole authorization: the goal, the beamline, the scopes, the budget, who authorized it, whether it still stands and who stopped it. Every field is what somebody would be reading it to check.
 
 The listing has two filters, which is [Equipment's](equipment.md#the-listing-and-why-it-has-two-filters) shape rather than Counsel's, and for a comparable reason: both filters have a caller who cannot work without one. The extra against the sibling listings is the beamline, and a pursuit names one in a way a proposal or an inquiry does not, because it is the authorization to run work there. So `?beamline=2-bm&status=Running` is the question somebody standing at a beamline asks, and `?status=Held` is the other one, which loops have stopped asking and are waiting for a person. Each row says which of the two answerable conclusions put it there, because one needs attention and the other needs data.
+
+## What the stream holds
+
+There is no pursuits table. A pursuit is worked out by replaying its events every time it is read.
+
+```
+   PursuitStarted      pursuit_id, actor_id, goal, beamline, scopes,
+                       budget, occurred_at
+   PursuitRoundOpened  pursuit_id, round_index, execution_id, inquiry_id,
+                       occurred_at
+   PursuitRoundClosed  pursuit_id, round_index, outcome, proposal_id,
+                       dispatched_id, occurred_at
+   PursuitCharged      pursuit_id, dimension, amount, occurred_at
+   PursuitResumed      pursuit_id, actor_id, occurred_at
+   PursuitWithdrawn    pursuit_id, actor_id, occurred_at
+```
+
+Opening and closing a round are two events rather than one, because something has to happen at a beamline in between and that takes as long as it takes. The opening names the run it looked at and the question it asked; the closing names what came back and the work that came of it.
+
+A charge records what one round spent in one dimension, and charges add rather than replace. Only the two dimensions this system cannot measure for itself are written down; the other three are counted from the rounds, so writing one of those would count it twice and the attempt is refused.
+
+The three events that stop or restart a pursuit each name the person who did it, because who took a permission back is the fact somebody will be looking for.
+
+## What gets refused
+
+| Refusal | Status | What happened |
+| --- | --- | --- |
+| `InvalidPursuitGoalError` | 400 | The goal is empty, too long, or not text. |
+| `InvalidPursuitBeamlineError` | 400 | The beamline is not a usable name. |
+| `InvalidPursuitScopesError` | 400 | The scopes are empty or malformed. |
+| `InvalidPursuitBudgetError` | 400 | No limit was given, or one of them is not a positive number. |
+| `InvalidPursuitChargeError` | 400 | The charge names a dimension this system counts for itself. |
+| `UnauthorizedError` | 403 | We know who is asking and they may not. Different from 401, where we do not know. |
+| `PursuitNotFoundError` | 404 | The id names no pursuit. |
+| `PursuitAlreadyExistsError` | 409 | Starting was aimed at an id that already has a history. |
+| `PursuitRoundCannotBeOpenedError` | 409 | The pursuit is not running, or it has already asked about this run. |
+| `PursuitRoundCannotBeClosedError` | 409 | No such round, it is already closed, or its question has no answer yet. |
+| `PursuitCannotBeResumedError` | 409 | It is running, or it was stopped for good. |
+| `PursuitCannotBeWithdrawnError` | 409 | It has already stopped. |
+| `ConcurrencyError` | 409 | The pursuit changed between the read and the write. Read it again and decide again. |
+| `IdempotencyConflictError` | 422 | The same retry key came back with a different body, so no saved answer can be right. |
+
+A budget with no limit at all is refused at the door. A loop with nothing bounding it is the exact thing this context exists to make impossible, so there is no way to write one down.
+
+Refusing a second round about a run it has already asked about is what makes opening one safe to retry, and it is most of the reason nothing has to hold a lock on a pursuit.
 
 ## Where the code is
 

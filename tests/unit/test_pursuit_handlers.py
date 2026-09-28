@@ -32,8 +32,8 @@ from keeper.counsel.features.make_proposal import MakeProposal
 from keeper.counsel.features.make_proposal import bind as bind_make_proposal
 from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
 from keeper.execution.aggregates.procedure import SetStep
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -621,13 +621,13 @@ async def _answered(
 
 
 async def _a_proposal(deps: Kernel) -> UUID:
-    plan_id = await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
     return await bind_make_proposal(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )

@@ -28,7 +28,7 @@ class ExecutionStepOutput(BaseModel):
 
     `procedure_step_id` names the composed step this one was dispatched
     from. Read the procedure to learn what the step was asked to do: the
-    plan an acquisition hands to an engine, the parameters it carries and
+    operation an acquisition hands to an engine, the parameters it carries and
     the devices it declares are all there, and none of them should be
     recovered by taking `describes` apart.
     """

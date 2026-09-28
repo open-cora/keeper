@@ -37,14 +37,14 @@ def client() -> TestClient:
 
 
 def _an_acquisition(client: TestClient) -> tuple[str, str]:
-    """A plan, a procedure acquiring it, and one dispatch, over HTTP.
+    """An operation, a procedure acquiring it, and one dispatch, over HTTP.
 
     The whole chain, because a dataset names a step and a step exists
     only inside an execution, so the registering route has something real
     to check against.
     """
-    plan = client.post("/plans", json={"name": "count", "parameters_schema": _SCHEMA})
-    assert plan.status_code == 201, plan.text
+    operation = client.post("/operations", json={"name": "count", "parameters_schema": _SCHEMA})
+    assert operation.status_code == 201, operation.text
     procedure = client.post(
         "/procedures",
         json={
@@ -53,7 +53,7 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
             "steps": [
                 {
                     "kind": "acquire",
-                    "plan_id": plan.json()["plan_id"],
+                    "operation_id": operation.json()["operation_id"],
                     "parameters": {},
                     "scopes": ["2bmb:det:"],
                 }

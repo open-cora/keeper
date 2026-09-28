@@ -38,8 +38,8 @@ from keeper.execution.aggregates.procedure import (
     InvalidProcedureStepsError,
     load_procedure,
 )
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.infrastructure.deps import make_postgres_kernel
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.ports import AllowAllAuthorize
@@ -70,13 +70,13 @@ _SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/sch
 
 
 async def _a_proposal(deps: Kernel) -> UUID:
-    plan_id = await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
     return await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )

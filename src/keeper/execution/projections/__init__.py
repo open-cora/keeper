@@ -15,12 +15,12 @@ from keeper.execution.projections.execution_summary import (
     STEP_EVENT_TYPES,
     ExecutionSummaryProjection,
 )
-from keeper.execution.projections.plan_summary import PlanSummaryProjection
+from keeper.execution.projections.operation_summary import OperationSummaryProjection
 from keeper.execution.projections.register import register_execution_projections
 
 __all__ = [
     "STEP_EVENT_TYPES",
     "ExecutionSummaryProjection",
-    "PlanSummaryProjection",
+    "OperationSummaryProjection",
     "register_execution_projections",
 ]

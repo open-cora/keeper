@@ -36,7 +36,7 @@ class ProposalMade:
     two genesis words fits. "Define a proposal" sounds like settling what
     the word means, and "register a proposal" says it came from somewhere
     else. That pair was built for things that persist as specifications,
-    a plan or a policy, and a proposal is an act. Acts are authored by
+    an operation or a policy, and a proposal is an act. Acts are authored by
     being performed, so the genesis takes the natural verb of the act.
 
     This system is the authority for the fact. Proposing is a speech act
@@ -59,7 +59,7 @@ class ProposalMade:
 
     proposal_id: UUID
     actor_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
     occurred_at: datetime
 
@@ -172,7 +172,7 @@ def to_payload(event: ProposalEvent) -> dict[str, Any]:
             return {
                 "proposal_id": str(event.proposal_id),
                 "actor_id": str(event.actor_id),
-                "plan_id": str(event.plan_id),
+                "operation_id": str(event.operation_id),
                 "parameters": dict(event.parameters),
                 "occurred_at": event.occurred_at.isoformat(),
             }
@@ -203,7 +203,7 @@ def from_stored(stored: StoredEvent) -> ProposalEvent:
                 lambda: ProposalMade(
                     proposal_id=UUID(payload["proposal_id"]),
                     actor_id=UUID(payload["actor_id"]),
-                    plan_id=UUID(payload["plan_id"]),
+                    operation_id=UUID(payload["operation_id"]),
                     parameters=dict(payload["parameters"]),
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),

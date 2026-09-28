@@ -2,7 +2,7 @@
 
 A decider is pure: it takes values and returns events, and it never
 reads from a port. This slice still has to check the proposed values
-against the schema the plan declares, and the plan is a different stream
+against the schema the operation declares, and the operation is a different stream
 in a different bounded context.
 
 So the handler does the reading and hands the result across as plain
@@ -15,17 +15,17 @@ which surface refuses.
 
 from dataclasses import dataclass
 
-from keeper.execution.aggregates.plan import Plan
+from keeper.execution.aggregates.operation import Operation
 
 
 @dataclass(frozen=True)
 class MakeProposalContext:
-    """The plan this proposal names, as it stands right now.
+    """The operation this proposal names, as it stands right now.
 
     Read at handler time, which means it can be stale by the time the
     append lands. That is accepted: the alternative is a transaction
     spanning two streams, and what this check is for is catching an
-    agent that proposed the wrong values, not racing a plan being
+    agent that proposed the wrong values, not racing an operation being
     edited.
 
     A proposal checked against a schema that later changes is not made
@@ -33,7 +33,7 @@ class MakeProposalContext:
     run is a record of what was run.
     """
 
-    plan: Plan
+    operation: Operation
 
 
 __all__ = ["MakeProposalContext"]

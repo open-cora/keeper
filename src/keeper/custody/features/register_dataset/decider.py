@@ -6,7 +6,7 @@ invent.
 
 There is no context module beside this one, and the absence is worth a
 sentence because the nearest slice in the tree has one. `define_procedure`
-loads plans because its decision needs their SCHEMAS: an acquisition's
+loads operations because its decision needs their SCHEMAS: an acquisition's
 parameters are checked against them, so sibling state is an input to the
 decision.
 This decision needs nothing from the execution. That the execution holds

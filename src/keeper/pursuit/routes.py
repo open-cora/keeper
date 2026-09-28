@@ -47,8 +47,8 @@ Four shapes:
 Four more this context relies on and does not register.
 `ExecutionNotFoundError` reaches a Pursuit route when a round names an
 execution that is not there, `InvalidOccurredAtError` when a charge
-carries a naive timestamp, and `PlanNotFoundError` when a round closing on
-a proposal cannot find the plan behind it. All three are Execution's.
+carries a naive timestamp, and `OperationNotFoundError` when a round closing on
+a proposal cannot find the operation behind it. All three are Execution's.
 `InquiryNotFoundError` and `ProposalNotFoundError` are Counsel's, and
 reach a route here for the same reason: a round cites records in two other
 contexts and either could be gone. FastAPI's exception handlers are

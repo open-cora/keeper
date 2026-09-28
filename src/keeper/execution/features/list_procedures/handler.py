@@ -1,6 +1,6 @@
 """Answer the question: authorize, clamp, read the summaries.
 
-The plan list's sibling and the same three steps. No decider, no append,
+The operation list's sibling and the same three steps. No decider, no append,
 no clock, and the answer comes from a port rather than from a fold, so
 the environment with no database can answer too.
 
@@ -45,7 +45,7 @@ class Handler(Protocol):
 def bind(deps: Kernel, summaries: ProcedureSummaryLookup) -> Handler:
     """Build the handler, closed over the dependencies and the read port.
 
-    Two arguments, like the plan list and for the same reason: the read
+    Two arguments, like the operation list and for the same reason: the read
     port is not on the kernel and cannot be, because the kernel is
     declared in infrastructure and a procedure summary is Execution's own
     idea.

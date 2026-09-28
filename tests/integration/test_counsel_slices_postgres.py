@@ -11,10 +11,10 @@ serialised proves nothing about the one a deployed system reads back,
 and those values are most of what a proposal says.
 
 The two cross-context reads are the second. Making a proposal loads a
-plan and taking one loads an execution, both out of different stream
+operation and taking one loads an execution, both out of different stream
 types in the same table. In memory those are dictionary keys; in
 Postgres they are queries that have to name the right stream type, and a
-query naming the wrong one finds nothing and reports a plan that exists
+query naming the wrong one finds nothing and reports an operation that exists
 as missing.
 
 The second event on a stream is the third, and it is what this context
@@ -52,9 +52,9 @@ from keeper.counsel.features.make_proposal import MakeProposal
 from keeper.counsel.features.take_proposal import TakeProposal
 from keeper.execution import wire_execution
 from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
-from keeper.execution.aggregates.plan import PlanNotFoundError
+from keeper.execution.aggregates.operation import OperationNotFoundError
 from keeper.execution.aggregates.procedure import AcquireStep
-from keeper.execution.features.define_plan import DefinePlan
+from keeper.execution.features.define_operation import DefineOperation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
 from keeper.infrastructure.deps import make_postgres_kernel
@@ -87,16 +87,16 @@ def kernel(db_pool: asyncpg.Pool) -> Kernel:
     )
 
 
-async def _a_plan(deps: Kernel) -> UUID:
-    return await wire_execution(deps).define_plan(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+async def _an_operation(deps: Kernel) -> UUID:
+    return await wire_execution(deps).define_operation(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
 
 
-async def _an_acquisition_of(deps: Kernel, plan_id: UUID) -> tuple[UUID, UUID]:
-    """Compose and dispatch a procedure acquiring with this plan.
+async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UUID]:
+    """Compose and dispatch a procedure acquiring with this operation.
 
     Two more writes than the run this replaced, and they are the point:
     the step the take names cannot be conjured, so the cross-type read
@@ -107,7 +107,7 @@ async def _an_acquisition_of(deps: Kernel, plan_id: UUID) -> tuple[UUID, UUID]:
         DefineProcedure(
             name="one_scan",
             beamline="2-bm",
-            steps=(AcquireStep(plan_id=plan_id, parameters={}, scopes=("2bmb:det:",)),),
+            steps=(AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),
@@ -125,10 +125,10 @@ async def _an_acquisition_of(deps: Kernel, plan_id: UUID) -> tuple[UUID, UUID]:
 async def test_a_proposal_reads_back_through_a_real_round_trip(kernel: Kernel) -> None:
     counsel = wire_counsel(kernel)
     principal_id = uuid4()
-    plan_id = await _a_plan(kernel)
+    operation_id = await _an_operation(kernel)
 
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=principal_id,
         correlation_id=uuid4(),
     )
@@ -138,10 +138,10 @@ async def test_a_proposal_reads_back_through_a_real_round_trip(kernel: Kernel) -
         correlation_id=uuid4(),
     )
 
-    assert (proposal.id, proposal.actor_id, proposal.plan_id) == (
+    assert (proposal.id, proposal.actor_id, proposal.operation_id) == (
         proposal_id,
         principal_id,
-        plan_id,
+        operation_id,
     )
     assert (proposal.execution_id, proposal.step_id) == (None, None)
 
@@ -153,7 +153,7 @@ async def test_nested_parameters_survive_the_jsonb_round_trip(
     counsel = wire_counsel(kernel)
 
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=await _a_plan(kernel), parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=await _an_operation(kernel), parameters=dict(_PARAMETERS)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -173,11 +173,11 @@ async def test_nested_parameters_survive_the_jsonb_round_trip(
 async def test_the_plan_a_proposal_names_is_found_across_the_stream_types(
     kernel: Kernel,
 ) -> None:
-    """Plan and Proposal share a table, so the query has to name the right type."""
+    """Operation and Proposal share a table, so the query has to name the right type."""
     counsel = wire_counsel(kernel)
 
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=await _a_plan(kernel), parameters={}),
+        MakeProposal(operation_id=await _an_operation(kernel), parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -190,9 +190,9 @@ async def test_naming_a_plan_that_does_not_exist_writes_nothing(
 ) -> None:
     counsel = wire_counsel(kernel)
 
-    with pytest.raises(PlanNotFoundError):
+    with pytest.raises(OperationNotFoundError):
         await counsel.make_proposal(
-            MakeProposal(plan_id=uuid4(), parameters={}),
+            MakeProposal(operation_id=uuid4(), parameters={}),
             principal_id=uuid4(),
             correlation_id=uuid4(),
         )
@@ -205,10 +205,10 @@ async def test_taking_appends_a_second_event_at_the_version_it_read(
     kernel: Kernel, db_pool: asyncpg.Pool
 ) -> None:
     counsel = wire_counsel(kernel)
-    plan_id = await _a_plan(kernel)
-    execution_id, step_id = await _an_acquisition_of(kernel, plan_id)
+    operation_id = await _an_operation(kernel)
+    execution_id, step_id = await _an_acquisition_of(kernel, operation_id)
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -239,10 +239,10 @@ async def test_a_reported_take_time_is_stored_as_the_instant_it_names(
     kernel: Kernel, db_pool: asyncpg.Pool
 ) -> None:
     counsel = wire_counsel(kernel)
-    plan_id = await _a_plan(kernel)
-    execution_id, step_id = await _an_acquisition_of(kernel, plan_id)
+    operation_id = await _an_operation(kernel)
+    execution_id, step_id = await _an_acquisition_of(kernel, operation_id)
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -272,7 +272,7 @@ async def test_taking_with_an_execution_that_does_not_exist_writes_nothing(
     """The execution lives in another stream type, so this is a real cross-type miss."""
     counsel = wire_counsel(kernel)
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=await _a_plan(kernel), parameters={}),
+        MakeProposal(operation_id=await _an_operation(kernel), parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -295,11 +295,11 @@ async def test_taking_one_twice_leaves_the_first_acquisition_on_the_record(
     kernel: Kernel,
 ) -> None:
     counsel = wire_counsel(kernel)
-    plan_id = await _a_plan(kernel)
-    first_execution, first_step = await _an_acquisition_of(kernel, plan_id)
-    second_execution, second_step = await _an_acquisition_of(kernel, plan_id)
+    operation_id = await _an_operation(kernel)
+    first_execution, first_step = await _an_acquisition_of(kernel, operation_id)
+    second_execution, second_step = await _an_acquisition_of(kernel, operation_id)
     proposal_id = await counsel.make_proposal(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -339,9 +339,9 @@ async def test_a_replayed_key_returns_the_first_proposal_rather_than_a_second(
 ) -> None:
     """Against the real key store, not a dictionary."""
     counsel = wire_counsel(kernel)
-    plan_id = await _a_plan(kernel)
+    operation_id = await _an_operation(kernel)
     principal_id = uuid4()
-    command = MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS))
+    command = MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS))
 
     first = await counsel.make_proposal(
         command,

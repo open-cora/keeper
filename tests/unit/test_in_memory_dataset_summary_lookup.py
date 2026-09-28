@@ -14,10 +14,10 @@ import pytest
 from keeper.custody.adapters.in_memory_dataset_summary_lookup import (
     InMemoryDatasetSummaryLookup,
 )
-from keeper.execution.aggregates.plan.state import PlanName
+from keeper.execution.aggregates.operation.state import OperationName
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.shared.identifier import Identifier
-from tests._port_contracts._writers import EventStoreDatasetWriter, EventStorePlanWriter
+from tests._port_contracts._writers import EventStoreDatasetWriter, EventStoreOperationWriter
 from tests._port_contracts.dataset_summary_lookup import (
     CHECKS,
     Check,
@@ -50,7 +50,7 @@ async def test_the_in_memory_dataset_summary_lookup_keeps_the_port_contract(
 
 async def test_a_plan_stream_in_the_same_store_is_not_read_as_a_dataset() -> None:
     """Every aggregate in the process shares one store, and this adapter
-    enumerates it. Enumerating by stream type is what keeps a plan out of a
+    enumerates it. Enumerating by stream type is what keeps an operation out of a
     list of datasets, and the Postgres side gets that for free from
     subscribing to dataset event types only.
 
@@ -59,8 +59,8 @@ async def test_a_plan_stream_in_the_same_store_is_not_read_as_a_dataset() -> Non
     would find a plausible-looking row rather than an obviously wrong
     one."""
     event_store = InMemoryEventStore()
-    await EventStorePlanWriter(event_store).define(
-        plan_id=uuid4(), name=PlanName("count"), at=datetime.now(tz=UTC)
+    await EventStoreOperationWriter(event_store).define(
+        operation_id=uuid4(), name=OperationName("count"), at=datetime.now(tz=UTC)
     )
     await EventStoreDatasetWriter(event_store).register(
         dataset_id=uuid4(),

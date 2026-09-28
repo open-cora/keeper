@@ -33,11 +33,11 @@ class SetStepOutput(BaseModel):
 
 
 class AcquireStepOutput(BaseModel):
-    """A step that asks an engine to run a plan."""
+    """A step that asks an engine to run an operation."""
 
     kind: Literal["acquire"] = "acquire"
     step_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
     scopes: list[str]
 
@@ -65,7 +65,7 @@ def _to_output_step(composed: ComposedStep) -> SetStepOutput | AcquireStepOutput
         return SetStepOutput(step_id=composed.id, record=step.record, to=step.to)
     return AcquireStepOutput(
         step_id=composed.id,
-        plan_id=step.plan_id,
+        operation_id=step.operation_id,
         parameters=step.parameters,
         scopes=list(step.scopes),
     )

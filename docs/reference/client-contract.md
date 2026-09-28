@@ -15,7 +15,7 @@ So one acquisition carries both:
 | | minted by | known at | where it appears |
 | --- | --- | --- | --- |
 | run uid | the engine | the moment the run opens | `start["uid"]` |
-| execution and step ids | the keeper | at dispatch, before the plan is submitted | `start["keeper_execution_id"]`, `start["keeper_step_id"]` |
+| execution and step ids | the keeper | at dispatch, before the operation is submitted | `start["keeper_execution_id"]`, `start["keeper_step_id"]` |
 
 An earlier draft of this table named a single key holding one reference the driver minted, and no such key exists. Two travel, because a step is an entity inside the Execution aggregate rather than a stream of its own, so naming one means naming the execution around it.
 
@@ -27,7 +27,7 @@ The old arrangement was that the reporter filed a run into the keeper under the 
 
 The keeper now composes the work and dispatches it, so the ids exist before an engine is asked for anything. Whatever drives an execution carries the step's execution id and step id into the engine's own metadata, and the reporter reads them back out: `KEEPER_METADATA_KEYS` in the reporter's `translate` module is where the spelling is written down, and nothing else in either tree knows it.
 
-That means a keeper identifier now sits in somebody else's records, which nothing in this tree had done before. It was weighed rather than assumed. What it buys is that the reporter resolves nothing, carries no plan map, and cannot join the wrong record; what it costs is that a document with no such reference cannot be attributed at all, and is skipped.
+That means a keeper identifier now sits in somebody else's records, which nothing in this tree had done before. It was weighed rather than assumed. What it buys is that the reporter resolves nothing, carries no operation map, and cannot join the wrong record; what it costs is that a document with no such reference cannot be attributed at all, and is skipped.
 
 The engine's own uid still travels, in the other direction, as a step's `engine_reference`. It is a correlation hint rather than a key: nothing checks that such a run exists, and nothing could, because whatever watches the engine records it on its own schedule.
 
@@ -46,7 +46,7 @@ This section used to say the reporter sent the scheme with every run and that a 
 
 ## What this page does not promise
 
-**The metadata is writable by anyone who can start a plan.** The engine is outside the keeper, so the two keys can be set by hand, copied between runs, or left off. What that buys an attacker is narrower than it was: the ids name records the keeper already wrote, so a forged pair moves an existing step rather than creating anything, and a pair naming nothing is refused. `plan_name` and `exit_status` remain equally forgeable, and everything the reporter relays is something the keeper was told rather than something it checked.
+**The metadata is writable by anyone who can start an operation.** The engine is outside the keeper, so the two keys can be set by hand, copied between runs, or left off. What that buys an attacker is narrower than it was: the ids name records the keeper already wrote, so a forged pair moves an existing step rather than creating anything, and a pair naming nothing is refused. `operation_name` and `exit_status` remain equally forgeable, and everything the reporter relays is something the keeper was told rather than something it checked.
 
 **The reference is a correlation hint, not a credential.** Nothing is granted, billed or gated on it. A wrong one costs a wrong lookup. The day something authorizes off an external reference, this design has to change before that ships.
 

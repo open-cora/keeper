@@ -66,7 +66,7 @@ def _stored(event_type: str, payload: dict[str, object]) -> StoredEvent:
 
 def _acquire(**overrides: Any) -> AcquireStep:
     fields: dict[str, Any] = {
-        "plan_id": _PLAN_ID,
+        "operation_id": _PLAN_ID,
         "parameters": {"exposure_seconds": 0.2},
         "scopes": ("2bmb:m1",),
     }

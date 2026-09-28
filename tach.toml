@@ -357,9 +357,9 @@ visibility = ["keeper.custody"]
 [[interfaces]]
 from = ["keeper.execution.aggregates"]
 expose = [
-    "plan.load_plan",
-    "plan.Plan",
-    "plan.PlanNotFoundError",
+    "operation.load_operation",
+    "operation.Operation",
+    "operation.OperationNotFoundError",
     "execution.load_execution",
     "execution.Execution",
     "execution.ExecutionNotFoundError",
@@ -368,7 +368,7 @@ expose = [
     "procedure.ComposedStep",
     "procedure.ProcedureNotFoundError",
     "procedure.ProcedureStepNotFoundError",
-    "procedure.runs_plan",
+    "procedure.runs_operation",
 ]
 visibility = ["keeper.counsel"]
 
@@ -387,8 +387,8 @@ from = ["keeper.execution.aggregates"]
 expose = [
     "execution.load_execution",
     "execution.ExecutionNotFoundError",
-    "plan.load_plan",
-    "plan.PlanNotFoundError",
+    "operation.load_operation",
+    "operation.OperationNotFoundError",
 ]
 visibility = ["keeper.pursuit"]
 

@@ -1,15 +1,15 @@
-"""Make the proposal: authorize, check the plan, decide, append.
+"""Make the proposal: authorize, check the operation, decide, append.
 
 Create-style on its own stream, so there is no load-and-fold of a
 proposal and `state=None` goes straight to the decider.
 
-The plan is loaded and handed across on a context, which is
+The operation is loaded and handed across on a context, which is
 `define_procedure`'s shape rather than `register_dataset`'s. The
 difference is what the decision needs: registering a dataset checks only
-that the step exists, so nothing crosses; this decision reads the plan's
-schema, so the plan is an input and travels as plain data.
+that the step exists, so nothing crosses; this decision reads the operation's
+schema, so the operation is an input and travels as plain data.
 
-`PlanNotFoundError` is Execution's class, raised from here. It is not
+`OperationNotFoundError` is Execution's class, raised from here. It is not
 re-registered on Counsel's routes: FastAPI's exception handlers are
 app-scoped and Execution already maps it to 404, which is the rule in
 docs/reference/patterns.md for a cross-BC domain error.
@@ -27,7 +27,7 @@ from keeper.counsel.aggregates.proposal import PROPOSAL_STREAM_TYPE, to_payload
 from keeper.counsel.features.make_proposal.command import MakeProposal
 from keeper.counsel.features.make_proposal.context import MakeProposalContext
 from keeper.counsel.features.make_proposal.decider import decide
-from keeper.execution.aggregates.plan import PlanNotFoundError, load_plan
+from keeper.execution.aggregates.operation import OperationNotFoundError, load_operation
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
@@ -93,22 +93,22 @@ def bind(deps: Kernel) -> Handler:
             _log.info(
                 "make_proposal.denied",
                 command_name=_COMMAND_NAME,
-                plan_id=str(command.plan_id),
+                operation_id=str(command.operation_id),
                 principal_id=str(principal_id),
                 correlation_id=str(correlation_id),
                 reason=decision.reason,
             )
             raise UnauthorizedError(decision.reason)
 
-        plan = await load_plan(deps.event_store, command.plan_id)
-        if plan is None:
-            raise PlanNotFoundError(command.plan_id)
+        operation = await load_operation(deps.event_store, command.operation_id)
+        if operation is None:
+            raise OperationNotFoundError(command.operation_id)
 
         new_id = deps.id_generator.new_id()
         events = decide(
             None,
             command,
-            context=MakeProposalContext(plan=plan),
+            context=MakeProposalContext(operation=operation),
             actor_id=principal_id,
             now=deps.clock.now(),
             new_id=new_id,
@@ -137,7 +137,7 @@ def bind(deps: Kernel) -> Handler:
             "make_proposal.success",
             command_name=_COMMAND_NAME,
             proposal_id=str(new_id),
-            plan_id=str(command.plan_id),
+            operation_id=str(command.operation_id),
             principal_id=str(principal_id),
             correlation_id=str(correlation_id),
         )

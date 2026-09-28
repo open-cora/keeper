@@ -7,7 +7,7 @@ The execution is loaded and then only tested: that it exists, and that it
 holds the step this dataset names. The handler fetches the sibling,
 refuses a missing one itself, and passes nothing across to the decision.
 `define_procedure` builds a context dataclass because its decider reads
-the schemas of the plans it cites; this one has nothing to read, so there
+the schemas of the operations it cites; this one has nothing to read, so there
 is no context to build.
 
 Two checks rather than one, and the second is what a step reference costs.

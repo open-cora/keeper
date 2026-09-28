@@ -185,14 +185,14 @@ def test_every_dispatched_step_cites_the_composed_step_it_came_from() -> None:
     """The one machine-readable thing a step carries, beside its id.
 
     Counsel joins a proposal to the step that took it and compares the
-    plan that step runs; without this the comparison would have to index
+    operation that step runs; without this the comparison would have to index
     into the procedure's own list, which is a correspondence nothing
     checks. A move cites one too: what a step was asked to do is the
     definition's to say, whichever kind it is.
     """
     context = _procedure(
         SetStep(record="2bmb:m1", to=0.0),
-        AcquireStep(plan_id=_PLAN_ID, parameters={}, scopes=("2bmb:det:",)),
+        AcquireStep(operation_id=_PLAN_ID, parameters={}, scopes=("2bmb:det:",)),
     )
     events = decide_dispatch(
         None,

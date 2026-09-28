@@ -63,7 +63,7 @@ An agent identity (an entity that subscribes to events, runs inference, and regi
 | Domain verb | English doer | Agent name |
 | --- | --- | --- |
 | draft | drafter | `<Domain>Drafter` |
-| plan | planner | `<Domain>Planner` |
+| operation | planner | `<Domain>Planner` |
 | verify | verifier | `<Domain>Verifier` |
 | audit | auditor | `<Domain>Auditor` |
 | detect | detector | `<Domain>Detector` |

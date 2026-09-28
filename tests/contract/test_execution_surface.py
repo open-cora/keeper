@@ -1,4 +1,4 @@
-"""Writing and reading a plan over HTTP, through the app the process builds.
+"""Writing and reading an operation over HTTP, through the app the process builds.
 
 The unit tests exercise the handlers directly and the integration tests
 exercise them against real SQL. Neither goes through a route, so neither
@@ -20,7 +20,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from keeper.api.main import create_app
-from keeper.execution.aggregates.plan import PLAN_NAME_MAX_LENGTH
+from keeper.execution.aggregates.operation import OPERATION_NAME_MAX_LENGTH
 from keeper.infrastructure.settings import Settings
 
 pytestmark = pytest.mark.contract
@@ -38,26 +38,26 @@ def client() -> TestClient:
     return TestClient(create_app(settings=Settings(app_env="test")))
 
 
-def _a_plan(client: TestClient, name: str = "count") -> str:
-    response = client.post("/plans", json={"name": name, "parameters_schema": _SCHEMA})
+def _an_operation(client: TestClient, name: str = "count") -> str:
+    response = client.post("/operations", json={"name": name, "parameters_schema": _SCHEMA})
     assert response.status_code == 201, response.text
-    plan_id: str = response.json()["plan_id"]
-    return plan_id
+    operation_id: str = response.json()["operation_id"]
+    return operation_id
 
 
 def test_posting_a_plan_returns_its_id(client: TestClient) -> None:
     with client:
-        assert _a_plan(client)
+        assert _an_operation(client)
 
 
 def test_a_defined_plan_reads_back_with_its_name_and_schema(client: TestClient) -> None:
     with client:
-        plan_id = _a_plan(client)
-        response = client.get(f"/plans/{plan_id}")
+        operation_id = _an_operation(client)
+        response = client.get(f"/operations/{operation_id}")
 
     assert response.status_code == 200, response.text
     assert response.json() == {
-        "plan_id": plan_id,
+        "operation_id": operation_id,
         "name": "count",
         "parameters_schema": _SCHEMA,
     }
@@ -79,16 +79,16 @@ def test_the_schema_reads_back_byte_for_byte(client: TestClient) -> None:
         "properties": {"exposure_seconds": {"minimum": 0, "type": "number"}},
     }
     with client:
-        created = client.post("/plans", json={"name": "count", "parameters_schema": ordered})
-        plan_id = created.json()["plan_id"]
-        response = client.get(f"/plans/{plan_id}")
+        created = client.post("/operations", json={"name": "count", "parameters_schema": ordered})
+        operation_id = created.json()["operation_id"]
+        response = client.get(f"/operations/{operation_id}")
 
     assert response.json()["parameters_schema"] == ordered
 
 
 def test_reading_a_plan_that_was_never_defined_is_not_found(client: TestClient) -> None:
     with client:
-        response = client.get("/plans/00000000-0000-0000-0000-000000000000")
+        response = client.get("/operations/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
 
 
@@ -101,7 +101,7 @@ def test_a_schema_outside_the_stored_subset_is_a_bad_request(client: TestClient)
     """
     with client:
         response = client.post(
-            "/plans",
+            "/operations",
             json={"name": "count", "parameters_schema": {"type": "object"}},
         )
     assert response.status_code == 400, response.text
@@ -116,7 +116,7 @@ def test_a_whitespace_only_name_is_a_bad_request(client: TestClient) -> None:
     of the two fired.
     """
     with client:
-        response = client.post("/plans", json={"name": "   ", "parameters_schema": _SCHEMA})
+        response = client.post("/operations", json={"name": "   ", "parameters_schema": _SCHEMA})
     assert response.status_code == 400, response.text
 
 
@@ -128,8 +128,8 @@ def test_an_over_long_name_is_unprocessable(client: TestClient) -> None:
     """
     with client:
         response = client.post(
-            "/plans",
-            json={"name": "x" * (PLAN_NAME_MAX_LENGTH + 1), "parameters_schema": _SCHEMA},
+            "/operations",
+            json={"name": "x" * (OPERATION_NAME_MAX_LENGTH + 1), "parameters_schema": _SCHEMA},
         )
     assert response.status_code == 422
 
@@ -137,18 +137,18 @@ def test_an_over_long_name_is_unprocessable(client: TestClient) -> None:
 def test_a_body_with_no_schema_is_unprocessable(client: TestClient) -> None:
     """Required, with no default, so omitting it is a malformed request.
 
-    A plan whose parameters nobody described is the state the aggregate
+    An operation whose parameters nobody described is the state the aggregate
     exists to refuse, and reaching it by leaving a key out would make the
     refusal look like a bug in the client.
     """
     with client:
-        response = client.post("/plans", json={"name": "count"})
+        response = client.post("/operations", json={"name": "count"})
     assert response.status_code == 422
 
 
 def _a_procedure(client: TestClient, name: str = "align_then_scan", beamline: str = "2-bm") -> str:
-    """A plan and a procedure that moves once and acquires once."""
-    plan_id = _a_plan(client, name="tomo_scan")
+    """An operation and a procedure that moves once and acquires once."""
+    operation_id = _an_operation(client, name="tomo_scan")
     response = client.post(
         "/procedures",
         json={
@@ -158,7 +158,7 @@ def _a_procedure(client: TestClient, name: str = "align_then_scan", beamline: st
                 {"kind": "set", "record": "2bmb:m1", "to": 0.0},
                 {
                     "kind": "acquire",
-                    "plan_id": plan_id,
+                    "operation_id": operation_id,
                     "parameters": {"exposure_seconds": 0.1},
                     "scopes": ["2bmb:det:"],
                 },
@@ -537,34 +537,34 @@ def test_asking_for_more_executions_than_a_page_holds_is_refused_by_the_surface(
 
 
 def test_replaying_an_idempotency_key_returns_the_first_plan(client: TestClient) -> None:
-    """A retry gets the plan it already made, not a second one."""
+    """A retry gets the operation it already made, not a second one."""
     body = {"name": "count", "parameters_schema": _SCHEMA}
     headers = {"Idempotency-Key": "a-retried-request"}
     with client:
-        first = client.post("/plans", json=body, headers=headers)
-        second = client.post("/plans", json=body, headers=headers)
+        first = client.post("/operations", json=body, headers=headers)
+        second = client.post("/operations", json=body, headers=headers)
 
     assert first.status_code == 201, first.text
     assert second.status_code == 201, second.text
-    assert first.json()["plan_id"] == second.json()["plan_id"]
+    assert first.json()["operation_id"] == second.json()["operation_id"]
 
 
 def test_listing_plans_finds_every_plan_written_down_under_a_name(
     client: TestClient,
 ) -> None:
-    """A name may match more than one plan on purpose, so the endpoint
+    """A name may match more than one operation on purpose, so the endpoint
     returns however many there are. An adapter resolving a routine's name
-    to a plan has to see both and decide, which it cannot do if this
+    to an operation has to see both and decide, which it cannot do if this
     picks one."""
     with client:
-        first = _a_plan(client)
-        second = _a_plan(client)
-        _a_plan(client, name="scan")
-        response = client.get("/plans", params={"name": "count"})
+        first = _an_operation(client)
+        second = _an_operation(client)
+        _an_operation(client, name="scan")
+        response = client.get("/operations", params={"name": "count"})
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert [item["plan_id"] for item in body["items"]] == [second, first]
+    assert [item["operation_id"] for item in body["items"]] == [second, first]
     assert body["next_cursor"] is None
 
 
@@ -572,21 +572,21 @@ def test_a_plan_summary_carries_exactly_the_fields_a_list_row_has(
     client: TestClient,
 ) -> None:
     """The shape, pinned. No schema, because a page of fifty would be a
-    page of schemas, and one timestamp because a plan has one event."""
+    page of schemas, and one timestamp because an operation has one event."""
     with client:
-        _a_plan(client)
-        body = client.get("/plans").json()
+        _an_operation(client)
+        body = client.get("/operations").json()
 
     (row,) = body["items"]
     assert set(body) == {"items", "next_cursor"}
-    assert set(row) == {"plan_id", "name", "created_at"}
+    assert set(row) == {"operation_id", "name", "created_at"}
     assert row["name"] == "count"
 
 
 def test_listing_plans_by_a_name_nothing_uses_is_an_empty_page(client: TestClient) -> None:
     with client:
-        _a_plan(client)
-        response = client.get("/plans", params={"name": "absent"})
+        _an_operation(client)
+        response = client.get("/operations", params={"name": "absent"})
 
     assert response.status_code == 200, response.text
     assert response.json() == {"items": [], "next_cursor": None}
@@ -594,10 +594,10 @@ def test_listing_plans_by_a_name_nothing_uses_is_an_empty_page(client: TestClien
 
 def test_listing_plans_by_a_name_over_the_bound_is_refused(client: TestClient) -> None:
     """The filter goes through the same value object the defining command
-    does, so a name no plan could carry is refused rather than quietly
+    does, so a name no operation could carry is refused rather than quietly
     matching nothing."""
     with client:
-        response = client.get("/plans", params={"name": "x" * 500})
+        response = client.get("/operations", params={"name": "x" * 500})
 
     assert response.status_code == 400, response.text
 
@@ -606,18 +606,20 @@ def test_a_page_of_plans_hands_back_a_cursor_that_reaches_the_rest(
     client: TestClient,
 ) -> None:
     with client:
-        defined = [_a_plan(client, name=f"p{i}") for i in range(3)]
-        first = client.get("/plans", params={"limit": 2}).json()
-        second = client.get("/plans", params={"limit": 2, "cursor": first["next_cursor"]}).json()
+        defined = [_an_operation(client, name=f"p{i}") for i in range(3)]
+        first = client.get("/operations", params={"limit": 2}).json()
+        second = client.get(
+            "/operations", params={"limit": 2, "cursor": first["next_cursor"]}
+        ).json()
 
-    walked = [item["plan_id"] for page in (first, second) for item in page["items"]]
+    walked = [item["operation_id"] for page in (first, second) for item in page["items"]]
     assert walked == list(reversed(defined))
     assert second["next_cursor"] is None
 
 
 def _an_acquisition(client: TestClient) -> tuple[str, str]:
     """A dispatched execution and the id of its one acquisition step."""
-    plan_id = _a_plan(client, name="tomo_scan")
+    operation_id = _an_operation(client, name="tomo_scan")
     defined = client.post(
         "/procedures",
         json={
@@ -626,7 +628,7 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
             "steps": [
                 {
                     "kind": "acquire",
-                    "plan_id": plan_id,
+                    "operation_id": operation_id,
                     "parameters": {"exposure_seconds": 0.1},
                     "scopes": ["2bmb:det:"],
                 }

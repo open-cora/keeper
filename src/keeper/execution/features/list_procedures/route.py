@@ -2,7 +2,7 @@
 
 `GET /procedures`, newest first, filterable by name and paged with an
 opaque cursor. A collection on the path the defining endpoint posts to,
-matching the plan list beside it.
+matching the operation list beside it.
 
 ## What a row carries and what it does not
 

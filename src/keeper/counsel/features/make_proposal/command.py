@@ -7,7 +7,7 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class MakeProposal:
-    """Put forward a run of this plan, with these values.
+    """Put forward a run of this operation, with these values.
 
     Make, not define and not register. Neither of the glossary's two
     genesis words fits: that pair was built for things that persist as
@@ -21,7 +21,7 @@ class MakeProposal:
     Proposing is a speech act: the call IS the proposing, so there is no
     earlier moment for the record to be late to, and the moment this
     system writes one is the moment it happened. That is R8 landing on
-    the makes side, beside `register_actor` and `define_plan` rather
+    the makes side, beside `register_actor` and `define_operation` rather
     than beside `register_dataset`.
 
     A proposer that decided elsewhere and tells this system afterwards is
@@ -39,7 +39,7 @@ class MakeProposal:
     is reproducible on replay.
     """
 
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
 
 

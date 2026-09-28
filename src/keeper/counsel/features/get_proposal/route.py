@@ -46,7 +46,7 @@ class GetProposalResponse(BaseModel):
 
     proposal_id: UUID
     actor_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
     status: ProposalStatus
     execution_id: UUID | None
@@ -92,7 +92,7 @@ async def get_proposal(
     return GetProposalResponse(
         proposal_id=proposal.id,
         actor_id=proposal.actor_id,
-        plan_id=proposal.plan_id,
+        operation_id=proposal.operation_id,
         parameters=proposal.parameters,
         status=proposal.status,
         execution_id=proposal.execution_id,

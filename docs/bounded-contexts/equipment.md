@@ -38,7 +38,7 @@ So the address is what two independent clients will agree on, and nothing else i
 
 **An adapter must not copy the facility's description field into it.** That field is free text somebody typed at a beamline, and free text swept in from outside is how a person's name reaches a table that cannot be edited. The same rule, for the same reason, keeps a message off a broken step and a reason off a deactivated actor.
 
-On the event the field is `device_name` rather than `name`, qualified the way a plan's is, because the personal-data check reads field names and cannot tell a piece of hardware's label from a person's.
+On the event the field is `device_name` rather than `name`, qualified the way an operation's is, because the personal-data check reads field names and cannot tell a piece of hardware's label from a person's.
 
 ## The status, and what it does not claim
 

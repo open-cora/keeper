@@ -68,11 +68,11 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "grant_permission",
         "revoke_permission",
         "get_policy",
-        "define_plan",
+        "define_operation",
         "define_procedure",
-        "get_plan",
+        "get_operation",
         "get_procedure",
-        "list_plans",
+        "list_operations",
         "list_procedures",
         "claim_execution",
         "dispatch_execution",
@@ -198,7 +198,7 @@ def _call(client: TestClient, live: dict[str, str], tool: str, **arguments: Any)
 
     The third parameter is `tool` and not `name` because a tool argument
     called `name` is ordinary, and one that collides with this helper's
-    own parameter cannot be passed at all. `define_plan` takes one. The
+    own parameter cannot be passed at all. `define_operation` takes one. The
     name this helper is given is the tool's; the names after it are the
     tool's arguments, and nothing should have to spell one differently
     to get it through.
@@ -314,7 +314,7 @@ def test_a_client_can_write_and_read_a_plan_over_the_mcp_surface() -> None:
     not recognise, would be handing out a contract nothing enforces.
     That shows up here as an inequality, not as a missing field.
 
-    `define_plan` mints the id, so the id the read uses had to come out
+    `define_operation` mints the id, so the id the read uses had to come out
     of the first response. A tool that echoed an input instead of
     returning what the handler produced has nothing to echo.
     """
@@ -327,21 +327,24 @@ def test_a_client_can_write_and_read_a_plan_over_the_mcp_surface() -> None:
 
     with TestClient(create_app(settings=Settings(app_env="test"))) as client:
         live = _open_session(client)
-        defined = _call(client, live, "define_plan", name="count", parameters_schema=schema)
-        plan_id = defined["plan_id"]
-        read = _call(client, live, "get_plan", plan_id=plan_id)
+        defined = _call(client, live, "define_operation", name="count", parameters_schema=schema)
+        operation_id = defined["operation_id"]
+        read = _call(client, live, "get_operation", operation_id=operation_id)
 
-        # A second plan under the same name, because that is allowed and
+        # A second operation under the same name, because that is allowed and
         # because a lookup returning one of two is the failure a caller
         # cannot see. Its schema differs, which is the whole reason the
-        # two are separate plans rather than one.
+        # two are separate operations rather than one.
         narrower = {**schema, "properties": {"exposure_seconds": {"type": "number", "minimum": 1}}}
-        second = _call(client, live, "define_plan", name="count", parameters_schema=narrower)
-        found = _call(client, live, "list_plans", name="count")
+        second = _call(client, live, "define_operation", name="count", parameters_schema=narrower)
+        found = _call(client, live, "list_operations", name="count")
 
-    assert read == {"plan_id": plan_id, "name": "count", "parameters_schema": schema}
-    assert {item["plan_id"] for item in found["items"]} == {plan_id, second["plan_id"]}, (
-        "a name lookup must return every plan written down under it; returning "
+    assert read == {"operation_id": operation_id, "name": "count", "parameters_schema": schema}
+    assert {item["operation_id"] for item in found["items"]} == {
+        operation_id,
+        second["operation_id"],
+    }, (
+        "a name lookup must return every operation written down under it; returning "
         "one of two would choose for the caller on an ordering nobody asked about"
     )
     assert found["next_cursor"] is None
@@ -356,8 +359,8 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
     would hand a caller a routine that is not the one it composed. That
     shows up here as an inequality on the whole list.
 
-    The acquisition cites a plan defined in the same session, because a
-    procedure citing a plan that does not exist is refused, which is the
+    The acquisition cites an operation defined in the same session, because a
+    procedure citing an operation that does not exist is refused, which is the
     check that makes a procedure more than a list of strings.
     """
     schema = {
@@ -368,14 +371,14 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
     }
     with TestClient(create_app(settings=Settings(app_env="test"))) as client:
         live = _open_session(client)
-        plan_id = _call(client, live, "define_plan", name="count", parameters_schema=schema)[
-            "plan_id"
-        ]
+        operation_id = _call(
+            client, live, "define_operation", name="count", parameters_schema=schema
+        )["operation_id"]
         steps = [
             {"kind": "set", "record": "2bmb:m1", "to": 12.5},
             {
                 "kind": "acquire",
-                "plan_id": plan_id,
+                "operation_id": operation_id,
                 "parameters": {"exposure_seconds": 0.2},
                 "scopes": ["2bmb:m1", "2bmb:det:"],
             },
@@ -405,7 +408,7 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
 def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() -> None:
     """The remaining Execution tool bodies executed, not just published.
 
-    The walk goes plan, procedure, execution, because each needs the one
+    The walk goes operation, procedure, execution, because each needs the one
     before it and none of them can be faked: those are the cross-aggregate
     reads exercised here through two surfaces rather than through a
     handler call.
@@ -424,22 +427,22 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
 
     with TestClient(create_app(settings=Settings(app_env="test"))) as client:
         live = _open_session(client)
-        plan_id = _call(client, live, "define_plan", name="count", parameters_schema=schema)[
-            "plan_id"
-        ]
+        operation_id = _call(
+            client, live, "define_operation", name="count", parameters_schema=schema
+        )["operation_id"]
 
         # Custody rides along on this walk rather than booting the
         # application again. A dataset names the step that produced it, so
         # it needs a dispatched execution rather than a run, and the
         # cheapest real one is a procedure of a single acquisition. The
         # cross-context read is exercised here through two surfaces rather
-        # than through a handler call, the same way the plan read above is.
+        # than through a handler call, the same way the operation read above is.
         # Custody rides along on this walk rather than booting the
         # application again. A dataset names the step that produced it, so
         # it needs a dispatched execution rather than a run, and the
         # cheapest real one is a procedure of a single acquisition. The
         # cross-context read is exercised here through two surfaces rather
-        # than through a handler call, the same way the plan read above is.
+        # than through a handler call, the same way the operation read above is.
         held_procedure = _call(
             client,
             live,
@@ -449,7 +452,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             steps=[
                 {
                     "kind": "acquire",
-                    "plan_id": plan_id,
+                    "operation_id": operation_id,
                     "parameters": {"exposure_seconds": 0.1},
                     "scopes": ["2bmb:det:"],
                 }
@@ -476,13 +479,13 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
 
         # Counsel rides along for the same reason Custody does, and it
         # closes the loop the other two halves of this walk opened: a
-        # proposal of the same plan, and the acquisition that took it.
+        # proposal of the same operation, and the acquisition that took it.
         # The step is the one Custody just registered data against, which
-        # is the shape the model asserts: one acquisition ran the plan,
+        # is the shape the model asserts: one acquisition ran the operation,
         # produced the data, and answered the advice. The proposer is
         # what only this surface can show, because no request field
         # carries one.
-        proposed = _call(client, live, "make_proposal", plan_id=plan_id, parameters={})
+        proposed = _call(client, live, "make_proposal", operation_id=operation_id, parameters={})
         proposal_id = proposed["proposal_id"]
         open_proposal = _call(client, live, "get_proposal", proposal_id=proposal_id)
         _call(
@@ -545,7 +548,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         # is the pair worth seeing side by side: one proposal closed by a
         # report of something that ran elsewhere, one closed by this
         # system deciding to run it.
-        to_adopt = _call(client, live, "make_proposal", plan_id=plan_id, parameters={})[
+        to_adopt = _call(client, live, "make_proposal", operation_id=operation_id, parameters={})[
             "proposal_id"
         ]
         adopted = _call(
@@ -715,7 +718,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         # append. Nothing in the closing call names a beamline, which is
         # the whole point of the pursuit having been authorized.
         _call(client, live, "claim_inquiry", inquiry_id=turned["inquiry_id"])
-        next_run = _call(client, live, "make_proposal", plan_id=plan_id, parameters={})
+        next_run = _call(client, live, "make_proposal", operation_id=operation_id, parameters={})
         _call(
             client,
             live,
@@ -890,10 +893,10 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "proposal is"
     )
     assert [step["describes"] for step in adopted_execution["steps"]] == [
-        f"acquire {plan_id} over 2bmb:det:"
+        f"acquire {operation_id} over 2bmb:det:"
     ], (
-        "one proposal is one run of one plan, so the procedure composed for it "
-        "has exactly one step, running that plan over the devices the adoption "
+        "one proposal is one run of one operation, so the procedure composed for it "
+        "has exactly one step, running that operation over the devices the adoption "
         "declared"
     )
     assert (after_adoption["execution_id"], after_adoption["step_id"]) == (

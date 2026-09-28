@@ -2,36 +2,36 @@
 
 Execution is the bounded context that answers three questions: what can this system be asked to run, what did it compose out of that, and what happened when the composition was carried out.
 
-It holds three aggregates, with a handful of things you can do to each. A Plan names a routine an engine already has. A Procedure is a routine composed here, out of sets and acquisitions in an order. An Execution is one traversal of a procedure.
+It holds three aggregates, with a handful of things you can do to each. An Operation names a routine an engine already has. A Procedure is a routine composed here, out of sets and acquisitions in an order. An Execution is one traversal of a procedure.
 
-The difference between a plan and a procedure is who composed the routine. A plan is a reference to a thing this system did not write. A procedure is authored here, and nothing anywhere holds that sequence until the record says so.
+The difference between an operation and a procedure is who composed the routine. An operation is a reference to a thing this system did not write. A procedure is authored here, and nothing anywhere holds that sequence until the record says so.
 
-**This system owns every genesis.** It writes the plan, composes the procedure and opens the execution. A client outside can only move what the keeper created, which is the posture the whole context is arranged around and the thing that changed most recently: there used to be a Run aggregate whose genesis an outside reporter issued, so a client could bring a record into existence. See [What became of the Run aggregate](#what-became-of-the-run-aggregate).
+**This system owns every genesis.** It writes the operation, composes the procedure and opens the execution. A client outside can only move what the keeper created, which is the posture the whole context is arranged around and the thing that changed most recently: there used to be a Run aggregate whose genesis an outside reporter issued, so a client could bring a record into existence. See [What became of the Run aggregate](#what-became-of-the-run-aggregate).
 
 The routine itself still runs outside, in whatever **engine** the deployment has. This context holds what that engine can be asked for, what it was asked for, and what it was reported to have done, never the running of it.
 
-## What a Plan is
+## What an Operation is
 
-A plan is something this system can be asked to run, written down.
+An operation is something this system can be asked to run, written down.
 
 ```
-   Plan
+   Operation
      id                 a UUID minted at definition, never reused
      name               what the engine calls the routine
      parameters_schema  the shape a run of it must supply
 ```
 
-Three fields. The name is not decoration: it is how the engine identifies what to run, so a plan without one names nothing and there is no act to record.
+Three fields. The name is not decoration: it is how the engine identifies what to run, so an operation without one names nothing and there is no act to record.
 
-Two plans may share a name and nothing stops that. That follows from what the name is for rather than being a rule of its own. This system identifies a plan by its id everywhere it matters: a run cites an id, and `GET /plans/{plan_id}` reads one back. The name is the handle the engine uses, carried so this system can eventually say which routine to run, and a handle does not have to be unique to do that job.
+Two operations may share a name and nothing stops that. That follows from what the name is for rather than being a rule of its own. This system identifies an operation by its id everywhere it matters: a run cites an id, and `GET /operations/{operation_id}` reads one back. The name is the handle the engine uses, carried so this system can eventually say which routine to run, and a handle does not have to be unique to do that job.
 
-One routine constrained two ways is two plans, and which one a run cites is what says how it was constrained. Be aware of how little of that difference the record can currently hold: the schema subset has no `items` keyword, so two plans that differ only in which devices they allow are the same document twice, distinguishable by id and nothing else.
+One routine constrained two ways is two operations, and which one a run cites is what says how it was constrained. Be aware of how little of that difference the record can currently hold: the schema subset has no `items` keyword, so two operations that differ only in which devices they allow are the same document twice, distinguishable by id and nothing else.
 
 ## Why the schema is required
 
-A plan carries a JSON Schema, in the constrained subset described in [Conventions](../reference/conventions.md#schema-validated-values), and it is required rather than optional.
+An operation carries a JSON Schema, in the constrained subset described in [Conventions](../reference/conventions.md#schema-validated-values), and it is required rather than optional.
 
-The shared carrier-side validator accepts an absent schema and refuses the values that would have gone with it. A plan closes that case earlier, at definition. An operator with nothing to constrain declares a schema that constrains nothing and says so in the record; the alternative is a plan that can never refuse a parameter, with nothing saying whether that was meant.
+The shared carrier-side validator accepts an absent schema and refuses the values that would have gone with it. An operation closes that case earlier, at definition. An operator with nothing to constrain declares a schema that constrains nothing and says so in the record; the alternative is an operation that can never refuse a parameter, with nothing saying whether that was meant.
 
 So of the four cells in that posture table, the absent-schema row is unreachable from here. It stays in the shared helper because the helper is shared and the next declarer may want it.
 
@@ -70,7 +70,7 @@ Two kinds of step, and only one of them declares what it touches.
 
 ```
    Set       record, to           what it touches is the record it names
-   Acquire   plan_id, parameters, scopes
+   Acquire   operation_id, parameters, scopes
 ```
 
 A set sends one record to one value, so deriving what it touches is exact and a declared field would be a second chance to say the same thing differently. An acquisition hands a routine to an engine, and nothing here can see inside that routine to work out which devices it will drive. So an acquisition declares its scopes and a set does not have the option, which is not an inconsistency: one is derivable and the other is not.
@@ -83,15 +83,15 @@ Nothing. A scope is stored as the string it arrived as, and is not parsed into a
 
 ### Where the parameters are checked
 
-An acquisition's parameters are validated against the schema its plan declares, and the check runs at definition rather than when the procedure is walked. That is earlier and cheaper: a procedure with a malformed acquisition is refused before anything is dispatched, instead of failing partway through a traversal that has already moved motors.
+An acquisition's parameters are validated against the schema its operation declares, and the check runs at definition rather than when the procedure is walked. That is earlier and cheaper: a procedure with a malformed acquisition is refused before anything is dispatched, instead of failing partway through a traversal that has already moved motors.
 
-Two gaps in that check are worth stating rather than discovering. An acquisition supplying no parameters at all is accepted whatever its plan requires, because the shared validator defers `required` to the point the values are finally acted on, which is the engine. And a plan retired or redefined after the fact does not invalidate a procedure citing it: the parameters were checked against the schema as it stood, and the record is a record of what was composed.
+Two gaps in that check are worth stating rather than discovering. An acquisition supplying no parameters at all is accepted whatever its operation requires, because the shared validator defers `required` to the point the values are finally acted on, which is the engine. And an operation retired or redefined after the fact does not invalidate a procedure citing it: the parameters were checked against the schema as it stood, and the record is a record of what was composed.
 
 ## What became of the Run aggregate
 
-There was a fourth aggregate here: a Run, one carrying-out of one plan, opened by a reporter telling this system that an engine had run something. It is gone, and the collapse is worth reading before the rest of this page, because several sections below are shorter than they were because of it.
+There was a fourth aggregate here: a Run, one carrying-out of one operation, opened by a reporter telling this system that an engine had run something. It is gone, and the collapse is worth reading before the rest of this page, because several sections below are shorter than they were because of it.
 
-**A run and one acquisition step were the same fact in two vocabularies.** A run cited a plan and carried the parameters it was given. An acquisition step cites a plan and carries the parameters it was dispatched with. The only thing a run held beyond that was the engine's own name for it, and that now sits on the step as `engine_reference`.
+**A run and one acquisition step were the same fact in two vocabularies.** A run cited an operation and carried the parameters it was given. An acquisition step cites an operation and carries the parameters it was dispatched with. The only thing a run held beyond that was the engine's own name for it, and that now sits on the step as `engine_reference`.
 
 The duplication only became visible when Procedure and Execution arrived. Before them, a run was the only record of anything having happened, and a step was a conductor's internal business this system never saw. Once the keeper composed the work and dispatched it, every step passed through here in the keeper's own vocabulary, and a run was a second record of the same act at a coarser scale.
 
@@ -107,9 +107,9 @@ The duplication only became visible when Procedure and Execution arrived. Before
 
 | What it does | HTTP | MCP tool | On success |
 | --- | --- | --- | --- |
-| Define a plan | `POST /plans` | `define_plan` | `201` with the new id |
-| Read one back | `GET /plans/{plan_id}` | `get_plan` | `200` with the plan |
-| Find plans | `GET /plans` | `list_plans` | `200` with a page of plans |
+| Define an operation | `POST /operations` | `define_operation` | `201` with the new id |
+| Read one back | `GET /operations/{operation_id}` | `get_operation` | `200` with the operation |
+| Find operations | `GET /operations` | `list_operations` | `200` with a page of operations |
 | Define a procedure | `POST /procedures` | `define_procedure` | `201` with the new id |
 | Read one back | `GET /procedures/{procedure_id}` | `get_procedure` | `200` with the procedure and its steps |
 | Find procedures | `GET /procedures` | `list_procedures` | `200` with a page of procedures |
@@ -123,7 +123,7 @@ The duplication only became visible when Procedure and Execution arrived. Before
 
 Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/execution/routes.py`.
 
-The four operations that move an existing execution take an optional `occurred_at`. The three that mint a record do not: defining a plan, composing a procedure and dispatching an execution all happen here, at the moment the record is written, so there is no earlier instant for a caller to report. That split is R8's, and it is explained under [When a report says it happened](#when-a-report-says-it-happened) below.
+The four operations that move an existing execution take an optional `occurred_at`. The three that mint a record do not: defining an operation, composing a procedure and dispatching an execution all happen here, at the moment the record is written, so there is no earlier instant for a caller to report. That split is R8's, and it is explained under [When a report says it happened](#when-a-report-says-it-happened) below.
 
 The engine report is the odd endpoint: a step in the path and the verb in the body, where every other transition here puts the verb in the path. The difference is what the caller is. A driver calls one endpoint per thing it means; a reporter drains an engine's document stream and turns each document into whichever of six it is, so a path per verb would make it build a URL by lookup where a field costs it nothing.
 
@@ -131,12 +131,12 @@ Both schemas and parameters come back exactly as they were stored, not re-render
 
 ## What the streams hold
 
-There is no plans table and no executions table. Current state is recomputed by replaying a stream on every read.
+There is no operations table and no executions table. Current state is recomputed by replaying a stream on every read.
 
 There are three derived tables, one per aggregate, and none holds state the fold does not. See [Finding one without its id](#finding-one-without-its-id).
 
 ```
-   PlanDefined        plan_id, plan_name, parameters_schema, occurred_at
+   OperationDefined        operation_id, operation_name, parameters_schema, occurred_at
 
    ProcedureDefined   procedure_id, procedure_name, steps, occurred_at
 
@@ -155,7 +155,7 @@ There are three derived tables, one per aggregate, and none holds state the fold
 
 A step outcome is addressed by index and an engine report by step id, which looks inconsistent and is not. A driver walks the list it was handed and knows where it is; whatever watches an engine knows only the id a driver carried into that engine's metadata.
 
-One event on a plan and one on a procedure, because nothing changes either yet. Retiring one arrives as a new class when the command that does lands, never as a field edited onto the genesis.
+One event on an operation and one on a procedure, because nothing changes either yet. Retiring one arrives as a new class when the command that does lands, never as a field edited onto the genesis.
 
 A procedure's whole step list rides its genesis, as a list of objects rather than flat fields, which makes it the only payload here holding a nested structure. Each step carries a `kind` discriminating a set from an acquisition. That key is on the wire and not on either class in the model, because there the class IS the kind and a field saying so again is a second thing to get wrong.
 
@@ -163,9 +163,9 @@ Every event after the genesis carries the same two fields. What is running is al
 
 Neither the pause nor the resume says why. A pause raised by a signal, by an operator, and by the routine asking for one itself all arrive as the same fact, because stopped versus not is the distinction this system can act on and the rest is the engine's to keep.
 
-The plan's name rides the payload as `plan_name` rather than `name`. The personal-data check reads field names and cannot tell a routine's name from a person's, and an unqualified `name` on an append-only row is the shape that rule exists to stop. The state keeps the bare `name`, where the aggregate it hangs off already supplies the qualifier.
+The operation's name rides the payload as `operation_name` rather than `name`. The personal-data check reads field names and cannot tell a routine's name from a person's, and an unqualified `name` on an append-only row is the shape that rule exists to stop. The state keeps the bare `name`, where the aggregate it hangs off already supplies the qualifier.
 
-A dispatched step travels as three fields: its id, the sentence rendered for a reader, and the plan it runs. The sentence is for display and the plan is what anything outside reads, which is why both are there when one of them contains the other as text.
+A dispatched step travels as three fields: its id, the sentence rendered for a reader, and the operation it runs. The sentence is for display and the operation is what anything outside reads, which is why both are there when one of them contains the other as text.
 
 ## The state machine
 
@@ -240,17 +240,17 @@ A report that does not follow is a 409 and not a 400, and that correction was ma
 
 | Refusal | Status | What happened |
 | --- | --- | --- |
-| `InvalidPlanNameError` | 400 | Empty after trimming, or over the length bound. |
+| `InvalidOperationNameError` | 400 | Empty after trimming, or over the length bound. |
 | `InvalidPlanParametersSchemaError` | 400 | Not a Draft 2020-12 document, or outside the stored subset. |
 | `InvalidProcedureNameError` | 400 | Empty after trimming, or over the length bound. |
 | `InvalidProcedureStepsError` | 400 | No steps, too many, a set naming no record or sent to a value JSON cannot carry, or an acquisition declaring no devices. |
-| `InvalidProcedureParametersError` | 400 | An acquisition's parameters do not satisfy the plan it cites. Names which step. |
+| `InvalidProcedureParametersError` | 400 | An acquisition's parameters do not satisfy the operation it cites. Names which step. |
 | `InvalidExecutionProcedureNameError` | 400 | The procedure's name falls outside what an execution stores. |
 | `InvalidExecutionStepsError` | 400 | The rendered step list is empty, too long, or holds a blank step. |
 | `InvalidStepReportError` | 400 | A step report carried a detail belonging to a different outcome, or a break named no cause. |
 | `InvalidIdentifierError` | 400 | An external reference had an empty or over-long half. |
 | `UnauthorizedError` | 403 | The caller is known and not allowed. |
-| `PlanNotFoundError` | 404 | The id names no plan, whether the caller asked to read one or cited one in a procedure. |
+| `OperationNotFoundError` | 404 | The id names no operation, whether the caller asked to read one or cited one in a procedure. |
 | `ProcedureNotFoundError` | 404 | The id names no procedure, or a dispatch cited one that does not exist. |
 | `ExecutionNotFoundError` | 404 | The id names no execution. |
 | `ExecutionStepOutOfRangeError` | 404 | The index is past the end of the list the genesis fixed. |
@@ -273,11 +273,11 @@ One table, where there were two. The second existed because the execution refusa
 
 `ExecutionCannotBeClaimedError` carries the status for the same reason: being told an execution cannot be claimed is much less useful than being told something already claimed it, which is a contest, or that it ended, which is merely late.
 
-A plan that is not there and a plan that refuses the values are deliberately different statuses. One means fix the id, the other means fix the values, and a caller needs to tell them apart.
+An operation that is not there and an operation that refuses the values are deliberately different statuses. One means fix the id, the other means fix the values, and a caller needs to tell them apart.
 
 Names and references are checked twice on the HTTP path, and the two checks answer to different callers. One the request model can refuse never reaches a command and gets FastAPI's own 422; one it cannot, such as a string of spaces, is refused by the value object inside the decision function and gets 400. Neither covers the other's callers, because the MCP surface has no request model.
 
-Reading is gated like writing. A plan says what this system can be asked to run and what a request has to look like; a procedure says what it was asked to do and to which devices; an execution says what happened. All three are things a deployment should get to decide who may see.
+Reading is gated like writing. An operation says what this system can be asked to run and what a request has to look like; a procedure says what it was asked to do and to which devices; an execution says what happened. All three are things a deployment should get to decide who may see.
 
 ## When a report says it happened
 
@@ -285,7 +285,7 @@ The four commands that move an existing execution accept an optional `occurred_a
 
 This matters most where it is easiest to overlook. For a driver reporting live, the gap between when a step ended and when this system heard is milliseconds. For a reporter that was down for an hour it is an hour. For a backfill out of an engine's own archive it is years, and without this field every one of those would be recorded as having happened on the afternoon somebody ran the import.
 
-**Which commands take the field is itself the claim.** The three that mint a record do not, and the asymmetry is the point. Defining a plan, composing a procedure and dispatching an execution are acts this system performs: the moment it writes one is the moment it exists. A step being driven and an engine opening a run for it happened somewhere else. That is R8 in [Naming](../reference/naming.md#r8-ask-whether-the-record-makes-the-fact-or-describes-one), and the split now runs through one aggregate rather than between two.
+**Which commands take the field is itself the claim.** The three that mint a record do not, and the asymmetry is the point. Defining an operation, composing a procedure and dispatching an execution are acts this system performs: the moment it writes one is the moment it exists. A step being driven and an engine opening a run for it happened somewhere else. That is R8 in [Naming](../reference/naming.md#r8-ask-whether-the-record-makes-the-fact-or-describes-one), and the split now runs through one aggregate rather than between two.
 
 A supplied timestamp must carry an offset and is stored as UTC. It is not checked against anything else: not against the clock, not against the execution's own genesis. A step may therefore claim to have finished before the execution was dispatched.
 
@@ -295,24 +295,24 @@ A list row carries both timestamps and a single read carries neither, which is a
 
 ## Finding one without its id
 
-Three reads in this context name what they want. `GET /plans/{plan_id}`, `GET /procedures/{procedure_id}` and `GET /executions/{execution_id}` replay one stream each and answer from it, which costs one query and stays correct forever because the stream is the record.
+Three reads in this context name what they want. `GET /operations/{operation_id}`, `GET /procedures/{procedure_id}` and `GET /executions/{execution_id}` replay one stream each and answer from it, which costs one query and stays correct forever because the stream is the record.
 
-Four questions cannot be answered that way: which plans answer to a name, which procedures do, which executions were dispatched for one procedure, and which are waiting at one beamline. Answering any of them would mean replaying every stream of its kind to see which ones match. A fold needs to know which stream to fold, and that is exactly what is being asked.
+Four questions cannot be answered that way: which operations answer to a name, which procedures do, which executions were dispatched for one procedure, and which are waiting at one beamline. Answering any of them would mean replaying every stream of its kind to see which ones match. A fold needs to know which stream to fold, and that is exactly what is being asked.
 
 So there is a second read path:
 
 ```
-   POST /plans                      GET /plans/{plan_id}
+   POST /operations                      GET /operations/{operation_id}
    POST /procedures                 GET /procedures/{procedure_id}
    POST /executions                 GET /executions/{execution_id}
      |                                fold a stream each. Unchanged.
      | event
      v
-   events  (the record)             GET /plans?name=...
+   events  (the record)             GET /operations?name=...
      |                              GET /procedures?name=...
      | one worker, three bookmarks  GET /executions?procedure_id=...
      v                                read the tables below
-   proj_execution_plan_summary
+   proj_execution_operation_summary
    proj_execution_procedure_summary
    proj_execution_execution_summary
 ```
@@ -329,9 +329,9 @@ There is a port per aggregate, each declared with the aggregate it summarises, a
 
 **The procedure index is not unique, and that is the ordinary case.** A routine composed once is executed every time it runs, so many executions under one procedure is what a deployment looks like rather than a duplicate. A unique constraint there would refuse the second run of anything.
 
-**A plan name is where the questions differ.** A plan's name is not an identity: it is the engine's handle, and this system holds plans for every engine it hears from. So `GET /plans?name=count` returns however many there are, and it is a way to see them rather than a way to choose between them.
+**An operation name is where the questions differ.** An operation's name is not an identity: it is the engine's handle, and this system holds operations for every engine it hears from. So `GET /operations?name=count` returns however many there are, and it is a way to see them rather than a way to choose between them.
 
-Choosing is the caller's, and a caller that has to choose holds a mapping rather than applies a rule. Something composing procedures for one engine knows which installation it serves and which plan each name means there; this system knows neither, and nothing on the two records would tell it apart if it tried. A lookup returning one of two would be making that choice on every call, silently, on the strength of an ordering nobody asked about.
+Choosing is the caller's, and a caller that has to choose holds a mapping rather than applies a rule. Something composing procedures for one engine knows which installation it serves and which operation each name means there; this system knows neither, and nothing on the two records would tell it apart if it tried. A lookup returning one of two would be making that choice on every call, silently, on the strength of an ordering nobody asked about.
 
 ## What an Execution is
 
@@ -352,19 +352,19 @@ An execution is one traversal of a procedure: the record this system opens when 
 a reader. A conductor asks for every dispatched execution at its own
 beamline, which is a filter over many rows, so the value has to be on the
 row rather than one reference away. That is what separates it from the
-plan id a step used to copy: that answered one reader's question about
+operation id a step used to copy: that answered one reader's question about
 one row with the whole definition a hop away, and this selects the page.
 
 Each step carries an id of its own, minted at dispatch and written onto the genesis. It is on the payload rather than made during the fold because a fold has to produce the same steps on every replay, and a record other aggregates point at cannot move between them.
 
 A step has an id at all so that something outside can name one. A dataset is produced by one acquisition, not by a whole traversal, so `(execution_id, index)` would be a pointer into the interior of another aggregate rather than a handle: it cannot be fetched, and checking it exists means folding the whole execution and bounds-checking an integer. Both [Custody](custody.md) and [Counsel](counsel.md) now cite one.
 
-**A step also cites the composed step it came from**, and that arrived with the second consumer rather than the first. Custody only needed a step to exist, so an id was enough. Counsel needs to ask something about one, whether it ran the plan a proposal named, and nothing on the record could answer: the plan id was present only inside the rendered sentence, written for a person to read.
+**A step also cites the composed step it came from**, and that arrived with the second consumer rather than the first. Custody only needed a step to exist, so an id was enough. Counsel needs to ask something about one, whether it ran the operation a proposal named, and nothing on the record could answer: the operation id was present only inside the rendered sentence, written for a person to read.
 
 ```
    Procedure R1                    Execution E1, on Tuesday
      T1  set 2bmb:m1 to 0.0   <------  S1  from T1
-     T2  acquire plan P1      <------  S2  from T2
+     T2  acquire operation P1      <------  S2  from T2
            exposure 0.25
            touches 2bmb:det:         Execution E2, on Wednesday
                             <------  S3  from T1
@@ -373,7 +373,7 @@ A step has an id at all so that something outside can name one. A dataset is pro
 
 Two ids on one step, and they are not interchangeable. `S2` names this traversal's step, which is what Custody and Counsel point at, and `T2` names the definition every traversal of the procedure shares. They cannot be collapsed, because one procedure is dispatched many times.
 
-**The first shape of this copied the plan id onto the step instead.** It worked and it was replaced, because a copy answers one consumer's one question and the next question needs the next field, a payload key and a migration each. A citation answers all of them: the plan, the parameters the step was composed with, and the devices it declares are all on the definition. The alternative to both was a positional join against the procedure's own step list, built by one zip in one decider and asserted nowhere.
+**The first shape of this copied the operation id onto the step instead.** It worked and it was replaced, because a copy answers one consumer's one question and the next question needs the next field, a payload key and a migration each. A citation answers all of them: the operation, the parameters the step was composed with, and the devices it declares are all on the definition. The alternative to both was a positional join against the procedure's own step list, built by one zip in one decider and asserted nowhere.
 
 Rot is what a copy would buy, and there is none to buy. A procedure has one event and nothing edits it, so a citation that resolved once resolves forever, and changing a routine means composing another one.
 
@@ -480,15 +480,15 @@ The answer is a page and not a single execution, and nothing reserves a row for 
 
 ## An execution cannot check the engine run its step opened
 
-A procedure's genesis checks that every plan it cites exists, and that check is real. The equivalent one scale down is unavailable, and the reason is worth stating rather than discovering.
+A procedure's genesis checks that every operation it cites exists, and that check is real. The equivalent one scale down is unavailable, and the reason is worth stating rather than discovering.
 
 A driver reports an acquisition step the moment its engine returns, and carries the engine's own name for the run it opened. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against: the run record this context used to keep is exactly what was retired. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
 
-That is weaker than a plan reference and it is the honest shape. An engine's names are the engine's, and a system that claimed to have checked one would be claiming to have asked.
+That is weaker than an operation reference and it is the honest shape. An engine's names are the engine's, and a system that claimed to have checked one would be claiming to have asked.
 
 ## Why the three share a context
 
-An acquisition step cannot be composed without the plan it cites, and checking one against the other is the whole of what a procedure's genesis does. A dispatch cannot open a record without copying the procedure it hands out. Across a context boundary each of those would have to reach through a sibling's read-side surface for a relationship neither side can be without, so the three stay together.
+An acquisition step cannot be composed without the operation it cites, and checking one against the other is the whole of what a procedure's genesis does. A dispatch cannot open a record without copying the procedure it hands out. Across a context boundary each of those would have to reach through a sibling's read-side surface for a relationship neither side can be without, so the three stay together.
 
 ## This system owns every genesis
 
@@ -516,7 +516,7 @@ What a driving surface would still add is the asking side of a pause, which is a
 
 ```
    apps/keeper/src/keeper/execution/
-     aggregates/plan/           state, events, the fold, how to load one, and
+     aggregates/operation/           state, events, the fold, how to load one, and
                                 the summary a list shows with the port over it
      aggregates/procedure/      the same, for a procedure, whose state module
                                 also holds the two step kinds
@@ -527,10 +527,10 @@ What a driving surface would still add is the asking side of a pause, which is a
      projections/               what keeps the tables in step with the log,
                                 and the call that hands them to the worker
      features/
-       define_plan/             command, decision, handler, route, tool
-       get_plan/                a query slice, so no decider: reading decides nothing
-       list_plans/              the queries a fold cannot serve, one per
-       define_procedure/        with a context module too, for the plans its
+       define_operation/             command, decision, handler, route, tool
+       get_operation/                a query slice, so no decider: reading decides nothing
+       list_operations/              the queries a fold cannot serve, one per
+       define_procedure/        with a context module too, for the operations its
                                 acquisitions cite, which is several
        get_procedure/           the only read that returns the typed steps
        list_procedures/         aggregate
@@ -550,7 +550,7 @@ What a driving surface would still add is the asking side of a pause, which is a
 
 `report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what Run did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
 
-`define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may acquire several times, so its handler loads each distinct plan once and hands the lot across keyed by id. Once, because a tomography procedure acquiring the same plan at twenty sample positions would otherwise replay that stream twenty times for no new information.
+`define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may acquire several times, so its handler loads each distinct operation once and hands the lot across keyed by id. Once, because a tomography procedure acquiring the same operation at twenty sample positions would otherwise replay that stream twenty times for no new information.
 
 ## What is not here yet
 
@@ -580,10 +580,10 @@ This is less damaging than it was. The reference is a correlation hint rather th
 
 A shared shell for near-identical update handlers. It was built for the Run aggregate's five, measured against the alternative and reverted; see [Layout](../reference/layout.md#bc-root-extras). There are fewer of them to share now, which is a reason the question has not come back rather than an answer to it.
 
-Any way to say which plan named `count` is the one to use now. Deliberately unanswered here rather than deferred: a caller resolving a name knows which engine it is speaking to and this system does not, so the mapping belongs with the caller. What would change that is a second caller wanting the same answer for a different reason, at which point the question is a plan lifecycle and worth deciding on its own terms rather than as a lookup.
+Any way to say which operation named `count` is the one to use now. Deliberately unanswered here rather than deferred: a caller resolving a name knows which engine it is speaking to and this system does not, so the mapping belongs with the caller. What would change that is a second caller wanting the same answer for a different reason, at which point the question is an operation lifecycle and worth deciding on its own terms rather than as a lookup.
 
-Anything about where a plan belongs. Nothing on a plan says which installation it was written for, so two plans named `count` for two engines are the same record twice, and "every plan for this installation" is a question nothing here can answer. Whatever composes procedures carries that scope in its own configuration, which holds until something inside this system needs it.
+Anything about where an operation belongs. Nothing on an operation says which installation it was written for, so two operations named `count` for two engines are the same record twice, and "every operation for this installation" is a question nothing here can answer. Whatever composes procedures carries that scope in its own configuration, which holds until something inside this system needs it.
 
 Anything a projection could answer beyond finding a record: how long executions take, how many steps broke last week, which procedure is dispatched most. The tables have the columns for none of those, and each is a column and a filter when somebody asks.
 
-Any search over what a plan constrains. The schema is on the record and on no index, so "which plans take an exposure time" is a question nothing can answer without reading every one.
+Any search over what an operation constrains. The schema is on the record and on no index, so "which operations take an exposure time" is a question nothing can answer without reading every one.

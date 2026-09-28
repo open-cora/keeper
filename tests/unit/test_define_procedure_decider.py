@@ -12,7 +12,7 @@ from uuid import uuid4
 
 import pytest
 
-from keeper.execution.aggregates.plan import Plan, PlanName
+from keeper.execution.aggregates.operation import Operation, OperationName
 from keeper.execution.aggregates.procedure import (
     AcquireStep,
     ComposedStep,
@@ -47,13 +47,15 @@ _SCHEMA: dict[str, Any] = {
 
 def _context() -> DefineProcedureContext:
     return DefineProcedureContext(
-        plans={_PLAN_ID: Plan(id=_PLAN_ID, name=PlanName("count"), parameters_schema=_SCHEMA)}
+        operations={
+            _PLAN_ID: Operation(id=_PLAN_ID, name=OperationName("count"), parameters_schema=_SCHEMA)
+        }
     )
 
 
 def _acquire(**overrides: Any) -> AcquireStep:
     fields: dict[str, Any] = {
-        "plan_id": _PLAN_ID,
+        "operation_id": _PLAN_ID,
         "parameters": {"exposure_seconds": 0.2},
         "scopes": ("2bmb:m1",),
     }
@@ -176,7 +178,7 @@ def test_a_procedure_of_moves_alone_needs_no_plans_at_all() -> None:
     events = decide(
         None,
         _command(SetStep(record="2bmb:m1", to=1.0)),
-        context=DefineProcedureContext(plans={}),
+        context=DefineProcedureContext(operations={}),
         now=_NOW,
         new_id=_NEW_ID,
         step_ids=[uuid4()],

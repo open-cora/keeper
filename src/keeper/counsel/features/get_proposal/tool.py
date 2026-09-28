@@ -29,7 +29,7 @@ class GetProposalOutput(BaseModel):
 
     proposal_id: UUID
     actor_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
     status: ProposalStatus
     execution_id: UUID | None
@@ -42,7 +42,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
     @mcp.tool(
         name="get_proposal",
         description=(
-            "Read a proposal by id: which agent put it forward, the plan and "
+            "Read a proposal by id: which agent put it forward, the operation and "
             "values it proposes, and the run that took it if one has."
         ),
     )
@@ -62,7 +62,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
         return GetProposalOutput(
             proposal_id=proposal.id,
             actor_id=proposal.actor_id,
-            plan_id=proposal.plan_id,
+            operation_id=proposal.operation_id,
             parameters=proposal.parameters,
             status=proposal.status,
             execution_id=proposal.execution_id,

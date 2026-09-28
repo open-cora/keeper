@@ -54,10 +54,10 @@ Fixed at module scope, because the point of them is that they are the
 same across every execution of one procedure, where the step ids in
 `_steps` below are minted afresh per dispatch.
 """
-"""Which step runs a plan, matched to `_STEPS` by position.
+"""Which step runs an operation, matched to `_STEPS` by position.
 
 The middle one is the acquisition, so the round trip below carries both
-a set plan and two unset ones. A fixture where every step was a move
+a set operation and two unset ones. A fixture where every step was a move
 would exercise only the null.
 """
 

@@ -1,7 +1,7 @@
 """The decision: what making a proposal produces.
 
 Pure. No awaits, no ports, no clock. `now` and `new_id` arrive as
-parameters, and the plan arrives on the context, precisely so this
+parameters, and the operation arrives on the context, precisely so this
 function has nothing to fetch and nothing to invent.
 
 `actor_id` arrives as a parameter rather than on the command, because it
@@ -38,7 +38,7 @@ def decide(
     Invariants:
       - State must be None, or the id already has a history
         -> ProposalAlreadyExistsError
-      - The values must satisfy the plan's declared schema
+      - The values must satisfy the operation's declared schema
         -> InvalidProposalParametersError
 
     The second is what makes this a proposal rather than a wish. Values
@@ -46,13 +46,13 @@ def decide(
     here means a proposer learns at the moment it advises rather than
     when somebody tries to act on it.
 
-    The handler has already refused a plan id with no stream behind it,
-    so by the time the context is built the plan exists. Existence is the
+    The handler has already refused an operation id with no stream behind it,
+    so by the time the context is built the operation exists. Existence is the
     handler's to check and state is the decider's, which is the split
     docs/reference/patterns.md draws between a 404 and a refusal.
 
     `no_schema_message` is not passed, so the shared validator runs in
-    its relaxed posture, and the choice does not matter here: a plan
+    its relaxed posture, and the choice does not matter here: an operation
     cannot be defined without a schema, so the absent-schema case the
     argument exists for cannot arise.
 
@@ -66,14 +66,14 @@ def decide(
         raise ProposalAlreadyExistsError(state.id)
     validate_values_against_schema(
         command.parameters,
-        context.plan.parameters_schema,
+        context.operation.parameters_schema,
         error_class=InvalidProposalParametersError,
     )
     return [
         ProposalMade(
             proposal_id=new_id,
             actor_id=actor_id,
-            plan_id=command.plan_id,
+            operation_id=command.operation_id,
             parameters=command.parameters,
             occurred_at=now,
         )

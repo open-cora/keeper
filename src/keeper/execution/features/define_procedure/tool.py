@@ -47,10 +47,10 @@ class SetStepInput(BaseModel):
 
 
 class AcquireStepInput(BaseModel):
-    """Ask an engine to run a plan, over the devices this step declares."""
+    """Ask an engine to run an operation, over the devices this step declares."""
 
     kind: Literal["acquire"]
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any] = Field(default_factory=dict[str, Any])
     scopes: list[Annotated[str, Field(max_length=PROCEDURE_SCOPE_MAX_LENGTH)]] = Field(
         min_length=1, max_length=PROCEDURE_MAX_SCOPES_PER_STEP
@@ -71,7 +71,7 @@ def _to_step(step: SetStepInput | AcquireStepInput) -> ProcedureStep:
     if isinstance(step, SetStepInput):
         return SetStep(record=step.record, to=step.to)
     return AcquireStep(
-        plan_id=step.plan_id,
+        operation_id=step.operation_id,
         parameters=step.parameters,
         scopes=tuple(step.scopes),
     )
@@ -84,7 +84,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
         name="define_procedure",
         description=(
             "Compose a routine out of ordered steps and return its id. A set "
-            "sends one record to one value; an acquisition runs a plan and must "
+            "sends one record to one value; an acquisition runs an operation and must "
             "declare the devices it touches. The beamline says where the routine "
             "runs, which is what routes a dispatch of it to a conductor."
         ),

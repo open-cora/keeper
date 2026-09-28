@@ -20,8 +20,8 @@ from keeper.execution.aggregates.execution import (
     load_execution,
 )
 from keeper.execution.aggregates.procedure import AcquireStep
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -77,14 +77,14 @@ def _kernel(*, authz: object | None = None) -> Kernel:
 
 
 async def _an_acquisition(deps: Kernel) -> tuple[UUID, UUID]:
-    """A plan, a procedure that acquires it, and one dispatch of that.
+    """An operation, a procedure that acquires it, and one dispatch of that.
 
     The whole chain, because the handler checks that the execution holds
     the step. A step is an entity inside that aggregate rather than a
     stream of its own, so there is nothing to stub short of dispatching.
     """
-    plan_id = await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -92,7 +92,7 @@ async def _an_acquisition(deps: Kernel) -> tuple[UUID, UUID]:
         DefineProcedure(
             name="one_scan",
             beamline="2-bm",
-            steps=(AcquireStep(plan_id=plan_id, parameters={}, scopes=("2bmb:det:",)),),
+            steps=(AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),

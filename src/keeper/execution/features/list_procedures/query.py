@@ -5,7 +5,7 @@ procedure to name, which a fold cannot answer: it would mean replaying
 every procedure stream to see which ones match.
 
 The filter is one optional name and that is the whole of it. No search
-over which plans a procedure acquires and no search over which devices it
+over which operations a procedure acquires and no search over which devices it
 touches: both are real questions, both would need a column nothing has
 built, and neither has been asked yet.
 """
@@ -18,7 +18,7 @@ DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 """How many procedures one page carries, by default and at most.
 
-The same two numbers the plan and run lists use, and deliberately not a
+The same two numbers the operation and run lists use, and deliberately not a
 third pair. A caller paging one collection and then another should not
 have to learn that the page sizes differ.
 """

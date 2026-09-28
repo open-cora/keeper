@@ -46,7 +46,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
         description=(
             "Record that an acquisition step was performed against a proposal. "
             "Refused if the proposal already has one, or if that step ran a "
-            "different plan or no plan at all."
+            "different operation or no operation at all."
         ),
     )
     async def take_proposal_tool(  # pyright: ignore[reportUnusedFunction]

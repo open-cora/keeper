@@ -6,7 +6,7 @@ Create-style on its own stream, so there is no load-and-fold and
 Nothing is loaded at all, which makes this the shortest handler in the
 tree. Its two nearest neighbours both load a sibling first:
 `register_dataset` loads the run that produced the data, and
-`make_proposal` loads the plan whose schema it checks against. This
+`make_proposal` loads the operation whose schema it checks against. This
 decision needs neither, because a device belongs to no run and satisfies
 no schema.
 """

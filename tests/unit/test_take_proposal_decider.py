@@ -35,11 +35,11 @@ _NOW = datetime(2026, 9, 19, 14, 30, tzinfo=UTC)
 _PARAMETERS: dict[str, Any] = {"exposure_time_s": 0.1}
 
 
-def _open_proposal(plan_id: UUID | None = None) -> Proposal:
+def _open_proposal(operation_id: UUID | None = None) -> Proposal:
     return Proposal(
         id=uuid4(),
         actor_id=uuid4(),
-        plan_id=plan_id if plan_id is not None else uuid4(),
+        operation_id=operation_id if operation_id is not None else uuid4(),
         parameters=dict(_PARAMETERS),
     )
 
@@ -48,23 +48,23 @@ def _taken(proposal: Proposal, *, by: UUID) -> Proposal:
     return Proposal(
         id=proposal.id,
         actor_id=proposal.actor_id,
-        plan_id=proposal.plan_id,
+        operation_id=proposal.operation_id,
         parameters=proposal.parameters,
         execution_id=uuid4(),
         step_id=by,
     )
 
 
-def _acquisition_of(plan_id: UUID | None) -> TakeProposalContext:
+def _acquisition_of(operation_id: UUID | None) -> TakeProposalContext:
     """The composed step behind the acquisition, as the handler found it.
 
-    A plan of None is the move case: the step exists and was composed to
+    An operation of None is the move case: the step exists and was composed to
     drive a motor rather than to ask an engine for anything.
     """
     step: ProcedureStep = (
         SetStep(record="2bmb:m1", to=0.0)
-        if plan_id is None
-        else AcquireStep(plan_id=plan_id, parameters={}, scopes=("2bmb:det:",))
+        if operation_id is None
+        else AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",))
     )
     return TakeProposalContext(composed=ComposedStep(id=uuid4(), step=step))
 
@@ -87,7 +87,7 @@ def test_taking_an_open_proposal_emits_one_event() -> None:
     events = decide(
         proposal,
         _take(proposal.id, execution_id=execution_id, step_id=step_id),
-        context=_acquisition_of(proposal.plan_id),
+        context=_acquisition_of(proposal.operation_id),
         now=_NOW,
     )
 
@@ -124,7 +124,7 @@ def test_taking_one_twice_is_refused_and_names_the_first_step() -> None:
         decide(
             proposal,
             _take(proposal.id),
-            context=_acquisition_of(proposal.plan_id),
+            context=_acquisition_of(proposal.operation_id),
             now=_NOW,
         )
 
@@ -133,32 +133,32 @@ def test_taking_one_twice_is_refused_and_names_the_first_step() -> None:
 
 def test_a_step_that_ran_a_different_plan_is_refused_and_names_both_plans() -> None:
     proposal = _open_proposal()
-    other_plan = uuid4()
+    other_operation = uuid4()
 
     with pytest.raises(ProposalCannotBeTakenError) as caught:
         decide(
             proposal,
             _take(proposal.id),
-            context=_acquisition_of(other_plan),
+            context=_acquisition_of(other_operation),
             now=_NOW,
         )
 
-    assert caught.value.proposed_plan_id == proposal.plan_id
-    assert caught.value.step_plan_id == other_plan
+    assert caught.value.proposed_operation_id == proposal.operation_id
+    assert caught.value.step_operation_id == other_operation
     assert caught.value.taken_by is None
 
 
 def test_a_move_cannot_take_a_proposal_and_is_not_reported_as_a_mismatch() -> None:
-    """A move runs no plan, so the comparison below would refuse it too.
+    """A move runs no operation, so the comparison below would refuse it too.
 
     What separates the two is the message. Told the step ran a different
-    plan and given none to compare against, a caller goes looking for a
-    closer acquisition; told the step runs no plan at all, it knows the
+    operation and given none to compare against, a caller goes looking for a
+    closer acquisition; told the step runs no operation at all, it knows the
     reference itself is wrong.
     """
     proposal = _open_proposal()
 
-    with pytest.raises(ProposalCannotBeTakenError, match="runs no plan") as caught:
+    with pytest.raises(ProposalCannotBeTakenError, match="runs no operation") as caught:
         decide(
             proposal,
             _take(proposal.id),
@@ -166,8 +166,8 @@ def test_a_move_cannot_take_a_proposal_and_is_not_reported_as_a_mismatch() -> No
             now=_NOW,
         )
 
-    assert caught.value.step_plan_id is None
-    assert caught.value.proposed_plan_id is None
+    assert caught.value.step_operation_id is None
+    assert caught.value.proposed_operation_id is None
 
 
 def test_the_three_refusals_are_told_apart_by_what_the_error_carries() -> None:
@@ -176,32 +176,32 @@ def test_the_three_refusals_are_told_apart_by_what_the_error_carries() -> None:
     taken = _taken(proposal, by=uuid4())
 
     with pytest.raises(ProposalCannotBeTakenError) as already:
-        decide(taken, _take(taken.id), context=_acquisition_of(taken.plan_id), now=_NOW)
+        decide(taken, _take(taken.id), context=_acquisition_of(taken.operation_id), now=_NOW)
     with pytest.raises(ProposalCannotBeTakenError) as mismatch:
         decide(proposal, _take(proposal.id), context=_acquisition_of(uuid4()), now=_NOW)
     with pytest.raises(ProposalCannotBeTakenError) as move:
         decide(proposal, _take(proposal.id), context=_acquisition_of(None), now=_NOW)
 
     assert [
-        (error.value.taken_by is None, error.value.step_plan_id is None)
+        (error.value.taken_by is None, error.value.step_operation_id is None)
         for error in (already, mismatch, move)
     ] == [(False, True), (True, False), (True, True)]
 
 
 def test_a_step_dispatched_with_other_parameters_still_takes_the_proposal() -> None:
-    """The plan is compared and nothing else is.
+    """The operation is compared and nothing else is.
 
     What a step was dispatched with is not on its record at all: an
-    execution copies the sentence and the plan, and the procedure keeps
+    execution copies the sentence and the operation, and the procedure keeps
     the rest. So this is not a comparison this decider declines to make,
-    it is one the record cannot support, and the plan is what it can.
+    it is one the record cannot support, and the operation is what it can.
     """
     proposal = _open_proposal()
 
     events = decide(
         proposal,
         _take(proposal.id),
-        context=_acquisition_of(proposal.plan_id),
+        context=_acquisition_of(proposal.operation_id),
         now=_NOW,
     )
 
@@ -221,7 +221,7 @@ def test_the_event_is_stamped_with_the_moment_the_decider_was_given() -> None:
     events = decide(
         proposal,
         _take(proposal.id, occurred_at=datetime(2026, 9, 18, 6, 0, tzinfo=UTC)),
-        context=_acquisition_of(proposal.plan_id),
+        context=_acquisition_of(proposal.operation_id),
         now=_NOW,
     )
 

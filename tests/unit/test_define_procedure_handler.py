@@ -2,7 +2,7 @@
 
 Create-style, so there is no load of its own stream to get wrong. What is
 interesting here is the reading it does of OTHER streams: a procedure
-cites plans, the decider is pure and cannot fetch them, and this is the
+cites operations, the decider is pure and cannot fetch them, and this is the
 first handler in the tree that loads several siblings rather than one.
 """
 
@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from keeper.execution.aggregates.plan import PlanNotFoundError
+from keeper.execution.aggregates.operation import OperationNotFoundError
 from keeper.execution.aggregates.procedure import (
     PROCEDURE_STREAM_TYPE,
     AcquireStep,
@@ -20,8 +20,8 @@ from keeper.execution.aggregates.procedure import (
     SetStep,
     load_procedure,
 )
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure, bind
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.deps import make_inmemory_kernel
@@ -50,7 +50,7 @@ class _FixedClock:
 
 
 class _CountingEventStore(InMemoryEventStore):
-    """Counts loads, so a test can assert a repeated plan is read once."""
+    """Counts loads, so a test can assert a repeated operation is read once."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -91,9 +91,9 @@ def _kernel(
     )
 
 
-async def _a_plan(deps: Kernel) -> UUID:
-    return await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+async def _an_operation(deps: Kernel) -> UUID:
+    return await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -101,11 +101,13 @@ async def _a_plan(deps: Kernel) -> UUID:
 
 async def test_composing_returns_the_id_the_procedure_can_be_loaded_by() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     steps = (
         SetStep(record="2bmb:m1", to=12.5),
         AcquireStep(
-            plan_id=plan_id, parameters={"exposure_seconds": 0.2}, scopes=("2bmb:m1", "2bmb:det:")
+            operation_id=operation_id,
+            parameters={"exposure_seconds": 0.2},
+            scopes=("2bmb:m1", "2bmb:det:"),
         ),
     )
 
@@ -128,25 +130,25 @@ async def test_a_procedure_citing_a_plan_that_does_not_exist_is_refused() -> Non
     deps = _kernel()
     absent = uuid4()
 
-    with pytest.raises(PlanNotFoundError):
+    with pytest.raises(OperationNotFoundError):
         await bind(deps)(
             DefineProcedure(
                 name="tomography",
                 beamline="2-bm",
-                steps=(AcquireStep(plan_id=absent, parameters={}, scopes=("2bmb:m1",)),),
+                steps=(AcquireStep(operation_id=absent, parameters={}, scopes=("2bmb:m1",)),),
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),
         )
 
 
-async def test_the_same_plan_acquired_many_times_is_read_once() -> None:
-    """A tomography procedure acquires the same plan at every sample
+async def test_the_same_operation_acquired_many_times_is_read_once() -> None:
+    """A tomography procedure acquires the same operation at every sample
     position. Reading that stream once per step would make composing a
     routine cost a replay per step for no new information."""
     store = _CountingEventStore()
     deps = _kernel(event_store=store)
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     store.loads.clear()
 
     await bind(deps)(
@@ -155,7 +157,7 @@ async def test_the_same_plan_acquired_many_times_is_read_once() -> None:
             beamline="2-bm",
             steps=tuple(
                 AcquireStep(
-                    plan_id=plan_id,
+                    operation_id=operation_id,
                     parameters={"exposure_seconds": 0.2},
                     scopes=(f"2bmb:m{i}",),
                 )
@@ -166,7 +168,7 @@ async def test_the_same_plan_acquired_many_times_is_read_once() -> None:
         correlation_id=uuid4(),
     )
 
-    assert store.loads.count(("Plan", plan_id)) == 1
+    assert store.loads.count(("Operation", operation_id)) == 1
 
 
 async def test_the_appended_event_records_the_principal_that_issued_the_command() -> None:
@@ -203,7 +205,7 @@ async def test_a_denied_caller_gets_an_error_and_writes_nothing() -> None:
 
 async def test_a_denied_caller_is_refused_before_any_plan_is_read() -> None:
     """Authorization settles first, so a caller who may not compose
-    cannot use this endpoint to learn which plan ids exist."""
+    cannot use this endpoint to learn which operation ids exist."""
     store = _CountingEventStore()
     deps = _kernel(authz=_DenyAllAuthorize(), event_store=store)
 
@@ -212,7 +214,7 @@ async def test_a_denied_caller_is_refused_before_any_plan_is_read() -> None:
             DefineProcedure(
                 name="tomography",
                 beamline="2-bm",
-                steps=(AcquireStep(plan_id=uuid4(), parameters={}, scopes=("2bmb:m1",)),),
+                steps=(AcquireStep(operation_id=uuid4(), parameters={}, scopes=("2bmb:m1",)),),
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),

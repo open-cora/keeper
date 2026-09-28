@@ -1,4 +1,4 @@
-"""Compose the writes that dispatch one run of one plan.
+"""Compose the writes that dispatch one run of one operation.
 
 A procedure and the execution that traverses it, decided together and
 handed back as appends for somebody else to commit. Nothing here touches
@@ -6,7 +6,7 @@ the store.
 
 ## Why this exists at all
 
-Advice becomes work by composing a procedure around a plan and dispatching
+Advice becomes work by composing a procedure around an operation and dispatching
 an execution against it, in one transaction with whatever the caller is
 recording on its own stream. That transaction cannot live here, because
 the thing being recorded belongs to the caller's context and this one
@@ -49,7 +49,7 @@ is who is asking.
 ## What it does not decide
 
 Whether the run should happen. This composes what was asked for and
-refuses only what this context's own deciders refuse: a plan whose schema
+refuses only what this context's own deciders refuse: an operation whose schema
 the parameters do not satisfy, a procedure with no steps, scopes that are
 malformed. Whether there is budget for it, whether a proposal was already
 adopted, whether anybody authorized a beamline: all of that is the
@@ -64,7 +64,7 @@ from uuid import UUID
 
 from keeper.execution.aggregates.execution import EXECUTION_STREAM_TYPE
 from keeper.execution.aggregates.execution import to_payload as execution_payload
-from keeper.execution.aggregates.plan import Plan
+from keeper.execution.aggregates.operation import Operation
 from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, AcquireStep
 from keeper.execution.aggregates.procedure import fold as fold_procedure
 from keeper.execution.aggregates.procedure import to_payload as procedure_payload
@@ -99,7 +99,7 @@ class ComposedRun:
 
 def compose_one_run(
     *,
-    plan: Plan,
+    operation: Operation,
     parameters: Mapping[str, Any],
     beamline: str,
     scopes: tuple[str, ...],
@@ -107,9 +107,9 @@ def compose_one_run(
     new_id: Callable[[], UUID],
     envelope: Callable[[str, dict[str, Any], datetime], NewEvent],
 ) -> ComposedRun:
-    """Decide a procedure around this plan and an execution that traverses it.
+    """Decide a procedure around this operation and an execution that traverses it.
 
-    One acquisition, named for the plan, at the beamline and over the
+    One acquisition, named for the operation, at the beamline and over the
     scopes the caller states. Both of those are safety-bearing and neither
     is inferred: a caller that could not state them has no business
     dispatching anything, which is the rule this signature exists to make
@@ -133,13 +133,15 @@ def compose_one_run(
     procedure_events = decide_procedure(
         None,
         DefineProcedure(
-            name=plan.name.value,
+            name=operation.name.value,
             beamline=beamline,
             steps=(
-                AcquireStep(plan_id=plan.id, parameters=dict(parameters), scopes=tuple(scopes)),
+                AcquireStep(
+                    operation_id=operation.id, parameters=dict(parameters), scopes=tuple(scopes)
+                ),
             ),
         ),
-        context=DefineProcedureContext(plans={plan.id: plan}),
+        context=DefineProcedureContext(operations={operation.id: operation}),
         now=now,
         new_id=procedure_id,
         step_ids=[composed_step_id],

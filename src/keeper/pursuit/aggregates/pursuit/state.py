@@ -7,7 +7,7 @@ one budget, until the objective is met or a stopping condition is reached.
 
 ## What a pursuit is for
 
-Advice can become work: a proposal names a plan and its values, and
+Advice can become work: a proposal names an operation and its values, and
 adopting one composes a procedure and dispatches an execution. What
 adopting cannot do on its own is decide that it should happen. Two of the
 three facts a procedure needs beyond the proposal are safety-bearing, the

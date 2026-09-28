@@ -57,15 +57,15 @@ from keeper.execution.aggregates.execution import (
     ExecutionStepNotFoundError,
     load_execution,
 )
-from keeper.execution.aggregates.plan import PlanNotFoundError
+from keeper.execution.aggregates.operation import OperationNotFoundError
 from keeper.execution.aggregates.procedure import (
     AcquireStep,
     InvalidProcedureStepsError,
     SetStep,
     load_procedure,
 )
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -119,16 +119,16 @@ def _kernel(*, authz: object | None = None) -> Kernel:
     )
 
 
-async def _a_plan(deps: Kernel) -> UUID:
-    return await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+async def _an_operation(deps: Kernel) -> UUID:
+    return await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
 
 
-async def _an_acquisition_of(deps: Kernel, plan_id: UUID) -> tuple[UUID, UUID]:
-    """Compose a procedure that acquires with this plan, dispatch it, hand back both ids.
+async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UUID]:
+    """Compose a procedure that acquires with this operation, dispatch it, hand back both ids.
 
     The whole chain has to be real, because the taking handler checks
     that the execution holds the step: a step is an entity inside that
@@ -145,7 +145,9 @@ async def _an_acquisition_of(deps: Kernel, plan_id: UUID) -> tuple[UUID, UUID]:
             beamline="2-bm",
             steps=(
                 SetStep(record="2bmb:m1", to=0.0),
-                AcquireStep(plan_id=plan_id, parameters=dict(_PARAMETERS), scopes=("2bmb:det:",)),
+                AcquireStep(
+                    operation_id=operation_id, parameters=dict(_PARAMETERS), scopes=("2bmb:det:",)
+                ),
             ),
         ),
         principal_id=uuid4(),
@@ -162,7 +164,7 @@ async def _an_acquisition_of(deps: Kernel, plan_id: UUID) -> tuple[UUID, UUID]:
 
 
 async def _a_move_in(deps: Kernel) -> tuple[UUID, UUID]:
-    """A dispatched step that runs no plan, for the refusal that needs one."""
+    """A dispatched step that runs no operation, for the refusal that needs one."""
     procedure_id = await bind_define_procedure(deps)(
         DefineProcedure(name="park", beamline="2-bm", steps=(SetStep(record="2bmb:m1", to=0.0),)),
         principal_id=uuid4(),
@@ -185,8 +187,8 @@ async def _an_inquiry(deps: Kernel) -> UUID:
     does: the handler reads the step count off it, so there is nothing to
     fake short of dispatching something.
     """
-    plan_id = await _a_plan(deps)
-    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, operation_id)
     return await bind_make_inquiry(deps)(
         MakeInquiry(execution_id=execution_id, objective="find the edge"),
         principal_id=uuid4(),
@@ -196,10 +198,10 @@ async def _an_inquiry(deps: Kernel) -> UUID:
 
 async def test_making_a_proposal_writes_one_event_and_returns_its_id() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
 
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -211,11 +213,11 @@ async def test_making_a_proposal_writes_one_event_and_returns_its_id() -> None:
 async def test_the_principal_becomes_the_proposer_on_the_record() -> None:
     """The one place this handler does more than plumb."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     principal_id = uuid4()
 
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=principal_id,
         correlation_id=uuid4(),
     )
@@ -228,10 +230,10 @@ async def test_the_principal_becomes_the_proposer_on_the_record() -> None:
 async def test_a_proposal_is_stamped_with_the_clock_and_nothing_else() -> None:
     """R8 in the wiring: there is no reported time for a caller to send."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
 
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -243,9 +245,9 @@ async def test_a_proposal_is_stamped_with_the_clock_and_nothing_else() -> None:
 async def test_proposing_against_a_plan_that_is_not_there_is_refused() -> None:
     deps = _kernel()
 
-    with pytest.raises(PlanNotFoundError):
+    with pytest.raises(OperationNotFoundError):
         await bind_make(deps)(
-            MakeProposal(plan_id=uuid4(), parameters={}),
+            MakeProposal(operation_id=uuid4(), parameters={}),
             principal_id=uuid4(),
             correlation_id=uuid4(),
         )
@@ -253,11 +255,11 @@ async def test_proposing_against_a_plan_that_is_not_there_is_refused() -> None:
 
 async def test_a_denied_caller_makes_no_proposal() -> None:
     deps = _kernel(authz=_DenyAllAuthorize())
-    plan_id = await _a_plan(_kernel())
+    operation_id = await _an_operation(_kernel())
 
     with pytest.raises(UnauthorizedError):
         await bind_make(deps)(
-            MakeProposal(plan_id=plan_id, parameters={}),
+            MakeProposal(operation_id=operation_id, parameters={}),
             principal_id=uuid4(),
             correlation_id=uuid4(),
         )
@@ -265,10 +267,10 @@ async def test_a_denied_caller_makes_no_proposal() -> None:
 
 async def test_taking_a_proposal_appends_to_the_stream_the_genesis_opened() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, step_id = await _an_acquisition_of(deps, operation_id)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -285,10 +287,10 @@ async def test_taking_a_proposal_appends_to_the_stream_the_genesis_opened() -> N
 
 async def test_a_taken_proposal_reads_back_with_its_acquisition_recorded() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, step_id = await _an_acquisition_of(deps, operation_id)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -306,10 +308,10 @@ async def test_a_taken_proposal_reads_back_with_its_acquisition_recorded() -> No
 
 async def test_a_reported_time_beats_the_clock_when_a_take_carries_one() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, step_id = await _an_acquisition_of(deps, operation_id)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -331,9 +333,9 @@ async def test_a_reported_time_beats_the_clock_when_a_take_carries_one() -> None
 
 async def test_taking_with_an_execution_that_is_not_there_is_the_handlers_refusal() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -357,10 +359,10 @@ async def test_taking_with_a_step_that_execution_does_not_hold_is_refused() -> N
     real traversal and named something inside it that is not there.
     """
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, operation_id)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -378,11 +380,11 @@ async def test_taking_with_a_step_that_execution_does_not_hold_is_refused() -> N
 
 async def test_taking_with_an_acquisition_of_another_plan_writes_nothing() -> None:
     deps = _kernel()
-    proposed_plan = await _a_plan(deps)
-    other_plan = await _a_plan(deps)
-    other_execution, other_step = await _an_acquisition_of(deps, other_plan)
+    proposed_operation = await _an_operation(deps)
+    other_operation = await _an_operation(deps)
+    other_execution, other_step = await _an_acquisition_of(deps, other_operation)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=proposed_plan, parameters={}),
+        MakeProposal(operation_id=proposed_operation, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -406,15 +408,15 @@ async def test_a_move_cannot_take_a_proposal_even_though_the_step_is_real() -> N
     and still cannot have run what was proposed.
     """
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     execution_id, step_id = await _a_move_in(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
 
-    with pytest.raises(ProposalCannotBeTakenError, match="runs no plan"):
+    with pytest.raises(ProposalCannotBeTakenError, match="runs no operation"):
         await bind_take(deps)(
             TakeProposal(proposal_id=proposal_id, execution_id=execution_id, step_id=step_id),
             principal_id=uuid4(),
@@ -438,10 +440,10 @@ async def test_reading_a_proposal_that_was_never_made_is_refused() -> None:
 
 async def test_reading_one_back_gives_what_was_proposed() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     principal_id = uuid4()
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=principal_id,
         correlation_id=uuid4(),
     )
@@ -452,10 +454,10 @@ async def test_reading_one_back_gives_what_was_proposed() -> None:
         correlation_id=uuid4(),
     )
 
-    assert (proposal.id, proposal.actor_id, proposal.plan_id) == (
+    assert (proposal.id, proposal.actor_id, proposal.operation_id) == (
         proposal_id,
         principal_id,
-        plan_id,
+        operation_id,
     )
     assert proposal.parameters == _PARAMETERS
     assert (proposal.execution_id, proposal.step_id) == (None, None)
@@ -474,8 +476,8 @@ async def test_a_denied_caller_cannot_read_a_proposal() -> None:
 
 async def test_making_an_inquiry_writes_one_event_and_returns_its_id() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, operation_id)
 
     inquiry_id = await bind_make_inquiry(deps)(
         MakeInquiry(execution_id=execution_id, objective="find the edge"),
@@ -491,8 +493,8 @@ async def test_the_principal_becomes_the_asker_on_the_record() -> None:
     """The one place this handler does more than plumb, and the same place
     its sibling above does: nothing in the request names who asked."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, operation_id)
     principal_id = uuid4()
 
     inquiry_id = await bind_make_inquiry(deps)(
@@ -511,8 +513,8 @@ async def test_the_handler_reads_the_step_count_off_the_execution() -> None:
     caller, which is why the handler loads an aggregate it otherwise only
     needs for its existence."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
-    execution_id, _step_id = await _an_acquisition_of(deps, plan_id)
+    operation_id = await _an_operation(deps)
+    execution_id, _step_id = await _an_acquisition_of(deps, operation_id)
 
     inquiry_id = await bind_make_inquiry(deps)(
         MakeInquiry(execution_id=execution_id, objective="find the edge"),
@@ -610,10 +612,10 @@ async def test_answering_an_inquiry_appends_after_the_genesis() -> None:
 async def test_a_propose_answer_naming_a_proposal_that_exists_is_recorded() -> None:
     """The join this aggregate adds, and the handler's one sideways read."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     inquiry_id = await _an_inquiry(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -729,9 +731,9 @@ def _streams(deps: Kernel, stream_type: str) -> list[UUID]:
 
 async def test_adopting_a_proposal_dispatches_an_execution_that_runs_it() -> None:
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters=dict(_PARAMETERS)),
+        MakeProposal(operation_id=operation_id, parameters=dict(_PARAMETERS)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -749,12 +751,12 @@ async def test_adopting_a_proposal_dispatches_an_execution_that_runs_it() -> Non
 
 
 async def test_adopting_composes_a_procedure_named_after_the_plan() -> None:
-    """One proposal is one run of one plan, so the routine composed for
-    it is named after the plan it runs and nobody has to name it."""
+    """One proposal is one run of one operation, so the routine composed for
+    it is named after the operation it runs and nobody has to name it."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -775,11 +777,11 @@ async def test_adopting_composes_a_procedure_named_after_the_plan() -> None:
 
 async def test_adopting_puts_the_declared_devices_on_the_composed_step() -> None:
     """The bound the caller stated, which is the reason the command takes
-    one: nothing here can derive what a plan touches."""
+    one: nothing here can derive what an operation touches."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -803,9 +805,9 @@ async def test_adopting_points_the_proposal_at_the_step_it_composed() -> None:
     """The join, written in the same transaction that created the step,
     which is what a caller reads to see that its advice became work."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -833,9 +835,9 @@ async def test_a_refused_adoption_dispatches_nothing_at_all() -> None:
     beamline committed to work no proposal knows about.
     """
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -861,9 +863,9 @@ async def test_an_adoption_with_no_devices_writes_nothing_anywhere() -> None:
     still has to leave the proposal untouched. Nothing is appended until
     all three decisions have been made."""
     deps = _kernel()
-    plan_id = await _a_plan(deps)
+    operation_id = await _an_operation(deps)
     proposal_id = await bind_make(deps)(
-        MakeProposal(plan_id=plan_id, parameters={}),
+        MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )

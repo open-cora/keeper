@@ -30,7 +30,7 @@ from keeper.execution.aggregates.procedure.state import (
     ProcedureStepNotFoundError,
     SetStep,
     describes,
-    runs_plan,
+    runs_operation,
     validated_composition,
     validated_steps,
 )
@@ -72,7 +72,7 @@ __all__ = [
     "fold",
     "from_stored",
     "load_procedure",
-    "runs_plan",
+    "runs_operation",
     "to_payload",
     "validated_composition",
     "validated_steps",

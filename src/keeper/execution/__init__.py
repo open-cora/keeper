@@ -3,25 +3,25 @@
 Owns what this system can be asked to run, what it composed out of that,
 and what happened when it was carried out.
 
-    plan        a routine an engine already has, by the name that engine
+    operation        a routine an engine already has, by the name that engine
                 knows it by, and the schema its parameters must satisfy.
 
     procedure   a routine this system composed: ordered steps, each of
-                them a set or an acquisition citing a plan.
+                them a set or an acquisition citing an operation.
 
     execution   one traversal of a procedure: the steps it was asked to
                 perform, and how each of them ended.
 
 Three aggregates in one context because none of them can be checked
 without the others. An acquisition's parameters are checked against the
-plan it cites, and a dispatch copies a procedure's steps onto the record
+operation it cites, and a dispatch copies a procedure's steps onto the record
 it opens. Across a context boundary each of those would have to reach
 through a sibling's read-side surface for a relationship neither side
 can be without.
 
 ## Who drove the act
 
-**This system owns every genesis.** It writes the plan, composes the
+**This system owns every genesis.** It writes the operation, composes the
 procedure and opens the execution, and a client outside can only move
 what it created. That is the whole of the posture, and it arrived by
 replacing one where an outside caller could bring a record into
@@ -42,7 +42,7 @@ kind of unbacked claim this tree refuses everywhere else.
 """
 
 from keeper.execution.aggregates.execution import Execution, load_execution
-from keeper.execution.aggregates.plan import Plan, load_plan
+from keeper.execution.aggregates.operation import Operation, load_operation
 from keeper.execution.projections import register_execution_projections
 from keeper.execution.routes import register_execution_routes
 from keeper.execution.tools import register_execution_tools
@@ -51,9 +51,9 @@ from keeper.execution.wire import ExecutionHandlers, wire_execution
 __all__ = [
     "Execution",
     "ExecutionHandlers",
-    "Plan",
+    "Operation",
     "load_execution",
-    "load_plan",
+    "load_operation",
     "register_execution_projections",
     "register_execution_routes",
     "register_execution_tools",

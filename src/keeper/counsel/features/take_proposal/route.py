@@ -77,7 +77,7 @@ router = APIRouter(tags=["counsel"])
         },
         status.HTTP_409_CONFLICT: {
             "model": ErrorResponse,
-            "description": "It was already taken, or the step ran another plan or none.",
+            "description": "It was already taken, or the step ran another operation or none.",
         },
     },
     summary="Record that an acquisition took a proposal",

@@ -16,7 +16,7 @@ class AdoptProposal:
     would leave that command nothing to be called.
 
     **Three fields, and two of them are the caller's because nothing here
-    can derive them.** A proposal cites a plan and carries values, which
+    can derive them.** A proposal cites an operation and carries values, which
     is not enough to compose a procedure out of: `define_procedure` says
     a beamline cannot be derived because the steps imply it in a prefix
     this system deliberately does not parse, and an acquisition
@@ -25,7 +25,7 @@ class AdoptProposal:
 
     So the bound is stated rather than inferred. A thinker or an
     operator reading the execution a proposal came from can see what
-    that plan touched last time and offer those values, and offering is
+    that operation touched last time and offer those values, and offering is
     where that belongs: a bound the system guessed is one nobody
     decided.
 
@@ -34,8 +34,8 @@ class AdoptProposal:
     moment for the record to be late to. That is R8 on the makes side,
     beside `make_proposal` rather than beside `take_proposal`.
 
-    **There is no procedure name.** One proposal is one run of one plan,
-    so the routine composed for it is named after the plan it runs, and
+    **There is no procedure name.** One proposal is one run of one operation,
+    so the routine composed for it is named after the operation it runs, and
     a caller naming it would be naming something it did not compose.
     """
 

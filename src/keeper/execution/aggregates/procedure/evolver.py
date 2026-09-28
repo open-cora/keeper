@@ -34,8 +34,8 @@ def evolve(state: Procedure | None, event: ProcedureEvent) -> Procedure:
     The name, the beamline and the step list all go back through their
     checks on the way out of the log, so a row that no longer passes fails here rather
     than folding into a procedure nothing could have written. What is
-    deliberately NOT re-checked is whether the plans the acquisitions
-    cite still exist: that needs a store, this is pure, and a plan
+    deliberately NOT re-checked is whether the operations the acquisitions
+    cite still exist: that needs a store, this is pure, and an operation
     retired after the fact does not make the record of what was composed
     wrong.
     """

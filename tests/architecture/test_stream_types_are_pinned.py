@@ -52,7 +52,7 @@ _SUFFIX = "_STREAM_TYPE"
 PINNED_STREAM_TYPES: dict[str, str] = {
     "access/actor": "Actor",
     "authority/policy": "Policy",
-    "execution/plan": "Plan",
+    "execution/operation": "Operation",
     "counsel/inquiry": "Inquiry",
     "counsel/proposal": "Proposal",
     "custody/dataset": "Dataset",

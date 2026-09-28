@@ -9,11 +9,11 @@ An execution is one traversal of a procedure, and a procedure is a
 routine composed here: sets and acquisitions in an order, each declaring
 the devices it touches.
 
-There used to be a Run aggregate beside it, one carrying-out of one plan,
+There used to be a Run aggregate beside it, one carrying-out of one operation,
 recorded because an engine had run something and this system was told.
 It is gone, and the reason is that it and an acquisition step were the
 same fact written twice once this system started composing the work: a
-step cites a plan and carries the parameters it was dispatched with,
+step cites an operation and carries the parameters it was dispatched with,
 which is all a run's genesis held beyond the engine's own reference for
 it. That reference is on the step too, as `engine_reference`.
 
@@ -35,7 +35,7 @@ need somewhere to land, so the length of the list rides the genesis.
 
 Everything else is cited rather than copied. `procedure_step_id` reaches
 the whole definition, so anything asking what a step was actually asked
-to do reads the plan, the parameters and the declared scopes from the
+to do reads the operation, the parameters and the declared scopes from the
 procedure instead of from whichever of them was copied across. A copy
 per question would be a field, a payload key and a migration each time,
 and the thing it protects against, a definition changing under a record
@@ -144,7 +144,7 @@ from keeper.shared.bounded_text import bounded_name
 EXECUTION_PROCEDURE_NAME_MAX_LENGTH = 200
 """How long a procedure's name may be after trimming.
 
-The same bound a plan name carries, because the two are the same kind of
+The same bound an operation name carries, because the two are the same kind of
 thing: a name some other system minted for a routine, stored whole.
 """
 
@@ -526,7 +526,7 @@ class DispatchedStep:
     Naming a step is only half of what a context outside this one needs;
     the other half is being able to ask something about it. This field is
     the whole of that answer: it names the composed step this one was
-    dispatched from, so a reader reaches the plan, the parameters and the
+    dispatched from, so a reader reaches the operation, the parameters and the
     declared scopes rather than whichever of them somebody thought to
     copy across.
 
@@ -536,7 +536,7 @@ class DispatchedStep:
     because the sentence in `describes` already carries the same fact in
     a form nothing should parse.
 
-    Never None, where the copied plan id was. A set comes from a
+    Never None, where the copied operation id was. A set comes from a
     composed step as surely as an acquisition does, so every step here
     has a definition to point at, and it is the definition that says
     which kind it was.

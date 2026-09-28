@@ -41,7 +41,7 @@ class Handler(Protocol):
 def bind(deps: Kernel, summaries: ExecutionSummaryLookup) -> Handler:
     """Build the handler, closed over the dependencies and the read port.
 
-    Two arguments rather than one, for the reason `list_plans` takes two:
+    Two arguments rather than one, for the reason `list_operations` takes two:
     the read port is not on the kernel and cannot be, because the kernel
     is declared in infrastructure and an execution summary is Execution's
     own idea. The wire module picks which implementation this gets.

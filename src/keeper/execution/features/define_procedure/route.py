@@ -56,7 +56,7 @@ class SetStepRequest(BaseModel):
 
 
 class AcquireStepRequest(BaseModel):
-    """Ask an engine to run a plan, over the devices this step declares.
+    """Ask an engine to run an operation, over the devices this step declares.
 
     `scopes` is required and must name at least one device. Nothing here
     can look inside a routine to work out what it will drive, so a step
@@ -65,7 +65,7 @@ class AcquireStepRequest(BaseModel):
     """
 
     kind: Literal["acquire"]
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any] = Field(default_factory=dict[str, Any])
     scopes: list[Annotated[str, Field(min_length=1, max_length=PROCEDURE_SCOPE_MAX_LENGTH)]] = (
         Field(min_length=1, max_length=PROCEDURE_MAX_SCOPES_PER_STEP)
@@ -99,7 +99,7 @@ def to_step(body: SetStepRequest | AcquireStepRequest) -> ProcedureStep:
     if isinstance(body, SetStepRequest):
         return SetStep(record=body.record, to=body.to)
     return AcquireStep(
-        plan_id=body.plan_id,
+        operation_id=body.operation_id,
         parameters=body.parameters,
         scopes=tuple(body.scopes),
     )
@@ -129,7 +129,7 @@ router = APIRouter(tags=["execution"])
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "An acquisition cites a plan that does not exist.",
+            "description": "An acquisition cites an operation that does not exist.",
         },
     },
     summary="Define a procedure",

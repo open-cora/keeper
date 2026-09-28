@@ -32,7 +32,7 @@ writes it, and `Identifier` does no more than trim and bound what arrives.
 Nothing withdraws, moves or supersedes a dataset yet, so a status would
 have one reachable value, and a one-valued field says less than no field
 while inviting a reader to believe a lifecycle is being enforced. It
-arrives with the command that flips it, the way a plan's would.
+arrives with the command that flips it, the way an operation's would.
 
 That is also the answer to the obvious question about a moved node. A
 record saying where data was at a moment stays true when the data moves;

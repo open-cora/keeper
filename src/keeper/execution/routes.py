@@ -6,9 +6,9 @@ MCP surface where those numbers mean nothing.
 
 Four shapes, grouped by the answer they produce:
 
-    400  InvalidPlanNameError
+    400  InvalidOperationNameError
              the name was empty or too long
-         InvalidPlanParametersSchemaError
+         InvalidOperationParametersSchemaError
              the schema is not a Draft 2020-12 document this system will
              store
          InvalidProcedureNameError
@@ -45,8 +45,8 @@ Four shapes, grouped by the answer they produce:
              `keeper.api.exception_handlers` rather than here: the class
              is shared by every context, so one mapping serves them all
 
-    404  PlanNotFoundError
-             the id names no plan this system has a record of, whether
+    404  OperationNotFoundError
+             the id names no operation this system has a record of, whether
              the caller asked to read one or named one in a procedure
          ProcedureNotFoundError
              a dispatch named a routine nobody composed
@@ -59,7 +59,7 @@ Four shapes, grouped by the answer they produce:
              the id names no execution, or that execution holds no such
              step, by id or by index
 
-    409  PlanAlreadyExistsError
+    409  OperationAlreadyExistsError
          ProcedureAlreadyExistsError
          ExecutionAlreadyExistsError
              a genesis event was asked for on a live stream
@@ -98,11 +98,11 @@ from keeper.execution.aggregates.execution import (
     InvalidStepReportError,
     StepRunCannotBeReportedError,
 )
-from keeper.execution.aggregates.plan import (
-    InvalidPlanNameError,
-    InvalidPlanParametersSchemaError,
-    PlanAlreadyExistsError,
-    PlanNotFoundError,
+from keeper.execution.aggregates.operation import (
+    InvalidOperationNameError,
+    InvalidOperationParametersSchemaError,
+    OperationAlreadyExistsError,
+    OperationNotFoundError,
 )
 from keeper.execution.aggregates.procedure import (
     InvalidProcedureBeamlineError,
@@ -115,15 +115,15 @@ from keeper.execution.aggregates.procedure import (
 )
 from keeper.execution.features import (
     claim_execution,
-    define_plan,
+    define_operation,
     define_procedure,
     dispatch_execution,
     end_execution,
     get_execution,
-    get_plan,
+    get_operation,
     get_procedure,
     list_executions,
-    list_plans,
+    list_operations,
     list_procedures,
     report_step,
     report_step_run,
@@ -152,9 +152,9 @@ async def _handle_conflict(request: Request, exc: Exception) -> JSONResponse:
 
 def register_execution_routes(app: FastAPI) -> None:
     """Include every Execution router and register its exception handlers."""
-    app.include_router(define_plan.router)
-    app.include_router(get_plan.router)
-    app.include_router(list_plans.router)
+    app.include_router(define_operation.router)
+    app.include_router(get_operation.router)
+    app.include_router(list_operations.router)
     app.include_router(dispatch_execution.router)
     app.include_router(claim_execution.router)
     app.include_router(report_step.router)
@@ -167,8 +167,8 @@ def register_execution_routes(app: FastAPI) -> None:
     app.include_router(list_procedures.router)
 
     for malformed_cls in (
-        InvalidPlanNameError,
-        InvalidPlanParametersSchemaError,
+        InvalidOperationNameError,
+        InvalidOperationParametersSchemaError,
         InvalidProcedureNameError,
         InvalidProcedureBeamlineError,
         InvalidProcedureParametersError,
@@ -182,7 +182,7 @@ def register_execution_routes(app: FastAPI) -> None:
     ):
         app.add_exception_handler(malformed_cls, _handle_bad_request)
     for missing_cls in (
-        PlanNotFoundError,
+        OperationNotFoundError,
         ProcedureNotFoundError,
         ProcedureStepNotFoundError,
         ExecutionNotFoundError,
@@ -191,7 +191,7 @@ def register_execution_routes(app: FastAPI) -> None:
     ):
         app.add_exception_handler(missing_cls, _handle_not_found)
     for conflict_cls in (
-        PlanAlreadyExistsError,
+        OperationAlreadyExistsError,
         ProcedureAlreadyExistsError,
         ExecutionAlreadyExistsError,
         ExecutionAlreadyEndedError,

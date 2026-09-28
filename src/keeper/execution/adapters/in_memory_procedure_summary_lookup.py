@@ -1,6 +1,6 @@
 """Answer the same questions by folding, when there is no table to read.
 
-The in-memory half of the `ProcedureSummaryLookup` port, and the plan
+The in-memory half of the `ProcedureSummaryLookup` port, and the operation
 lookup's sibling. Same reason for existing: this application boots and
 answers with no database, which is what the unit and contract tiers run
 against, and in that environment no projection worker runs so the table

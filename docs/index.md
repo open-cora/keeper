@@ -30,10 +30,18 @@ The model is split into seven bounded contexts. Each answers one question, and t
 | [Equipment](bounded-contexts/equipment.md) | What hardware exists, and what it was last reported doing |
 | [Pursuit](bounded-contexts/pursuit.md) | What a person allowed a machine to go and do alone, and how far it may get |
 
+## Running one
+
+Whoever has to stand this up and keep it running starts at [Running one](running.md): what it needs, the order the authorization bootstrap has to happen in, and what refuses to boot.
+
+[The surface](surface.md) is every route and MCP tool in one list, generated from the code and checked by a test, so it cannot be out of date.
+
 ## Reference
 
 | Page | Subject | State |
 | --- | --- | --- |
+| [Running one](running.md) | What it needs, how to start it, and how to turn authorization on | Current |
+| [The surface](surface.md) | Every route and MCP tool in one list | Generated |
 | [Workflow](reference/workflow.md) | Reading order, commits, migrations, tests, mutation runs | Current |
 | [Conventions](reference/conventions.md) | Identifiers, units, personal data, stored names, documentation | Current |
 | [Layout](reference/layout.md) | How a context is laid out, and what may import what | Carried, examples now from this tree |
@@ -51,10 +59,10 @@ The reference pages came with the chassis and describe rules that are real. Most
 ```
    bounded contexts    7     Access, Authority, Execution, Custody, Counsel,
                              Equipment, Pursuit
-   aggregates         10     Actor, Policy, Plan, Procedure, Execution,
+   aggregates         10     Actor, Policy, Operation, Procedure, Execution,
                              Dataset, Proposal, Inquiry, Device, Pursuit
    slices             48     four on Actor, four on Policy,
-                             three on Plan, three on Procedure,
+                             three on Operation, three on Procedure,
                              seven on Execution, three on Dataset,
                              five on Proposal, five on Inquiry,
                              six on Device, eight on Pursuit

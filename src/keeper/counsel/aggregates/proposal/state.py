@@ -18,9 +18,9 @@ answering, a typed marker on the Actor is where it goes.
 
 ## What it is not
 
-It cites a plan, it does not contain one, which is the posture every
-record in this tree that names a plan takes for the same reason: the
-plan is a record on another stream, and a copy here would go stale the
+It cites an operation, it does not contain one, which is the posture every
+record in this tree that names an operation takes for the same reason: the
+operation is a record on another stream, and a copy here would go stale the
 first time somebody defined a new one.
 
 That leaves a proposal carrying what an acquisition step carries, and
@@ -136,7 +136,7 @@ class ProposalAlreadyExistsError(Exception):
 
 
 class InvalidProposalParametersError(ValueError):
-    """The proposed values do not satisfy the plan's declared schema.
+    """The proposed values do not satisfy the operation's declared schema.
 
     A proposal that could not be run is not a proposal, so the values
     are checked against the same schema, by the same shared validator,
@@ -157,10 +157,10 @@ class ProposalCannotBeTakenError(Exception):
     several VERBS into one class, and there is one verb here.
 
     The causes are told apart by which attribute is set. `taken_by` set
-    means the proposal already has a step against it. `step_plan_id` set
-    means the cited step ran a different plan from the one proposed, and
-    the two plan ids say which. Neither set means the cited step runs no
-    plan at all, which is a set.
+    means the proposal already has a step against it. `step_operation_id` set
+    means the cited step ran a different operation from the one proposed, and
+    the two operation ids say which. Neither set means the cited step runs no
+    operation at all, which is a set.
 
     The third cause arrived with the step reference and is genuinely
     distinct rather than a mismatch against nothing. A mismatch tells a
@@ -178,14 +178,14 @@ class ProposalCannotBeTakenError(Exception):
         detail: str,
         *,
         taken_by: UUID | None = None,
-        proposed_plan_id: UUID | None = None,
-        step_plan_id: UUID | None = None,
+        proposed_operation_id: UUID | None = None,
+        step_operation_id: UUID | None = None,
     ) -> None:
         super().__init__(f"Proposal {proposal_id} cannot be taken: {detail}")
         self.proposal_id = proposal_id
         self.taken_by = taken_by
-        self.proposed_plan_id = proposed_plan_id
-        self.step_plan_id = step_plan_id
+        self.proposed_operation_id = proposed_operation_id
+        self.step_operation_id = step_operation_id
 
     @classmethod
     def already_taken(cls, proposal_id: UUID, taken_by: UUID) -> "ProposalCannotBeTakenError":
@@ -203,28 +203,29 @@ class ProposalCannotBeTakenError(Exception):
 
     @classmethod
     def plan_mismatch(
-        cls, proposal_id: UUID, *, proposed_plan_id: UUID, step_plan_id: UUID
+        cls, proposal_id: UUID, *, proposed_operation_id: UUID, step_operation_id: UUID
     ) -> "ProposalCannotBeTakenError":
-        """The cited acquisition ran a different plan from the one proposed."""
+        """The cited acquisition ran a different operation from the one proposed."""
         return cls(
             proposal_id,
-            f"it proposes plan {proposed_plan_id} and the step ran plan {step_plan_id}",
-            proposed_plan_id=proposed_plan_id,
-            step_plan_id=step_plan_id,
+            f"it proposes operation {proposed_operation_id} "
+            f"and the step ran operation {step_operation_id}",
+            proposed_operation_id=proposed_operation_id,
+            step_operation_id=step_operation_id,
         )
 
     @classmethod
     def not_an_acquisition(cls, proposal_id: UUID, step_id: UUID) -> "ProposalCannotBeTakenError":
-        """The cited step runs no plan, so it cannot have run this one.
+        """The cited step runs no operation, so it cannot have run this one.
 
         A set, today. What makes this refusable rather than merely
-        false is that a proposal proposes running a plan, and a step
+        false is that a proposal proposes running an operation, and a step
         that hands nothing to an engine has not run one whatever else it
         did.
         """
         return cls(
             proposal_id,
-            f"step {step_id} runs no plan, and a proposal proposes running one",
+            f"step {step_id} runs no operation, and a proposal proposes running one",
         )
 
 
@@ -238,7 +239,7 @@ class Proposal:
     infrastructure and the fold never sees it, and who advised is a
     domain question that should be answerable from the domain record.
 
-    Named for the aggregate it points at, the way `plan_id` is. The role
+    Named for the aggregate it points at, the way `operation_id` is. The role
     it plays is carried by the record it sits on rather than by a second
     word in the field name.
 
@@ -257,7 +258,7 @@ class Proposal:
 
     id: UUID
     actor_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
     status: ProposalStatus = ProposalStatus.OPEN
     execution_id: UUID | None = None

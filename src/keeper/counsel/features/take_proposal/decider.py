@@ -16,7 +16,7 @@ from keeper.counsel.aggregates.proposal import (
 )
 from keeper.counsel.features.take_proposal.command import TakeProposal
 from keeper.counsel.features.take_proposal.context import TakeProposalContext
-from keeper.execution.aggregates.procedure import runs_plan
+from keeper.execution.aggregates.procedure import runs_operation
 
 
 def decide(
@@ -33,9 +33,9 @@ def decide(
         -> ProposalNotFoundError
       - The proposal must not already have a step against it
         -> ProposalCannotBeTakenError
-      - The step's definition must run a plan at all, rather than being
+      - The step's definition must run an operation at all, rather than being
         a set -> ProposalCannotBeTakenError
-      - That plan must be the one the proposal names
+      - That operation must be the one the proposal names
         -> ProposalCannotBeTakenError
 
     **Taking one twice is refused, and that is a domain claim rather
@@ -45,15 +45,15 @@ def decide(
     direction: allowing it later costs a sentence, and disallowing it
     later costs a migration.
 
-    **A set is refused before the plans are compared**, and the order
-    matters to what the caller is told. A set runs no plan, so a single
+    **A set is refused before the operations are compared**, and the order
+    matters to what the caller is told. A set runs no operation, so a single
     comparison would refuse it anyway, with a message saying the step
-    ran a different plan and naming none. That reads as a near miss and
+    ran a different operation and naming none. That reads as a near miss and
     sends a caller looking for the right acquisition, when what it has
     is a step that could never take a proposal at all.
 
-    **The plan is compared and the parameters are not.** Comparing the
-    plan is the cheap guard against citing a step from the wrong
+    **The operation is compared and the parameters are not.** Comparing the
+    operation is the cheap guard against citing a step from the wrong
     execution, which is easy to do when one procedure is dispatched many
     times over. Comparing parameters would not be: an engine normalizes
     values and fills defaults, so what a step was dispatched with can
@@ -65,9 +65,9 @@ def decide(
     next move is the same in kind: stop, and work out which step it
     meant. The error carries what tells them apart.
 
-    **The plan is read off the procedure, not off the execution.** An
+    **The operation is read off the procedure, not off the execution.** An
     execution's step says which composed step it was dispatched from and
-    the composed step says what it does, so `runs_plan` is asked the same
+    the composed step says what it does, so `runs_operation` is asked the same
     question here that it is asked at dispatch. The step id in the
     refusals is still the execution's, because that is what the caller
     sent and what it has to go and fix.
@@ -76,14 +76,14 @@ def decide(
         raise ProposalNotFoundError(command.proposal_id)
     if state.step_id is not None:
         raise ProposalCannotBeTakenError.already_taken(state.id, state.step_id)
-    step_plan_id = runs_plan(context.composed.step)
-    if step_plan_id is None:
+    step_operation_id = runs_operation(context.composed.step)
+    if step_operation_id is None:
         raise ProposalCannotBeTakenError.not_an_acquisition(state.id, command.step_id)
-    if step_plan_id != state.plan_id:
+    if step_operation_id != state.operation_id:
         raise ProposalCannotBeTakenError.plan_mismatch(
             state.id,
-            proposed_plan_id=state.plan_id,
-            step_plan_id=step_plan_id,
+            proposed_operation_id=state.operation_id,
+            step_operation_id=step_operation_id,
         )
     return [
         ProposalTaken(

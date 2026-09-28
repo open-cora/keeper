@@ -4,7 +4,7 @@
 always reaches the bundle the lifespan wired rather than one captured
 before startup finished.
 
-These are the tools an agent actually holds. Reading plans belongs to
+These are the tools an agent actually holds. Reading operations belongs to
 Execution and reading an execution back belongs there too, so a full turn
 of the loop crosses two contexts' tools and writes only in this one.
 

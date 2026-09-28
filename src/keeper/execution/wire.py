@@ -9,7 +9,7 @@ Wrapping order, innermost first:
 
   1. bind          the bare handler
   2. idempotency   a replayed key returns the first answer instead of
-                   defining a second plan
+                   defining a second operation
   3. tracing       one span per call, whether or not the key hit cache
 
 Idempotency wraps inside tracing on purpose: a cache hit is still a call
@@ -26,7 +26,7 @@ fact about the system as a write that is, and the reads that go to a
 table rather than to a stream are the ones most likely to become the slow
 ones.
 
-Three slices take more than the kernel. `list_plans`, `list_procedures`
+Three slices take more than the kernel. `list_operations`, `list_procedures`
 and `list_executions` read a projection, which the kernel cannot hold
 because the kernel is declared in infrastructure and an execution summary
 is Execution's own idea, so this module picks the implementation and
@@ -36,7 +36,7 @@ this is where composition belongs once the thing being composed is a
 context's own.
 
 The three slices that mint an id take the idempotency wrapper: defining a
-plan, defining a procedure, and dispatching an execution. In each of them
+operation, defining a procedure, and dispatching an execution. In each of them
 the server mints the id, so a retry with no key would leave a second
 record of one act. Everything else names a record that already exists,
 and the domain refuses the second write on its own.
@@ -47,26 +47,26 @@ from uuid import UUID
 
 from keeper.execution.adapters import (
     InMemoryExecutionSummaryLookup,
-    InMemoryPlanSummaryLookup,
+    InMemoryOperationSummaryLookup,
     InMemoryProcedureSummaryLookup,
     PostgresExecutionSummaryLookup,
-    PostgresPlanSummaryLookup,
+    PostgresOperationSummaryLookup,
     PostgresProcedureSummaryLookup,
 )
 from keeper.execution.aggregates.execution.summary import ExecutionSummaryLookup
-from keeper.execution.aggregates.plan.summary import PlanSummaryLookup
+from keeper.execution.aggregates.operation.summary import OperationSummaryLookup
 from keeper.execution.aggregates.procedure.summary import ProcedureSummaryLookup
 from keeper.execution.features import (
     claim_execution,
-    define_plan,
+    define_operation,
     define_procedure,
     dispatch_execution,
     end_execution,
     get_execution,
-    get_plan,
+    get_operation,
     get_procedure,
     list_executions,
-    list_plans,
+    list_operations,
     list_procedures,
     report_step,
     report_step_run,
@@ -83,9 +83,9 @@ _BC = "execution"
 class ExecutionHandlers:
     """The bundle, one field per slice."""
 
-    define_plan: define_plan.IdempotentHandler
-    get_plan: get_plan.Handler
-    list_plans: list_plans.Handler
+    define_operation: define_operation.IdempotentHandler
+    get_operation: get_operation.Handler
+    list_operations: list_operations.Handler
     define_procedure: define_procedure.IdempotentHandler
     get_procedure: get_procedure.Handler
     list_procedures: list_procedures.Handler
@@ -112,8 +112,8 @@ def _execution_summary_lookup(deps: Kernel) -> ExecutionSummaryLookup:
     raise UnreadableSummariesError(type(deps.event_store).__name__)
 
 
-def _plan_summary_lookup(deps: Kernel) -> PlanSummaryLookup:
-    """Pick the read adapter for plans, the same way and for the same reason.
+def _plan_summary_lookup(deps: Kernel) -> OperationSummaryLookup:
+    """Pick the read adapter for operations, the same way and for the same reason.
 
     Two nearly identical functions rather than one generic picker. What
     they share is three lines of branching; what differs is the pair of
@@ -121,9 +121,9 @@ def _plan_summary_lookup(deps: Kernel) -> PlanSummaryLookup:
     would take those as arguments and read as a factory for factories.
     """
     if deps.pool is not None:
-        return PostgresPlanSummaryLookup(deps.pool)
+        return PostgresOperationSummaryLookup(deps.pool)
     if isinstance(deps.event_store, InMemoryEventStore):
-        return InMemoryPlanSummaryLookup(deps.event_store)
+        return InMemoryOperationSummaryLookup(deps.event_store)
     raise UnreadableSummariesError(type(deps.event_store).__name__)
 
 
@@ -139,26 +139,26 @@ def _procedure_summary_lookup(deps: Kernel) -> ProcedureSummaryLookup:
 def wire_execution(deps: Kernel) -> ExecutionHandlers:
     """Build the Execution handlers."""
     return ExecutionHandlers(
-        define_plan=with_tracing(
+        define_operation=with_tracing(
             with_idempotency(
-                define_plan.bind(deps),
+                define_operation.bind(deps),
                 deps.idempotency_store,
-                command_name="DefinePlan",
+                command_name="DefineOperation",
                 serialize_result=str,
                 deserialize_result=lambda raw: UUID(str(raw)),
                 lock_stale_seconds=deps.settings.idempotency_lock_stale_seconds,
             ),
-            command_name="DefinePlan",
+            command_name="DefineOperation",
             bc=_BC,
         ),
-        get_plan=with_tracing(
-            get_plan.bind(deps),
-            command_name="GetPlan",
+        get_operation=with_tracing(
+            get_operation.bind(deps),
+            command_name="GetOperation",
             bc=_BC,
         ),
-        list_plans=with_tracing(
-            list_plans.bind(deps, _plan_summary_lookup(deps)),
-            command_name="ListPlans",
+        list_operations=with_tracing(
+            list_operations.bind(deps, _plan_summary_lookup(deps)),
+            command_name="ListOperations",
             bc=_BC,
         ),
         define_procedure=with_tracing(

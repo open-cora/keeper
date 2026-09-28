@@ -8,7 +8,7 @@ Three parameters and they are three different kinds of thing. The filter
 says which executions. The limit says how many of them. The cursor says where
 the last page stopped.
 
-No classmethod wrapping the filter, unlike the plan and procedure lists.
+No classmethod wrapping the filter, unlike the operation and procedure lists.
 A procedure id is a UUID and both surfaces parse it before a query
 exists, so there is nothing left for the domain to refuse.
 """

@@ -1,15 +1,15 @@
-"""Run the definition: authorize, load the plans, decide, append.
+"""Run the definition: authorize, load the operations, decide, append.
 
 Create-style shape. A freshly minted id provably has no history, so this
 handler skips the load-and-fold that an editing handler starts with and
 hands `state=None` straight to the decider.
 
-The plans the acquisitions cite are read and not touched, so one store is
-written and there is no ordering to get right. Each distinct plan is read
-once: a procedure acquiring the same plan at twenty sample positions
+The operations the acquisitions cite are read and not touched, so one store is
+written and there is no ordering to get right. Each distinct operation is read
+once: a procedure acquiring the same operation at twenty sample positions
 should not replay that stream twenty times.
 
-A procedure citing a plan that does not exist is refused here rather than
+A procedure citing an operation that does not exist is refused here rather than
 in the decider, because discovering the absence needs the store and the
 decider has none. That is the split docs/reference/patterns.md draws
 between a 404 and a refusal, and every slice in this tree that reads a
@@ -19,7 +19,7 @@ sibling draws it the same way.
 from typing import Protocol
 from uuid import UUID
 
-from keeper.execution.aggregates.plan import Plan, PlanNotFoundError, load_plan
+from keeper.execution.aggregates.operation import Operation, OperationNotFoundError, load_operation
 from keeper.execution.aggregates.procedure import (
     PROCEDURE_STREAM_TYPE,
     AcquireStep,
@@ -99,21 +99,21 @@ def bind(deps: Kernel) -> Handler:
             )
             raise UnauthorizedError(decision.reason)
 
-        plans: dict[UUID, Plan] = {}
+        operations: dict[UUID, Operation] = {}
         for step in command.steps:
-            if not isinstance(step, AcquireStep) or step.plan_id in plans:
+            if not isinstance(step, AcquireStep) or step.operation_id in operations:
                 continue
-            plan = await load_plan(deps.event_store, step.plan_id)
-            if plan is None:
-                raise PlanNotFoundError(step.plan_id)
-            plans[step.plan_id] = plan
+            operation = await load_operation(deps.event_store, step.operation_id)
+            if operation is None:
+                raise OperationNotFoundError(step.operation_id)
+            operations[step.operation_id] = operation
 
         new_id = deps.id_generator.new_id()
         now = deps.clock.now()
         events = decide(
             None,
             command,
-            context=DefineProcedureContext(plans=plans),
+            context=DefineProcedureContext(operations=operations),
             now=now,
             new_id=new_id,
             step_ids=[deps.id_generator.new_id() for _ in command.steps],
