@@ -2,6 +2,12 @@
 
 *How the keeper's peer clients name the same work, and what that name is not.*
 
+This page exists in all three projects, word for word. They share no code
+and ship separately, so the agreement is prose in each of them rather than a
+package none of them wants to depend on. What holds the copies honest is not
+this page: it is that the two metadata keys are pinned to literals in a test
+on each side, and renaming one fails the other.
+
 The keeper has two clients that are not part of it. The reporter watches an acquisition engine and records what it sees. The conductor composes a procedure and drives a beamline through it, holding a device claim for each step. Neither imports `keeper`, nothing in the keeper imports either, and they do not import each other.
 
 They nevertheless talk about the same work, so they need one answer to "which run is that". This page is that answer. It is prose rather than a shared package on purpose: a third project existing to hold a string and four HTTP rules would cost more than the duplication it saves.
@@ -23,7 +29,7 @@ An earlier draft of this table named a single key holding one reference the driv
 
 The keeper composes the work and dispatches it, so the ids exist before an engine is asked for anything. Whatever drives an execution carries the step's execution id and step id into the engine's own metadata, and the reporter reads them back out: `KEEPER_METADATA_KEYS` in the reporter's `translate` module is where the spelling is written down, and nothing else in either tree knows it.
 
-That means a keeper identifier sits in somebody else's records, which is the one place in this tree where that happens. It was weighed rather than assumed. What it buys is that the reporter resolves nothing, carries no operation map, and cannot join the wrong record; what it costs is that a document with no such reference cannot be attributed at all, and is skipped.
+That means a keeper identifier sits in somebody else's records, which is the one place in this tree where that happens. It was weighed rather than assumed. What it buys is that the reporter resolves nothing, carries no plan map, and cannot join the wrong record; what it costs is that a document with no such reference cannot be attributed at all, and is skipped.
 
 The engine's own uid travels in the other direction, as a step's `engine_reference`. It is a correlation hint rather than a key: nothing checks that such a run exists, and nothing could, because whatever watches the engine records it on its own schedule.
 
@@ -40,7 +46,7 @@ Nothing checks this. Two deployments configured differently file data under two 
 
 ## What this page does not promise
 
-**The metadata is writable by anyone who can start an operation.** The engine is outside the keeper, so the two keys can be set by hand, copied between runs, or left off. What that buys an attacker is narrower than it was: the ids name records the keeper already wrote, so a forged pair moves an existing step rather than creating anything, and a pair naming nothing is refused. `operation_name` and `exit_status` remain equally forgeable, and everything the reporter relays is something the keeper was told rather than something it checked.
+**The metadata is writable by anyone who can start a plan.** The engine is outside the keeper, so the two keys can be set by hand, copied between runs, or left off. What that buys an attacker is narrower than it was: the ids name records the keeper already wrote, so a forged pair moves an existing step rather than creating anything, and a pair naming nothing is refused. `plan_name` and `exit_status` remain equally forgeable, and everything the reporter relays is something the keeper was told rather than something it checked.
 
 **The reference is a correlation hint, not a credential.** Nothing is granted, billed or gated on it. A wrong one costs a wrong lookup. The day something authorizes off an external reference, this design has to change before that ships.
 
