@@ -100,6 +100,9 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "retire_device",
         "get_device",
         "list_devices",
+        "start_pursuit",
+        "withdraw_pursuit",
+        "get_pursuit",
     }
 )
 """Spelled out rather than imported, so this side is independent.
@@ -604,6 +607,29 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         _call(client, live, "retire_device", device_id=device_id)
         after_retirement = _call(client, live, "get_device", device_id=device_id)["status"]
 
+        # The pursuit leg, which borrows nothing and is borrowed from by
+        # nothing yet. A pursuit authorizes what a machine may go on to do,
+        # and the verbs that spend that authorization are not on this
+        # surface, so what an execution of it can reach today is the
+        # authorization itself: state it, read it back, revoke it.
+        #
+        # The budget names two dimensions on purpose. One would run
+        # whatever the mapping does with a single key, and the whole reason
+        # a budget is a mapping is that a deployment picks more than one.
+        authorized = _call(
+            client,
+            live,
+            "start_pursuit",
+            goal="find the edge of the useful exposure range",
+            beamline="2-bm",
+            scopes=["2bmb:m1", "2bmb:det"],
+            budget={"Rounds": 8, "Tokens": 400000},
+        )
+        pursuit_id = authorized["pursuit_id"]
+        while_running = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
+        _call(client, live, "withdraw_pursuit", pursuit_id=pursuit_id)
+        after_withdrawal = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
+
         # The execution leg. An execution now cites a procedure, so this borrows the
         # one composed earlier on this same execution of the surface rather
         # than standing alone.
@@ -808,6 +834,19 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "each transition tool must reach its own status; two matching means "
         "two bundle fields are wired to one handler, and recovery returning "
         "to Available is the one edge on this machine that points backwards"
+    )
+    assert while_running["status"] == "Running"
+    assert while_running["budget"] == {"Rounds": 8, "Tokens": 400000}, (
+        "a budget comes back keyed by dimension and spelled as it went in, because "
+        "the caller that set it is the one who has to check it was understood"
+    )
+    assert while_running["scopes"] == ["2bmb:m1", "2bmb:det"]
+    assert (after_withdrawal["status"], after_withdrawal["stopped_by"] is not None) == (
+        "Stopped",
+        True,
+    ), (
+        "withdrawing names who did it, because an authorization ended by nobody "
+        "is the one thing this record must never read as"
     )
     assert [item["dataset_id"] for item in produced["items"]] == [dataset_id]
     assert held == {

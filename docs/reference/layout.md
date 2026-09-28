@@ -34,7 +34,6 @@ keeper/<bc>/
 ├── __init__.py                       # re-exports public BC surface
 ├── _bootstrap.py                     # BC-internal constants
 ├── _<aggregate>_update_handler.py    # update-handler factory hoist (when n>=3 update slices share scaffolding)
-├── errors.py                         # BC-application-layer errors
 ├── routes.py                         # register_<bc>_routes(app)
 ├── tools.py                          # register_<bc>_tools(mcp, *, get_handlers)
 ├── wire.py                           # <Bc>Handlers bundle + wire_<bc>(deps)

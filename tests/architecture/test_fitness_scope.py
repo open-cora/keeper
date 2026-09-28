@@ -56,14 +56,14 @@ from tests.architecture.conftest import (
 
 pytestmark = pytest.mark.architecture
 
-EXPECTED_BC_COUNT = 6
+EXPECTED_BC_COUNT = 7
 """Bounded contexts this suite expects to find under `src/keeper`.
 
 Zero is the baseline's honest state. Raise it deliberately, alongside the
 check described in the module docstring, never to make a red run green.
 """
 
-EXPECTED_AGGREGATE_COUNT = 9
+EXPECTED_AGGREGATE_COUNT = 10
 """Aggregate folders this suite expects to find across all bounded contexts.
 
 Separate from the bounded-context pin because the rules that read an
@@ -71,7 +71,7 @@ aggregate's state, events and deserializer range over these, not over
 packages. A bounded context added without one leaves every such rule idle.
 """
 
-EXPECTED_SLICE_COUNT = 40
+EXPECTED_SLICE_COUNT = 43
 """Slice folders this suite expects to find across all bounded contexts.
 
 Separate again, and the last to move. The slice contract, decider purity,

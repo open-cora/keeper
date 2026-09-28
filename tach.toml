@@ -79,6 +79,7 @@ depends_on = [
     "keeper.custody",
     "keeper.equipment",
     "keeper.execution",
+    "keeper.pursuit",
 ]
 
 # Bounded contexts go below, two entries each:
@@ -226,6 +227,27 @@ depends_on = [
     "keeper.shared",
     "keeper.infrastructure",
     "keeper.equipment.aggregates",
+]
+
+# Pursuit reaches no sibling either, and unlike Equipment it will. What a
+# pursuit authorizes is acted on in Counsel and in Execution, so the doors
+# are coming; what is here now is a standing authorization and the act of
+# revoking one, and neither needs to look anywhere else.
+#
+# The direction is fixed even though no edge exists yet. This context may
+# read the two it acts on, and neither may read it: a pursuit is why
+# something ran, and a context asking that would be asking about its own
+# cause.
+[[modules]]
+path = "keeper.pursuit.aggregates"
+depends_on = ["keeper.shared", "keeper.infrastructure"]
+
+[[modules]]
+path = "keeper.pursuit"
+depends_on = [
+    "keeper.shared",
+    "keeper.infrastructure",
+    "keeper.pursuit.aggregates",
 ]
 
 # The cross-BC doors, and how wide each one is.

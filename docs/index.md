@@ -10,7 +10,7 @@ An event-sourced system of record, built on a chassis inherited from an earlier 
 
 ## Where the documentation stands
 
-Six bounded contexts exist. Access, Execution, Custody, Counsel and Equipment have pages below; Authority does not yet, and is readable only from its code. Two pages were written the other way round, before their code rather than after: Counsel's, which has since been corrected against what landed, and Conducting, which describes a direction the code has only started on and says throughout which parts are not there. The reference pages were carried over with the chassis and describe rules that are real. Most of them now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders, and the table below says which is which.
+Seven bounded contexts exist. Access, Execution, Custody, Counsel and Equipment have pages below; Authority and Pursuit do not yet, and are readable only from their code. Two pages were written the other way round, before their code rather than after: Counsel's, which has since been corrected against what landed, and Conducting, which describes a direction the code has only started on and says throughout which parts are not there. The reference pages were carried over with the chassis and describe rules that are real. Most of them now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders, and the table below says which is which.
 
 | Page | Subject | State |
 | --- | --- | --- |
@@ -30,20 +30,20 @@ Six bounded contexts exist. Access, Execution, Custody, Counsel and Equipment ha
 
 ## What is missing
 
-A page on the Authority context, which holds the Policy aggregate and the four slices that author a policy, edit one and read one. No tutorial and no how-to guides. The beamline page describes 2-BM's descriptor and the one script that reads it; nothing is running there, and its device register is still empty. There is no page on the chassis itself, so how the event store, the idempotency wrapper and the kernel fit together is currently readable only from the code and its docstrings.
+A page on the Authority context, which holds the Policy aggregate and the four slices that author a policy, edit one and read one. A page on the Pursuit context, which holds the standing authorization a person gives a machine and is the newest thing here. No tutorial and no how-to guides. The beamline page describes 2-BM's descriptor and the one script that reads it; nothing is running there, and its device register is still empty. There is no page on the chassis itself, so how the event store, the idempotency wrapper and the kernel fit together is currently readable only from the code and its docstrings.
 
 ## What the code looks like today
 
 ```
-   bounded contexts    6     Access, Authority, Execution, Custody, Counsel,
-                             Equipment
-   aggregates          9     Actor, Policy, Plan, Procedure, Execution,
-                             Dataset, Proposal, Inquiry, Device
-   slices             40     four on Actor, four on Policy,
+   bounded contexts    7     Access, Authority, Execution, Custody, Counsel,
+                             Equipment, Pursuit
+   aggregates         10     Actor, Policy, Plan, Procedure, Execution,
+                             Dataset, Proposal, Inquiry, Device, Pursuit
+   slices             43     four on Actor, four on Policy,
                              three on Plan, three on Procedure,
                              seven on Execution, three on Dataset,
                              five on Proposal, five on Inquiry,
-                             six on Device
+                             six on Device, three on Pursuit
 ```
 
 Those three match the integers `test_fitness_scope.py` pins, and `test_docs_match_code_constants.py` compares this block against them, so neither side can drift alone. That check was written after this page said it was pinned and was not: the slice count sat at 15 while the code had 17. Test counts are not quoted here, because a number in prose goes stale on the next commit and nothing notices.

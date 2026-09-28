@@ -1,0 +1,88 @@
+"""Mount the Pursuit HTTP routes, and map its errors onto status codes.
+
+The handler raises typed errors and knows nothing about HTTP. The
+translation lives here, in one place, so the same handler can serve the
+MCP surface where those numbers mean nothing.
+
+Four shapes:
+
+    400  InvalidPursuitGoalError
+         InvalidPursuitBeamlineError
+             the text is empty, whitespace-only, or too long
+         InvalidPursuitScopesError
+             there were none, one was empty, or there were too many
+         InvalidPursuitBudgetError
+             it bounded nothing, or a limit was not positive
+
+    403  UnauthorizedError
+             the caller is known and refused, which is a different fact
+             from 401, where we do not know who is asking. Registered in
+             `keeper.api.exception_handlers` rather than here: the class
+             is shared by every context, so one mapping serves them all
+
+    404  PursuitNotFoundError
+             the id names no pursuit this system has a record of
+
+    409  PursuitAlreadyExistsError
+             a genesis event was asked for on a live stream
+         PursuitCannotBeWithdrawnError
+             the pursuit had already stopped
+
+Four classes on the 400 line where the sibling contexts have one or two,
+and the count is what a standing authorization costs. Every one of them
+guards a field a person is stating on behalf of a machine, so each refusal
+has to name which field rather than saying the request was malformed.
+"""
+
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+
+from keeper.pursuit.aggregates.pursuit import (
+    InvalidPursuitBeamlineError,
+    InvalidPursuitBudgetError,
+    InvalidPursuitGoalError,
+    InvalidPursuitScopesError,
+    PursuitAlreadyExistsError,
+    PursuitCannotBeWithdrawnError,
+    PursuitNotFoundError,
+)
+from keeper.pursuit.features import get_pursuit, start_pursuit, withdraw_pursuit
+
+
+async def _handle_bad_request(request: Request, exc: Exception) -> JSONResponse:
+    """The caller sent something this context can see is wrong."""
+    _ = request
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
+
+
+async def _handle_not_found(request: Request, exc: Exception) -> JSONResponse:
+    """The id names nothing this system has a record of."""
+    _ = request
+    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+
+
+async def _handle_conflict(request: Request, exc: Exception) -> JSONResponse:
+    """The request disagrees with state that is already there."""
+    _ = request
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+def register_pursuit_routes(app: FastAPI) -> None:
+    """Include every Pursuit router and register its exception handlers."""
+    app.include_router(start_pursuit.router)
+    app.include_router(withdraw_pursuit.router)
+    app.include_router(get_pursuit.router)
+
+    for bad_request_cls in (
+        InvalidPursuitGoalError,
+        InvalidPursuitBeamlineError,
+        InvalidPursuitScopesError,
+        InvalidPursuitBudgetError,
+    ):
+        app.add_exception_handler(bad_request_cls, _handle_bad_request)
+    app.add_exception_handler(PursuitNotFoundError, _handle_not_found)
+    for conflict_cls in (PursuitAlreadyExistsError, PursuitCannotBeWithdrawnError):
+        app.add_exception_handler(conflict_cls, _handle_conflict)
+
+
+__all__ = ["register_pursuit_routes"]

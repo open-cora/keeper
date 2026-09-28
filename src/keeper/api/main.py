@@ -83,6 +83,11 @@ from keeper.infrastructure.observability import configure_tracing, instrument_ap
 from keeper.infrastructure.projection.lifespan import projection_worker_lifespan
 from keeper.infrastructure.projection.registry import ProjectionRegistry
 from keeper.infrastructure.settings import Settings
+from keeper.pursuit import (
+    register_pursuit_routes,
+    register_pursuit_tools,
+    wire_pursuit,
+)
 
 
 def _settings_for_app() -> Settings:
@@ -135,6 +140,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     register_custody_tools(mcp, get_handlers=lambda: fastapi_app.state.custody)
     register_counsel_tools(mcp, get_handlers=lambda: fastapi_app.state.counsel)
     register_equipment_tools(mcp, get_handlers=lambda: fastapi_app.state.equipment)
+    register_pursuit_tools(mcp, get_handlers=lambda: fastapi_app.state.pursuit)
 
     mcp_app = mcp.streamable_http_app()
 
@@ -156,6 +162,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             app.state.custody = wire_custody(deps)
             app.state.counsel = wire_counsel(deps)
             app.state.equipment = wire_equipment(deps)
+            app.state.pursuit = wire_pursuit(deps)
 
             registry = ProjectionRegistry()
             register_execution_projections(registry, deps)
@@ -248,6 +255,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     register_custody_routes(fastapi_app)
     register_counsel_routes(fastapi_app)
     register_equipment_routes(fastapi_app)
+    register_pursuit_routes(fastapi_app)
 
     # RFC 9728 Protected Resource Metadata, discoverable at
     # /.well-known/oauth-protected-resource. Clients dereference it after a
