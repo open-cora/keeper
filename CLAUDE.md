@@ -31,6 +31,18 @@ The domains are the open question. The baseline carries zero bounded contexts on
 - Test names carry scenarios (`test_<subject>_<scenario>_<expectation>`); per-test docstrings stay rare.
 - A docstring may not name a symbol or a file that does not exist. Backticks mean "this is a symbol"; use a plain word when you mean a word. Enforced by `test_docstring_references_resolve.py`, which declares its two exception sets inline.
 
+Two more that are about how the tests are written rather than what they say.
+Both hold in every project and both were learned here.
+
+- **Stage new files before trusting a green run.** The architecture rules
+  resolve their roots through `git ls-files`, in `tests/_roots.py` and
+  `tests/architecture/conftest.py`, so a file git has never seen is invisible
+  to all of them.
+- **A new test must be able to fail.** Break the thing it names and watch it go
+  red before trusting it. Several checks here were found to be testing nothing
+  exactly this way, and one of them was a filter that had stopped matching any
+  file at all. The sibling projects state this rule by pointing at this one.
+
 ## Architecture fitness tests
 
 `tests/architecture/` holds structural checks that range over whatever bounded contexts exist. With zero BCs they find nothing to check and pass vacuously, which is a false negative, not a green light.
