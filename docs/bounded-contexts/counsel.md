@@ -26,7 +26,7 @@ That makes a proposal and a run step the same two fields, and the difference bet
 
 ```
    Proposal        operation_id, parameters   nothing has happened
-   Acquire step    operation_id, parameters   dispatched, and something drove it
+   Run step        operation_id, parameters   dispatched, and something drove it
 ```
 
 That is not a missing field, it is the whole distinction: a proposal is the one record in this tree that refers to no act at all.
@@ -291,7 +291,7 @@ This is the part with a real gap in it, and the page is the right place to say w
                    |
                    | somebody decides to run it
                    v
-   agent      define_procedure(steps=[..., acquire P's operation, ...])
+   agent      define_procedure(steps=[..., run P's operation, ...])
               dispatch_execution(procedure_id)          ->  E, with step S
                    |
                    | a conductor claims E and drives it

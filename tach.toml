@@ -128,7 +128,7 @@ depends_on = [
 ]
 
 # Execution BC: what this system can be asked to run, and what happened
-# when it ran. Holds the Plan and Run aggregates.
+# when it ran. Holds the Operation, Procedure and Execution aggregates.
 #
 # No sibling edge outward. Execution reads nobody. It is now read BY
 # Custody, which does not appear here: an edge is declared on the module
@@ -310,8 +310,8 @@ visibility = ["keeper.custody"]
 # Counsel reads Execution five times, and the five reads are different
 # in kind, which is why this door is wider than Custody's.
 #
-# Making a proposal loads a plan and reads its schema, so the decision
-# needs the plan itself and a context module names the type.
+# Making a proposal loads an operation and reads its schema, so the
+# decision needs the operation itself and a context module names the type.
 #
 # Making an inquiry loads an execution and counts the steps it was
 # dispatched with, which is the denominator of the observation boundary
@@ -321,12 +321,12 @@ visibility = ["keeper.custody"]
 # Taking a proposal loads an execution and finds one step inside it,
 # which is the pair of checks Custody makes, and then follows that step's
 # reference to the composed step of the procedure it was dispatched from.
-# That last hop is what the extra names buy: the decision asks which plan
-# the step runs, and the answer lives on the definition.
+# That last hop is what the extra names buy: the decision asks which
+# operation the step runs, and the answer lives on the definition.
 #
 # Adopting a proposal is the fifth and the only one that writes, and it
 # is the one that shrank. It once needed six more names here: the two
-# stream types, the two payload renderers, `AcquireStep` to compose a
+# stream types, the two payload renderers, `RunStep` to compose a
 # procedure and `fold` to turn the one it had just decided into the value
 # the dispatch decider takes as context. All six were an account of how
 # Execution composes, held in Counsel.
@@ -344,7 +344,7 @@ visibility = ["keeper.custody"]
 # size one, and `test_tach_edges_are_used.py` is what keeps that true.
 #
 # This door traded a name rather than simply widening. `ExecutionStep`
-# left it when the step stopped carrying a copied plan id: the handler
+# left it when the step stopped carrying a copied operation id: the handler
 # searches for the step and reads one field off it without ever writing
 # the type down, so keeping it would be a door held open for nobody.
 #
@@ -374,12 +374,12 @@ visibility = ["keeper.counsel"]
 
 # Pursuit reads Execution's aggregates twice, for two existence checks and
 # nothing else. A round naming a run that is not there is refused, and so
-# is one closing on a proposal whose plan has gone.
+# is one closing on a proposal whose operation has gone.
 #
-# `Execution` and `Plan` are both absent, although both values are loaded
-# and used. The execution is handed straight to Counsel's decider, which
-# declares the type in its own context module, and the plan goes to the
-# composer, which declares it in its signature. Neither is written down
+# `Execution` and `Operation` are both absent, although both values are
+# loaded and used. The execution is handed straight to Counsel's decider,
+# which declares the type in its own context module, and the operation goes
+# to the composer, which declares it in its signature. Neither is written down
 # here. That is the same sizing rule that kept `Execution` off Counsel's
 # door until an inquiry started naming it.
 [[interfaces]]
@@ -484,7 +484,7 @@ visibility = ["keeper.pursuit"]
 #
 # What collapsed them was the second caller the old comment here named as
 # the trigger. `composing.compose_one_run` hands back the appends for
-# dispatching one run of one plan, and two contexts now ask for it rather
+# dispatching one run of one operation, and two contexts now ask for it rather
 # than each assembling it. That the door is narrower is the smaller half
 # of the gain: the larger half is that neither caller any longer knows
 # that a procedure is defined and then dispatched, or that the dispatch
