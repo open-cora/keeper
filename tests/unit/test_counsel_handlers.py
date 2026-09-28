@@ -128,14 +128,14 @@ async def _an_operation(deps: Kernel) -> UUID:
 
 
 async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UUID]:
-    """Compose a procedure that acquires with this operation, dispatch it, hand back both ids.
+    """Compose a procedure that runs this operation, dispatch it, hand back both ids.
 
     The whole chain has to be real, because the taking handler checks
     that the execution holds the step: a step is an entity inside that
     aggregate rather than a stream of its own, so there is nothing to
     fake short of dispatching something.
 
-    A move goes in front of the run so the step this returns is
+    A set goes in front of the run so the step this returns is
     never the first one. A procedure of one run would let an
     off-by-one in the search pass.
     """
@@ -163,7 +163,7 @@ async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UU
     return execution_id, execution.steps[1].id
 
 
-async def _a_move_in(deps: Kernel) -> tuple[UUID, UUID]:
+async def _a_set_in(deps: Kernel) -> tuple[UUID, UUID]:
     """A dispatched step that runs no operation, for the refusal that needs one."""
     procedure_id = await bind_define_procedure(deps)(
         DefineProcedure(name="park", beamline="2-bm", steps=(SetStep(record="2bmb:m1", to=0.0),)),
@@ -400,16 +400,16 @@ async def test_taking_with_an_acquisition_of_another_plan_writes_nothing() -> No
     assert len(stored) == 1
 
 
-async def test_a_move_cannot_take_a_proposal_even_though_the_step_is_real() -> None:
+async def test_a_set_cannot_take_a_proposal_even_though_the_step_is_real() -> None:
     """The refusal that only exists because a step can be something else.
 
-    A run was always a run. A step is a move or a run, so the
+    A run was always a run. A step is a set or a run, so the
     handler can resolve a step that exists, belongs to a real execution,
     and still cannot have run what was proposed.
     """
     deps = _kernel()
     operation_id = await _an_operation(deps)
-    execution_id, step_id = await _a_move_in(deps)
+    execution_id, step_id = await _a_set_in(deps)
     proposal_id = await bind_make(deps)(
         MakeProposal(operation_id=operation_id, parameters={}),
         principal_id=uuid4(),

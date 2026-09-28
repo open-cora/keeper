@@ -108,7 +108,7 @@ def handlers(db_pool: asyncpg.Pool) -> ExecutionHandlers:
 async def _a_procedure(handlers: ExecutionHandlers) -> UUID:
     """An operation and a procedure running with it, through the wired handlers.
 
-    Two steps, a move then a run, so a test naming a step by
+    Two steps, a set then a run, so a test naming a step by
     index or by position is naming one of two rather than the only one.
     """
     operation_id = await handlers.define_operation(
@@ -267,12 +267,12 @@ async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
     procedure = await load_procedure(store, procedure_id)
 
     assert procedure is not None
-    move, acquire = procedure.steps
-    assert move.step == SetStep(record="2bmb:m1", to=0.0)
-    assert isinstance(acquire.step, RunStep)
-    assert acquire.step.parameters == {"exposure_seconds": 0.25, "detector": "eiger"}
-    assert acquire.step.scopes == ("2bmb:det:",)
-    assert move.id != acquire.id
+    setting, run = procedure.steps
+    assert setting.step == SetStep(record="2bmb:m1", to=0.0)
+    assert isinstance(run.step, RunStep)
+    assert run.step.parameters == {"exposure_seconds": 0.25, "detector": "eiger"}
+    assert run.step.scopes == ("2bmb:det:",)
+    assert setting.id != run.id
 
 
 async def test_an_execution_copies_the_steps_its_procedure_holds(

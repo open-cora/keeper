@@ -57,7 +57,7 @@ def _walk(*after: object, ended: bool = False) -> Execution:
                 ),
                 DispatchedStep(
                     id=_ACQUIRE,
-                    describes="acquire tomo_scan over 2bmb:det:",
+                    describes="run tomo_scan over 2bmb:det:",
                     procedure_step_id=UUID(int=5),
                 ),
             ],
@@ -231,6 +231,6 @@ def test_the_two_accounts_of_one_step_are_kept_apart_on_the_fold() -> None:
     assert (step.outcome, step.engine_state) == (StepOutcome.DONE, EngineState.FAILED)
 
 
-def test_a_move_carries_no_engine_state_because_it_opens_no_run() -> None:
+def test_a_set_carries_no_engine_state_because_it_opens_no_run() -> None:
     state = _walk(_started())
     assert state.steps[0].engine_state is None

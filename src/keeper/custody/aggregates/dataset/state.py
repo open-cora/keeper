@@ -75,7 +75,7 @@ class Dataset:
 
     ## Why this points at a step and not at a whole execution
 
-    An execution may hold a thousand steps and acquire several times, and
+    An execution may hold a thousand steps and run several times, and
     each run produces its own data. A reference to the execution
     alone would say that these five datasets came out of this traversal
     and nothing about which came from where, which at a tomography

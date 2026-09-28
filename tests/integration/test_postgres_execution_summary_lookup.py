@@ -36,7 +36,7 @@ from tests._port_contracts.execution_summary_lookup import CHECKS, Check
 
 pytestmark = [pytest.mark.integration]
 
-_STEPS = ["set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0"]
+_STEPS = ["set 2bmb:m1 to 0.0", "run tomo_scan", "set 2bmb:m2 to 5.0"]
 
 
 class _DrainingExecutionWriter:

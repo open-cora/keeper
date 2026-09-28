@@ -96,7 +96,7 @@ class DatasetSummaryLookup(Protocol):
         `step_id` narrows to the datasets one run produced,
         which is the question this context exists to answer. Filtering on
         the step and not on the execution is the whole point: an
-        execution may acquire several times, and which run made
+        execution may run several times, and which run made
         which data is the fact a reader needs.
 
         It is deliberately not guaranteed to match at most one: how many

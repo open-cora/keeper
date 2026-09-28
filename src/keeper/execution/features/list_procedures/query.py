@@ -5,7 +5,7 @@ procedure to name, which a fold cannot answer: it would mean replaying
 every procedure stream to see which ones match.
 
 The filter is one optional name and that is the whole of it. No search
-over which operations a procedure acquires and no search over which devices it
+over which operations a procedure runs and no search over which devices it
 touches: both are real questions, both would need a column nothing has
 built, and neither has been asked yet.
 """

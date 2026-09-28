@@ -46,7 +46,7 @@ pytestmark = pytest.mark.unit
 _WHEN = datetime(2026, 9, 23, 9, 30, tzinfo=UTC)
 _PROCEDURE_ID = UUID(int=7)
 _PLAN_ID = UUID(int=9)
-_STEPS = ["set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0"]
+_STEPS = ["set 2bmb:m1 to 0.0", "run tomo_scan", "set 2bmb:m2 to 5.0"]
 _COMPOSED = [uuid4(), uuid4(), uuid4()]
 """The ids of the procedure steps these were dispatched from.
 
@@ -57,7 +57,7 @@ same across every execution of one procedure, where the step ids in
 """Which step runs an operation, matched to `_STEPS` by position.
 
 The middle one is the run, so the round trip below carries both
-a set operation and two unset ones. A fixture where every step was a move
+a set operation and two unset ones. A fixture where every step wrote a record
 would exercise only the null.
 """
 
@@ -115,7 +115,7 @@ def test_the_genesis_builds_a_step_for_every_step_it_names() -> None:
 
 
 def test_the_fold_keeps_the_composed_step_each_one_was_dispatched_from() -> None:
-    """Every step cites one, a move as much as a run.
+    """Every step cites one, a set as much as a run.
 
     The fold rebuilds steps from the genesis payload, so a field dropped
     on the way through would leave a record that reads correctly and has
@@ -142,7 +142,7 @@ def test_reporting_a_step_done_leaves_every_other_step_alone() -> None:
 
 
 def test_a_done_step_that_opened_no_run_carries_no_reference() -> None:
-    """A move drives a motor and opens nothing, which is most steps."""
+    """A set drives a motor and opens nothing, which is most steps."""
     state = _walk(
         ExecutionStepDone(
             execution_id=UUID(int=1), index=0, engine_reference=None, occurred_at=_WHEN
@@ -285,14 +285,14 @@ def _dispatched_steps(*described: str) -> tuple[DispatchedStep, ...]:
 
 
 def test_steps_are_trimmed_on_the_way_in() -> None:
-    (step,) = validated_steps(_dispatched_steps("  move m1  "))
-    assert step.describes == "move m1"
+    (step,) = validated_steps(_dispatched_steps("  set m1  "))
+    assert step.describes == "set m1"
 
 
 def test_trimming_a_step_keeps_the_id_it_was_dispatched_with() -> None:
     """A dataset points at a step id, so trimming the text must not mint
     a new one and orphan whatever already cited it."""
-    given = _dispatched_steps("  move m1  ")
+    given = _dispatched_steps("  set m1  ")
     (step,) = validated_steps(given)
     assert step.id == given[0].id
 

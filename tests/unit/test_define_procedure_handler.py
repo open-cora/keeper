@@ -143,7 +143,7 @@ async def test_a_procedure_citing_a_plan_that_does_not_exist_is_refused() -> Non
 
 
 async def test_the_same_operation_acquired_many_times_is_read_once() -> None:
-    """A tomography procedure acquires the same operation at every sample
+    """A tomography procedure runs the same operation at every sample
     position. Reading that stream once per step would make composing a
     routine cost a replay per step for no new information."""
     store = _CountingEventStore()

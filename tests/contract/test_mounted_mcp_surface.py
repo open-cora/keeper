@@ -893,7 +893,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "proposal is"
     )
     assert [step["describes"] for step in adopted_execution["steps"]] == [
-        f"acquire {operation_id} over 2bmb:det:"
+        f"run {operation_id} over 2bmb:det:"
     ], (
         "one proposal is one run of one operation, so the procedure composed for it "
         "has exactly one step, running that operation over the devices the adoption "

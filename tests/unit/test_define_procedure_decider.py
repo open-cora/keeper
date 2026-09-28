@@ -1,8 +1,8 @@
 """The decision behind defining a procedure.
 
 Pure, so every case here is a value in and a value or a refusal out. The
-one worth reading closely is the parameter check: a procedure may acquire
-several times, and a caller told only that one of its runs is
+one worth reading closely is the parameter check: a procedure may hold
+several runs, and a caller told only that one of them is
 wrong has to check each by hand.
 """
 
@@ -159,7 +159,7 @@ def test_an_acquisition_supplying_no_parameters_at_all_is_accepted() -> None:
 
 
 def test_the_refusal_names_which_step_failed() -> None:
-    """A procedure may acquire several times. A caller told only that one
+    """A procedure may hold several runs. A caller told only that one
     of them is wrong has to check each."""
     with pytest.raises(InvalidProcedureParametersError) as caught:
         _decide(
@@ -172,8 +172,8 @@ def test_the_refusal_names_which_step_failed() -> None:
     assert caught.value.index == 2
 
 
-def test_a_procedure_of_moves_alone_needs_no_plans_at_all() -> None:
-    """The context is empty and nothing looks in it, because a move cites
+def test_a_procedure_of_sets_alone_needs_no_operations_at_all() -> None:
+    """The context is empty and nothing looks in it, because a set cites
     nothing."""
     events = decide(
         None,

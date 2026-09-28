@@ -147,7 +147,7 @@ def test_a_body_with_no_schema_is_unprocessable(client: TestClient) -> None:
 
 
 def _a_procedure(client: TestClient, name: str = "align_then_scan", beamline: str = "2-bm") -> str:
-    """An operation and a procedure that moves once and acquires once."""
+    """An operation and a procedure that sets once and runs once."""
     operation_id = _an_operation(client, name="tomo_scan")
     response = client.post(
         "/procedures",

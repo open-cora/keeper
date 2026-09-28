@@ -327,7 +327,7 @@ class ComposedStep:
     step: ProcedureStep
 
 
-def _validated_move(index: int, step: SetStep) -> SetStep:
+def _validated_set(index: int, step: SetStep) -> SetStep:
     """Trim a set and refuse one this system will not store."""
     record = step.record.strip()
     if not record:
@@ -409,7 +409,7 @@ def validated_steps(raw: tuple[ProcedureStep, ...]) -> tuple[ProcedureStep, ...]
     for index, step in enumerate(raw):
         match step:
             case SetStep():
-                validated.append(_validated_move(index, step))
+                validated.append(_validated_set(index, step))
             case RunStep():
                 validated.append(_validated_run(index, step))
     return tuple(validated)
@@ -452,7 +452,7 @@ def describes(step: ProcedureStep) -> str:
         case SetStep():
             return f"set {step.record} to {step.to}"
         case RunStep():
-            return f"acquire {step.operation_id} over {', '.join(step.scopes)}"
+            return f"run {step.operation_id} over {', '.join(step.scopes)}"
 
 
 def runs_operation(step: ProcedureStep) -> UUID | None:

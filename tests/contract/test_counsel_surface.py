@@ -54,7 +54,7 @@ def _an_operation(client: TestClient, schema: dict[str, Any] | None = None) -> s
 
 
 def _an_acquisition_of(client: TestClient, operation_id: str) -> tuple[str, str]:
-    """Compose a procedure that acquires with this operation and dispatch it.
+    """Compose a procedure that runs this operation and dispatch it.
 
     Three calls where a run took one, and all three are load bearing.
     There is no way to make a step without a procedure holding it and an
@@ -87,7 +87,7 @@ def _an_acquisition_of(client: TestClient, operation_id: str) -> tuple[str, str]
     return execution_id, step_id
 
 
-def _a_move_in(client: TestClient) -> tuple[str, str]:
+def _a_set_in(client: TestClient) -> tuple[str, str]:
     """A dispatched step that runs no operation."""
     defined = client.post(
         "/procedures",
@@ -222,16 +222,16 @@ def test_naming_a_plan_that_does_not_exist_is_404(client: TestClient) -> None:
     assert response.status_code == 404, response.text
 
 
-def test_taking_with_a_move_is_409_and_says_the_step_runs_no_plan(client: TestClient) -> None:
+def test_taking_with_a_set_is_409_and_says_the_step_runs_no_operation(client: TestClient) -> None:
     """The refusal a run reference could not produce.
 
-    A run was always a run. A step is a move or a run, so this
+    A run was always a run. A step is a set or a run, so this
     route can be handed a step that exists, belongs to a real execution,
     and still cannot have run what was proposed.
     """
     with client:
         proposal_id = _a_proposal(client, _an_operation(client))
-        response = client.post(f"/proposals/{proposal_id}/take", json=_body(_a_move_in(client)))
+        response = client.post(f"/proposals/{proposal_id}/take", json=_body(_a_set_in(client)))
 
     assert response.status_code == 409, response.text
     assert "runs no operation" in response.json()["detail"]

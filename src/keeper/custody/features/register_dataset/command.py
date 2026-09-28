@@ -19,7 +19,7 @@ class RegisterDataset:
     "define a dataset" sounds like inventing data.
 
     The data is attached to one step of one execution, not to the
-    execution as a whole. An execution may acquire several times and each
+    execution as a whole. An execution may run several times and each
     run writes its own data, so a reference to the traversal
     alone would lose which run made which, and at a tomography
     beamline that is the sample position.

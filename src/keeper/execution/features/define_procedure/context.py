@@ -8,7 +8,7 @@ stream.
 So the handler does the reading and hands the result across as plain
 data. `dispatch_execution/context.py` next door is the same shape for
 one procedure; this one carries an operation per run, because a
-procedure may acquire more than once.
+procedure may run more than once.
 """
 
 from collections.abc import Mapping
@@ -23,7 +23,7 @@ class DefineProcedureContext:
     """The operations this procedure's runs cite, as they stand now.
 
     Keyed by id and holding each distinct operation once, because a procedure
-    that acquires the same operation at five sample positions should not make
+    that runs the same operation at five sample positions should not make
     this system read the same stream five times.
 
     Every run's operation is present. The handler refuses a procedure

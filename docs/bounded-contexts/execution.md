@@ -70,7 +70,7 @@ Two kinds of step, and only one of them declares what it touches.
 
 ```
    Set       record, to           what it touches is the record it names
-   Acquire   operation_id, parameters, scopes
+   Run       operation_id, parameters, scopes
 ```
 
 A set sends one record to one value, so deriving what it touches is exact and a declared field would be a second chance to say the same thing differently. A run hands a routine to an engine, and nothing here can see inside that routine to work out which devices it will drive. So a run declares its scopes and a set does not have the option, which is not an inconsistency: one is derivable and the other is not.
@@ -348,11 +348,11 @@ A step has an id at all so that something outside can name one. A dataset is pro
 ```
    Procedure R1                    Execution E1, on Tuesday
      T1  set 2bmb:m1 to 0.0   <------  S1  from T1
-     T2  acquire operation P1      <------  S2  from T2
+     T2  run operation P1     <------  S2  from T2
            exposure 0.25
            touches 2bmb:det:         Execution E2, on Wednesday
-                            <------  S3  from T1
-                            <------  S4  from T2
+                              <------  S3  from T1
+                              <------  S4  from T2
 ```
 
 Two ids on one step, and they are not interchangeable. `S2` names this traversal's step, which is what Custody and Counsel point at, and `T2` names the definition every traversal of the procedure shares. They cannot be collapsed, because one procedure is dispatched many times.
@@ -534,7 +534,7 @@ What a driving surface would still add is the asking side of a pause, which is a
 
 `report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what Run did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
 
-`define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may acquire several times, so its handler loads each distinct operation once and hands the lot across keyed by id. Once, because a tomography procedure running the same operation at twenty sample positions would otherwise replay that stream twenty times for no new information.
+`define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may hold several runs, so its handler loads each distinct operation once and hands the lot across keyed by id. Once, because a tomography procedure running the same operation at twenty sample positions would otherwise replay that stream twenty times for no new information.
 
 ## What is not here yet
 

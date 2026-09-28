@@ -72,7 +72,7 @@ router = APIRouter(tags=["execution"])
     },
     summary="Define an operation",
 )
-async def post_plans(
+async def post_operations(
     body: DefineOperationRequest,
     handler: Annotated[IdempotentHandler, Depends(_get_handler)],
     cid: Annotated[UUID, Depends(get_correlation_id)],

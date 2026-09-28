@@ -31,6 +31,14 @@ ALTER INDEX proj_execution_plan_summary_name_idx
 ALTER INDEX proj_execution_plan_summary_keyset_idx
     RENAME TO proj_execution_operation_summary_keyset_idx;
 
+-- A primary key keeps its own name when its table is renamed, so it is not
+-- covered by the two above and the table would otherwise keep a constraint
+-- named for the aggregate this migration exists to rename. Renaming the
+-- constraint renames the index behind it.
+ALTER TABLE proj_execution_operation_summary
+    RENAME CONSTRAINT proj_execution_plan_summary_pkey
+    TO proj_execution_operation_summary_pkey;
+
 -- The bookmark is found by name, and the projection's registered name moves
 -- with the table, so this row has to move with both or the worker advances a
 -- cursor over rows it never wrote.

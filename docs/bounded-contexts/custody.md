@@ -26,7 +26,7 @@ What no store holds is which run produced what it is keeping. A store was handed
 
 ### Why a step and not a whole execution
 
-An execution may hold a thousand steps and acquire several times, and each run writes its own data. A reference to the execution alone would say that these five datasets came out of this traversal and nothing about which came from where, which at a tomography beamline is the sample position: the one thing that makes the data interpretable.
+An execution may hold a thousand steps and run several times, and each run writes its own data. A reference to the execution alone would say that these five datasets came out of this traversal and nothing about which came from where, which at a tomography beamline is the sample position: the one thing that makes the data interpretable.
 
 ### Why both ids
 

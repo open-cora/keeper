@@ -77,7 +77,7 @@ def _kernel(*, authz: object | None = None) -> Kernel:
 
 
 async def _an_acquisition(deps: Kernel) -> tuple[UUID, UUID]:
-    """An operation, a procedure that acquires it, and one dispatch of that.
+    """An operation, a procedure that runs it, and one dispatch of that.
 
     The whole chain, because the handler checks that the execution holds
     the step. A step is an entity inside that aggregate rather than a

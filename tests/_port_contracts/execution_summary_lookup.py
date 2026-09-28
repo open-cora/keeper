@@ -74,7 +74,7 @@ same timestamps every run.
 _PAGE = 50
 """A limit wide enough that paging does not interfere with other checks."""
 
-_STEPS = ["set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0"]
+_STEPS = ["set 2bmb:m1 to 0.0", "run tomo_scan", "set 2bmb:m2 to 5.0"]
 
 
 _PROCEDURE = uuid4()

@@ -148,7 +148,7 @@ def test_a_step_that_ran_a_different_plan_is_refused_and_names_both_plans() -> N
     assert caught.value.taken_by is None
 
 
-def test_a_move_cannot_take_a_proposal_and_is_not_reported_as_a_mismatch() -> None:
+def test_a_set_cannot_take_a_proposal_and_is_not_reported_as_a_mismatch() -> None:
     """A move runs no operation, so the comparison below would refuse it too.
 
     What separates the two is the message. Told the step ran a different

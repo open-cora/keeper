@@ -63,7 +63,7 @@ _ID = UUID(int=1)
 _PROCEDURE_ID = UUID(int=7)
 _STEP_ID = UUID(int=8)
 _PLAN_ID = UUID(int=9)
-_STEPS = ("set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0")
+_STEPS = ("set 2bmb:m1 to 0.0", "run tomo_scan", "set 2bmb:m2 to 5.0")
 
 
 def _live(*, ended: bool = False, reported: tuple[int, ...] = ()) -> Execution:
@@ -187,7 +187,7 @@ def test_every_dispatched_step_cites_the_composed_step_it_came_from() -> None:
     Counsel joins a proposal to the step that took it and compares the
     operation that step runs; without this the comparison would have to index
     into the procedure's own list, which is a correspondence nothing
-    checks. A move cites one too: what a step was asked to do is the
+    checks. A set cites one too: what a step was asked to do is the
     definition's to say, whichever kind it is.
     """
     context = _procedure(

@@ -155,19 +155,19 @@ def test_a_procedure_over_the_step_bound_is_refused() -> None:
         validated_steps(too_many)
 
 
-def test_a_move_naming_no_record_is_refused() -> None:
+def test_a_set_naming_no_record_is_refused() -> None:
     with pytest.raises(InvalidProcedureStepsError, match="names no record"):
         validated_steps((SetStep(record="   ", to=1.0),))
 
 
-def test_a_move_record_is_trimmed() -> None:
+def test_a_set_record_is_trimmed() -> None:
     (step,) = validated_steps((SetStep(record="  2bmb:m1  ", to=1.0),))
     assert isinstance(step, SetStep)
     assert step.record == "2bmb:m1"
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
-def test_a_move_to_a_value_json_cannot_carry_is_refused(value: float) -> None:
+def test_a_set_to_a_value_json_cannot_carry_is_refused(value: float) -> None:
     """A payload holding one of these does not survive the log. Refusing
     at definition beats writing a row that fails to load."""
     with pytest.raises(InvalidProcedureStepsError, match="JSON cannot carry"):
@@ -193,7 +193,7 @@ def test_an_acquisition_scope_that_is_empty_after_trimming_is_refused() -> None:
         validated_steps((_acquire(scopes=("2bmb:m1", "   ")),))
 
 
-def test_a_move_carries_no_declared_scopes_because_its_record_is_the_claim() -> None:
+def test_a_set_carries_no_declared_scopes_because_its_record_is_the_claim() -> None:
     """The asymmetry between the two kinds, asserted rather than assumed:
     a move is derivable and a run is not."""
     assert not hasattr(SetStep(record="2bmb:m1", to=1.0), "scopes")
