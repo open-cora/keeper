@@ -122,16 +122,17 @@ There are three derived tables, one per aggregate, and none holds state the fold
 ```
    OperationDefined        operation_id, operation_name, parameters_schema, occurred_at
 
-   ProcedureDefined   procedure_id, procedure_name, steps, occurred_at
+   ProcedureDefined   procedure_id, procedure_name, beamline, steps, occurred_at
 
    ExecutionDispatched  execution_id, procedure_id, procedure_name,
-                        steps, occurred_at
+                        beamline, steps, occurred_at
    ExecutionClaimed     execution_id, occurred_at
    ExecutionStepDone    execution_id, index, engine_reference, occurred_at
    ExecutionStepRefused execution_id, index, occurred_at
    ExecutionStepBroken  execution_id, index, cause, occurred_at
    ExecutionStepSkipped execution_id, index, occurred_at
-   ExecutionStepEngine*    execution_id, step_id, engine_reference, occurred_at
+   ExecutionStepEngine*    execution_id, step_id, occurred_at,
+                           and engine_reference on Started alone
    ExecutionEnded       execution_id, occurred_at
 ```
 

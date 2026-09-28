@@ -53,9 +53,6 @@ EXTERNAL_NAMES: frozenset[str] = frozenset(
     {
         # Postgres
         "AccessExclusiveLock",
-        # asyncpg
-        "PoolConnectionProxy",
-        "Record",
         # starlette / fastapi / mcp
         "ServerErrorMiddleware",
         "Context",
@@ -67,8 +64,6 @@ EXTERNAL_NAMES: frozenset[str] = frozenset(
         "Host",
         "Authorization",
         "Bearer",
-        # typing
-        "Optional",
         # PyJWT
         "PyJWT",
         # Spring Security 6, named in a corpus comparison
@@ -103,28 +98,21 @@ are admitted separately since `dir(builtins)` already enumerates them.
 
 PROSPECTIVE_NAMES: frozenset[str] = frozenset(
     {
-        # Shapes the first bounded context should take. Named here before
-        # anything defines them, which is the point: the docstring is telling
-        # a future author what to call the thing, not citing one that exists.
-        "Handler",
-        "Item",
-        "Page",
+        # A shape a bounded context should take, named before anything
+        # defines it: the docstring is telling a future author what to call
+        # the thing, not citing one that exists.
         "SurfaceKind",
-        # Worked examples inside `bounded_text`'s own docstrings, standing in
-        # for the per-aggregate value object a BC declares for itself. Operation now
-        # declares a real one, `OperationName`; these three stay undefined because
-        # the examples name aggregates that hold no text.
-        "MethodName",
+        # A worked example inside `bounded_text`'s own docstrings, standing
+        # in for the per-aggregate value object a BC declares for itself.
+        # Operation declares a real one, `OperationName`; this one stays
+        # undefined because the example names an aggregate that holds no text.
         "PolicyName",
-        "InvalidPolicyNameError",
         # Alternatives considered and rejected. The prose exists to say why
         # they are absent, so requiring them to be present inverts it.
         # `ActorRegister` is a malformed event name the naming rules cite
         # as an example of what they refuse: its verb is not in the past.
         "ActorRegister",
-        "BoundedText",
         "Builder",
-        "Llm",
         "TestDatabase",
         "Test",
         # The per-value-object length bound each aggregate declares in its
