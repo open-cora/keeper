@@ -15,13 +15,15 @@ still reading open for the next caller to adopt and run again.
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
 
 import asyncio
-from typing import Any
+from dataclasses import replace
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 import asyncpg
 import pytest
 
 from keeper.counsel.aggregates.proposal import (
+    PROPOSAL_STREAM_TYPE,
     ProposalCannotBeAdoptedError,
     ProposalStatus,
     load_proposal,
@@ -44,6 +46,10 @@ from keeper.infrastructure.ports import AllowAllAuthorize
 from keeper.infrastructure.ports.clock import SystemClock
 from keeper.infrastructure.ports.id_generator import UUIDv7Generator
 from keeper.infrastructure.settings import Settings
+from tests._racing import HeldAtTheLoad
+
+if TYPE_CHECKING:
+    from keeper.infrastructure.ports.event_store import EventStore
 
 pytestmark = [pytest.mark.integration]
 
@@ -177,11 +183,25 @@ async def test_two_callers_adopting_at_once_leave_exactly_one_execution(
     and dispatched an execution by the time it is refused, and a
     conductor polling that beamline would walk work no proposal points
     at. In one append it writes nothing at all.
+
+    `HeldAtTheLoad` is what makes that the arrangement rather than the
+    hope. Under a bare `asyncio.gather` the first caller reliably
+    finished before the second loaded, so the second was refused by the
+    decider before it composed anything and the run proved nothing:
+    splitting the append into two passed this test on every attempt. The
+    barrier holds both callers at the proposal until each has folded it.
     """
     proposal_id = await _a_proposal(postgres_kernel)
     procedures = await _stream_count(db_pool, PROCEDURE_STREAM_TYPE)
     executions = await _stream_count(db_pool, EXECUTION_STREAM_TYPE)
-    adopt = bind_adopt(postgres_kernel)
+    racing = replace(
+        postgres_kernel,
+        event_store=cast(
+            "EventStore",
+            HeldAtTheLoad(postgres_kernel.event_store, asyncio.Barrier(2), on=PROPOSAL_STREAM_TYPE),
+        ),
+    )
+    adopt = bind_adopt(racing)
 
     async def attempt() -> UUID:
         return await adopt(

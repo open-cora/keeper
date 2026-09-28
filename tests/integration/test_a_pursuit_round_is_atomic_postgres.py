@@ -92,6 +92,8 @@ from keeper.pursuit.features.start_pursuit import bind as bind_start
 if TYPE_CHECKING:
     from keeper.infrastructure.ports.event_store import EventStore
 
+from tests._racing import HeldAtTheLoad
+
 pytestmark = [pytest.mark.integration]
 
 _SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/schema"}
@@ -133,39 +135,6 @@ async def _an_execution(deps: Kernel) -> UUID:
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
-
-
-class _HeldAtTheLoad:
-    """The real store, with both callers made to read the pursuit first.
-
-    Delegates everything. The only behaviour added is the barrier, and it
-    trips on the pursuit stream alone: every caller loads an execution too,
-    and a barrier on that one would have them waiting for each other twice
-    and deadlock on the second.
-
-    This is a test fixture rather than a seam the source knows about. What
-    it arranges is a state two real callers reach on their own often
-    enough to matter, and cannot be relied on to reach on any given run.
-    """
-
-    def __init__(self, inner: Any, barrier: asyncio.Barrier) -> None:
-        self._inner = inner
-        self._barrier = barrier
-
-    async def load(self, stream_type: str, stream_id: UUID) -> Any:
-        loaded = await self._inner.load(stream_type, stream_id)
-        if stream_type == PURSUIT_STREAM_TYPE:
-            await self._barrier.wait()
-        return loaded
-
-    async def append(
-        self, stream_type: str, stream_id: UUID, expected_version: int, events: Any
-    ) -> int:
-        appended: int = await self._inner.append(stream_type, stream_id, expected_version, events)
-        return appended
-
-    async def append_streams(self, streams: Any, *, conn: object | None = None) -> Any:
-        return await self._inner.append_streams(streams, conn=conn)
 
 
 async def _stream_count(pool: asyncpg.Pool, stream_type: str) -> int:
@@ -240,7 +209,8 @@ async def test_two_callers_opening_one_round_at_once_leave_exactly_one(
     racing = replace(
         postgres_kernel,
         event_store=cast(
-            "EventStore", _HeldAtTheLoad(postgres_kernel.event_store, asyncio.Barrier(2))
+            "EventStore",
+            HeldAtTheLoad(postgres_kernel.event_store, asyncio.Barrier(2), on=PURSUIT_STREAM_TYPE),
         ),
     )
     open_round = bind_open_round(racing)
@@ -414,7 +384,8 @@ async def test_two_callers_closing_one_round_at_once_dispatch_exactly_one_run(
     racing = replace(
         postgres_kernel,
         event_store=cast(
-            "EventStore", _HeldAtTheLoad(postgres_kernel.event_store, asyncio.Barrier(2))
+            "EventStore",
+            HeldAtTheLoad(postgres_kernel.event_store, asyncio.Barrier(2), on=PURSUIT_STREAM_TYPE),
         ),
     )
     close = bind_close(racing)
