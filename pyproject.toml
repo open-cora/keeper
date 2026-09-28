@@ -161,7 +161,10 @@ indent-style = "space"
 known-first-party = ["keeper", "tests"]
 
 [tool.pyright]
-include = ["src", "tests"]
+# `scripts` is checked like the rest because it is load-bearing, not a
+# convenience: scripts/generate_surface.py writes docs/surface.md, and a test
+# runs it to prove the committed page still matches the code.
+include = ["src", "tests", "scripts"]
 exclude = ["**/__pycache__", "**/*.parked"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"

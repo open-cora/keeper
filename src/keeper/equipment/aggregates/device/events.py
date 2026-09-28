@@ -24,7 +24,7 @@ The reference travels as two flat strings and is rebuilt into a pair by
 the fold, because events carry primitives and that pair is a value
 object. The label travels as a bare string for the same reason.
 
-`device_name`, not `name`. Qualified for the reason `PlanDefined` gives
+`device_name`, not `name`. Qualified for the reason `OperationDefined` gives
 next door: the personal-data check reads field names and cannot tell a
 piece of hardware's label from a person's name, and an unqualified
 `name` on an append-only row is the exact shape that rule exists to

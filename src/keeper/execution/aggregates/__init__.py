@@ -1,7 +1,7 @@
 """Aggregate kernels for the Execution bounded context.
 
 The half of this context a sibling may read. A bounded context that needs
-a fact about a plan reaches under `aggregates`; it never reaches into
+a fact about an operation reaches under `aggregates`; it never reaches into
 `features`, which holds the slice handlers.
 
 No sibling reads it yet, so there is no `[[interfaces]]` block in

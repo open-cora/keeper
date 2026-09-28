@@ -6,11 +6,31 @@ It holds one aggregate. A pursuit is a bounded, goal-oriented, autonomous loop: 
 
 It is the newest context here, and the second whose subject is a permission rather than a thing. Authority holds the rulebook, which says which principals may call which commands and is general, standing and about the system. A pursuit is one person's authorization of one goal, bounded and revocable and about a stretch of time. The rulebook says an agent may adopt proposals at all; a pursuit is why one particular adoption at one particular beamline is allowed to happen with nobody watching.
 
+## What a Pursuit is
+
+One person's standing permission for a machine to chase one goal, with limits on how far it may get.
+
+```
+   Pursuit
+     id          a UUID minted when the pursuit is started
+     actor_id    who authorized it
+     goal        what it is chasing, in words
+     beamline    the one place its work may run
+     scopes      the equipment it may drive
+     budget      the limits, in one or more dimensions
+     status      Running, Held or Stopped
+     rounds      what it has asked and what came back, in order
+     charged     what it has spent so far
+     stopped_by  who took it back, if anybody did
+```
+
+Two of those fields are the reason the whole context exists. The beamline and the scopes say where a machine may work and what it may touch, and a person states both once here rather than every time something acts. Everything else is the record of what that permission went on to cause.
+
 ## The two facts that may not be inferred
 
 The whole context follows from one gap, and the gap is in [Counsel](counsel.md#what-a-proposal-does-not-say-and-why-the-caller-must).
 
-A proposal names a plan and the values to run it with. Turning one into work needs two more facts that a proposal does not carry: the beamline it runs at, and the scopes it may drive. Both are safety-bearing, and neither can be worked out from anything on the record. So adopting a proposal makes the caller state them, every time.
+A proposal names an operation and the values to run it with. Turning one into work needs two more facts that a proposal does not carry: the beamline it runs at, and the scopes it may drive. Both are safety-bearing, and neither can be worked out from anything on the record. So adopting a proposal makes the caller state them, every time.
 
 That is the right answer while the caller is a person. It becomes the wrong answer the moment the caller is software, because software stating a scope is software deciding what it may touch.
 
@@ -198,7 +218,7 @@ The store names the state in a column now instead of inferring it from which col
 
 Every status in this system is derived in the fold and stored nowhere. On the read side that is not the question, because a projection has to write something into a row, and the question is whether the row carries a status at all.
 
-Eight read models here, and five aggregates have a status at all: the plan, the procedure and the dataset have none, so their tables never faced the question. The five that did answer it two ways. The proposal and inquiry tables refuse a column, because their states only ever go forwards, so a nullable reference and a pair of nullable timestamps carry the whole of each and a status beside them would be one fact written twice. The execution, device and pursuit tables carry one.
+Eight read models here, and five aggregates have a status at all: the operation, the procedure and the dataset have none, so their tables never faced the question. The five that did answer it two ways. The proposal and inquiry tables refuse a column, because their states only ever go forwards, so a nullable reference and a pair of nullable timestamps carry the whole of each and a status beside them would be one fact written twice. The execution, device and pursuit tables carry one.
 
 The split is not stored against derived. It is whether the states go one way. A pursuit's do not: Held becomes Running when somebody resumes and may become Held again on the next round, so timestamps would have to record the last of an unbounded sequence rather than whether something happened. A device is the same shape, recovering much the way a pursuit resumes, which is why `proj_pursuit_pursuit_summary` is the third table here to carry a status and the second whose states revisit.
 
@@ -221,32 +241,75 @@ Four doors, which is more than any other context has, and the count is the price
                                             deciders
 ```
 
-Every door is sized by what this context actually imports, which is the only honest way to size one, and `test_tach_edges_are_used.py` is what keeps that true. `Execution`, `Plan`, `Proposal` and `Inquiry` are all loaded here and none of them is on a door, because the handler tests fields off them and hands them to deciders that declare their own types.
+Every door is sized by what this context actually imports, which is the only honest way to size one, and `test_tach_edges_are_used.py` is what keeps that true. `Execution`, `Operation`, `Proposal` and `Inquiry` are all loaded here and none of them is on a door, because the handler tests fields off them and hands them to deciders that declare their own types.
 
 The Execution feature door is one name, and it would have been six. `compose_one_run` was extracted from Counsel's adoption slice before this context's second caller was written, precisely so that two contexts would not hold two copies of one account of how Execution composes a run. That the door is narrower is the smaller half of the gain. The larger half is that neither caller any longer knows that a procedure is defined and then dispatched, or that the dispatch needs the procedure folded first.
 
 **Nothing reaches into Pursuit.** There is no door pointing this way and no sibling imports this package, which is what being the top of the stack looks like. The context reads three others and is read by none.
 
-## The surface
+## The operations
 
-Eight slices, eight routes, eight tools.
-
-```
-   POST   /pursuits                                         start_pursuit
-   GET    /pursuits                                         list_pursuits
-   GET    /pursuits/{pursuit_id}                            get_pursuit
-   POST   /pursuits/{pursuit_id}/rounds                     open_pursuit_round
-   POST   /pursuits/{pursuit_id}/rounds/{round_index}/close close_pursuit_round
-   POST   /pursuits/{pursuit_id}/charges                    charge_pursuit
-   POST   /pursuits/{pursuit_id}/resume                     resume_pursuit
-   POST   /pursuits/{pursuit_id}/withdraw                   withdraw_pursuit
-```
+| What it does | HTTP | MCP tool | On success |
+| --- | --- | --- | --- |
+| Authorize a loop | `POST /pursuits` | `start_pursuit` | `201` with the new id |
+| Find them | `GET /pursuits` | `list_pursuits` | `200` with a page of pursuits |
+| Read one back | `GET /pursuits/{pursuit_id}` | `get_pursuit` | `200` with the pursuit |
+| Ask the next question | `POST /pursuits/{pursuit_id}/rounds` | `open_pursuit_round` | `201` with the question to answer |
+| Act on the answer | `POST /pursuits/{pursuit_id}/rounds/{round_index}/close` | `close_pursuit_round` | `200` with what the round came to |
+| Record what it spent | `POST /pursuits/{pursuit_id}/charges` | `charge_pursuit` | `201` with the running total |
+| Let a held one carry on | `POST /pursuits/{pursuit_id}/resume` | `resume_pursuit` | `204` |
+| Take the authorization back | `POST /pursuits/{pursuit_id}/withdraw` | `withdraw_pursuit` | `204` |
 
 Rounds are a subcollection rather than a verb, because opening one creates something that is then addressable, and closing is a verb on the round rather than on the pursuit. Charges are a collection for the same reason: each call adds one to a list rather than transitioning anything. Both answer 201, beside the genesis, because all three create something. Resuming and withdrawing are verbs on the pursuit and answer 204, because neither creates anything and handing the record back would make the common case pay for the rare one.
 
 The single read carries the whole authorization: the goal, the beamline, the scopes, the budget, who authorized it, whether it still stands and who stopped it. Every field is what somebody would be reading it to check.
 
 The listing has two filters, which is [Equipment's](equipment.md#the-listing-and-why-it-has-two-filters) shape rather than Counsel's, and for a comparable reason: both filters have a caller who cannot work without one. The extra against the sibling listings is the beamline, and a pursuit names one in a way a proposal or an inquiry does not, because it is the authorization to run work there. So `?beamline=2-bm&status=Running` is the question somebody standing at a beamline asks, and `?status=Held` is the other one, which loops have stopped asking and are waiting for a person. Each row says which of the two answerable conclusions put it there, because one needs attention and the other needs data.
+
+## What the stream holds
+
+There is no pursuits table. A pursuit is worked out by replaying its events every time it is read.
+
+```
+   PursuitStarted      pursuit_id, actor_id, goal, beamline, scopes,
+                       budget, occurred_at
+   PursuitRoundOpened  pursuit_id, round_index, execution_id, inquiry_id,
+                       occurred_at
+   PursuitRoundClosed  pursuit_id, round_index, outcome, proposal_id,
+                       dispatched_id, occurred_at
+   PursuitCharged      pursuit_id, dimension, amount, occurred_at
+   PursuitResumed      pursuit_id, actor_id, occurred_at
+   PursuitWithdrawn    pursuit_id, actor_id, occurred_at
+```
+
+Opening and closing a round are two events rather than one, because something has to happen at a beamline in between and that takes as long as it takes. The opening names the run it looked at and the question it asked; the closing names what came back and the work that came of it.
+
+A charge records what one round spent in one dimension, and charges add rather than replace. Only the two dimensions this system cannot measure for itself are written down; the other three are counted from the rounds, so writing one of those would count it twice and the attempt is refused.
+
+The three events that stop or restart a pursuit each name the person who did it, because who took a permission back is the fact somebody will be looking for.
+
+## What gets refused
+
+| Refusal | Status | What happened |
+| --- | --- | --- |
+| `InvalidPursuitGoalError` | 400 | The goal is empty, too long, or not text. |
+| `InvalidPursuitBeamlineError` | 400 | The beamline is not a usable name. |
+| `InvalidPursuitScopesError` | 400 | The scopes are empty or malformed. |
+| `InvalidPursuitBudgetError` | 400 | No limit was given, or one of them is not a positive number. |
+| `InvalidPursuitChargeError` | 400 | The charge names a dimension this system counts for itself. |
+| `UnauthorizedError` | 403 | We know who is asking and they may not. Different from 401, where we do not know. |
+| `PursuitNotFoundError` | 404 | The id names no pursuit. |
+| `PursuitAlreadyExistsError` | 409 | Starting was aimed at an id that already has a history. |
+| `PursuitRoundCannotBeOpenedError` | 409 | The pursuit is not running, or it has already asked about this run. |
+| `PursuitRoundCannotBeClosedError` | 409 | No such round, it is already closed, or its question has no answer yet. |
+| `PursuitCannotBeResumedError` | 409 | It is running, or it was stopped for good. |
+| `PursuitCannotBeWithdrawnError` | 409 | It has already stopped. |
+| `ConcurrencyError` | 409 | The pursuit changed between the read and the write. Read it again and decide again. |
+| `IdempotencyConflictError` | 422 | The same retry key came back with a different body, so no saved answer can be right. |
+
+A budget with no limit at all is refused at the door. A loop with nothing bounding it is the exact thing this context exists to make impossible, so there is no way to write one down.
+
+Refusing a second round about a run it has already asked about is what makes opening one safe to retry, and it is most of the reason nothing has to hold a lock on a pursuit.
 
 ## Where the code is
 

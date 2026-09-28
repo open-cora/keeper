@@ -115,7 +115,7 @@ class InMemoryProposalSummaryLookup:
                 ProposalSummary(
                     proposal_id=proposal.id,
                     actor_id=proposal.actor_id,
-                    plan_id=proposal.plan_id,
+                    operation_id=proposal.operation_id,
                     status=proposal.status,
                     execution_id=proposal.execution_id,
                     step_id=proposal.step_id,

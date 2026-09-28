@@ -111,8 +111,8 @@ PROSPECTIVE_NAMES: frozenset[str] = frozenset(
         "Page",
         "SurfaceKind",
         # Worked examples inside `bounded_text`'s own docstrings, standing in
-        # for the per-aggregate value object a BC declares for itself. Plan now
-        # declares a real one, `PlanName`; these three stay undefined because
+        # for the per-aggregate value object a BC declares for itself. Operation now
+        # declares a real one, `OperationName`; these three stay undefined because
         # the examples name aggregates that hold no text.
         "MethodName",
         "PolicyName",
@@ -128,7 +128,7 @@ PROSPECTIVE_NAMES: frozenset[str] = frozenset(
         "TestDatabase",
         "Test",
         # The per-value-object length bound each aggregate declares in its
-        # own state module. Plan declares `PLAN_NAME_MAX_LENGTH`; the bare
+        # own state module. Operation declares `OPERATION_NAME_MAX_LENGTH`; the bare
         # `MAX_LENGTH` is the placeholder the convention is written with, and
         # is deliberately a constant nowhere.
         "MAX_LENGTH",

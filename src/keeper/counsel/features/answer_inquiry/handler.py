@@ -18,8 +18,8 @@ costs a load and no door. What it buys is that a `Propose` answer cannot
 cite a proposal nobody made, which would leave the join this context exists
 to hold pointing at nothing.
 
-Nothing compares the proposal's plan against anything here. The inquiry
-names an execution rather than a plan, so there is no second opinion to
+Nothing compares the proposal's operation against anything here. The inquiry
+names an execution rather than an operation, so there is no second opinion to
 check it against, and the thinker that wrote the proposal is the one
 reporting it.
 

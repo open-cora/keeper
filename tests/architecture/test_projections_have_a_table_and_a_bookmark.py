@@ -49,6 +49,18 @@ _CREATE_TABLE = re.compile(
     r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(proj_[a-z0-9_]+)",
     re.IGNORECASE,
 )
+_RENAME_TABLE = re.compile(
+    r"ALTER\s+TABLE\s+(proj_[a-z0-9_]+)\s+RENAME\s+TO\s+(proj_[a-z0-9_]+)",
+    re.IGNORECASE,
+)
+"""A projection table changing its name, which is not a new table.
+
+A rename produces no `CREATE`, so a check that only looked for one would
+report the renamed table as missing and the old name as present. Both are
+wrong in the direction that matters: it would fail a rename that is
+correct and pass a projection pointed at a table that has moved away.
+"""
+
 _SEEDS_BOOKMARK = re.compile(
     r"INSERT\s+INTO\s+projection_bookmarks[^;]*?'([a-z0-9_]+)'",
     re.IGNORECASE | re.DOTALL,
@@ -154,15 +166,33 @@ def test_at_least_one_projection_is_registered() -> None:
     )
 
 
+def _live_projection_tables() -> set[str]:
+    """Every projection table a migration leaves in place, by current name.
+
+    Folded in migration order rather than matched against the whole corpus
+    at once, because order is what decides the answer: a later rename
+    retires the name an earlier `CREATE` introduced, and a walker that
+    ignores ordering reports both names as live.
+    """
+    live: set[str] = set()
+    for path in tracked_migration_files():
+        text = path.read_text(encoding="utf-8")
+        live.update(_CREATE_TABLE.findall(text))
+        for old_name, new_name in _RENAME_TABLE.findall(text):
+            live.discard(old_name)
+            live.add(new_name)
+    return live
+
+
 def test_every_registered_projection_has_a_table_some_migration_creates() -> None:
-    created = set(_CREATE_TABLE.findall(_migration_text()))
+    created = _live_projection_tables()
     missing = {
         class_name: name
         for class_name, name in _registered_projection_names().items()
         if name not in created
     }
     assert not missing, (
-        "Projections registered with no matching CREATE TABLE in any migration. "
+        "Projections registered with no table any migration leaves in place. "
         "The worker writes to a table that is not there and fails inside its "
         f"own backoff loop while every write succeeds: {missing}"
     )

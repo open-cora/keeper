@@ -50,7 +50,7 @@ def _execution(*, steps: int = 3) -> Execution:
                 steps=[
                     DispatchedStep(
                         id=uuid4(),
-                        describes=f"move 2bmb:m{index} to 0.0",
+                        describes=f"set 2bmb:m{index} to 0.0",
                         procedure_step_id=uuid4(),
                     )
                     for index in range(steps)

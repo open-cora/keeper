@@ -1,6 +1,6 @@
 """Read procedure summaries out of the projection table.
 
-The deployment half of the `ProcedureSummaryLookup` port, and the plan
+The deployment half of the `ProcedureSummaryLookup` port, and the operation
 lookup's sibling. Same keyset ordering on `(created_at, procedure_id)`,
 same reason for the id being in the sort key rather than only in the
 output, same read-one-row-past-the-page trick for deciding whether a next

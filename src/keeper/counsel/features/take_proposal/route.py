@@ -1,4 +1,4 @@
-"""HTTP door for recording that an acquisition took a proposal.
+"""HTTP door for recording that a run took a proposal.
 
 `POST /proposals/{proposal_id}/take`, carrying the step that took it.
 
@@ -35,7 +35,7 @@ from keeper.infrastructure.request import (
 
 
 class TakeProposalRequest(BaseModel):
-    """The acquisition that took the proposal, and when it did.
+    """The run that took the proposal, and when it did.
 
     Both ids are required: this endpoint exists to record a join, and a
     join with one end is nothing. The execution is not redundant beside
@@ -77,10 +77,10 @@ router = APIRouter(tags=["counsel"])
         },
         status.HTTP_409_CONFLICT: {
             "model": ErrorResponse,
-            "description": "It was already taken, or the step ran another plan or none.",
+            "description": "It was already taken, or the step ran another operation or none.",
         },
     },
-    summary="Record that an acquisition took a proposal",
+    summary="Record that a run took a proposal",
 )
 async def post_proposal_take(
     proposal_id: UUID,

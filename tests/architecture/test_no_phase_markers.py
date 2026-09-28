@@ -1,7 +1,7 @@
 """No phase, iteration, or audit tags in source, tests or documentation.
 
 `Phase 8f-d`, `Iter B-3`, `slice 5g-c`, `audit-2026-05-20`: these name a moment
-in a plan, and they rot the moment the plan moves. The current code is what is
+in an operation, and they rot the moment the operation moves. The current code is what is
 true; ordering lives in git history.
 
 The check is literal AND shape-based, because the literal forms are easy to
@@ -11,7 +11,7 @@ sneaks through review.
 ## Why all three, and not just `src`
 
 This reached `src/keeper` alone, which left the larger half of the prose
-unchecked: `docs/` is where a plan coordinate is most tempting to write,
+unchecked: `docs/` is where an operation coordinate is most tempting to write,
 because a page explaining why something is the way it is has the history
 fresh in mind. The client packages next door check their source, their tests
 and their pages together, and there is no reason this tree should be the
@@ -41,7 +41,7 @@ _PATTERNS = (
     re.compile(r"\bIter(ation)?[\s_-]*[A-Z]-?\d", re.IGNORECASE),
     re.compile(r"\bslice\s+\d+[a-z]\b", re.IGNORECASE),
     re.compile(r"\baudit-20\d\d-\d\d-\d\d\b", re.IGNORECASE),
-    # A bare plan coordinate such as 6g-c or 5g-a: digit, letter, dash, letter.
+    # A bare operation coordinate such as 6g-c or 5g-a: digit, letter, dash, letter.
     re.compile(r"\b\d+[a-z]-[a-z]\b"),
     # A review-finding reference: `gate-review F2`, `SEC S2`, `impl#11`,
     # `test#6`, `BLOCKING F1`. Same rot as a phase tag and one step worse:

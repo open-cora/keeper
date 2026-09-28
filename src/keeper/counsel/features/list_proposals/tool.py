@@ -37,7 +37,7 @@ class ProposalSummaryOutput(BaseModel):
 
     proposal_id: UUID
     actor_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     status: ProposalStatus
     execution_id: UUID | None
     step_id: UUID | None
@@ -83,7 +83,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
                 ProposalSummaryOutput(
                     proposal_id=summary.proposal_id,
                     actor_id=summary.actor_id,
-                    plan_id=summary.plan_id,
+                    operation_id=summary.operation_id,
                     execution_id=summary.execution_id,
                     step_id=summary.step_id,
                     status=summary.status,

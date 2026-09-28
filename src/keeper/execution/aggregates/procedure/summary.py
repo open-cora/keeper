@@ -1,13 +1,13 @@
 """One row per procedure, and the port that reads those rows.
 
-The Plan's sibling, and the same shape for the same reason: `read.py`
+The Operation's sibling, and the same shape for the same reason: `read.py`
 answers a question that names a procedure, and this answers the ones
 that do not. Which procedure is called `tomography`, and what has been
 composed at all.
 
 ## Why a name lookup cannot promise one answer
 
-Two procedures may share a name, for the reason two plans may: one
+Two procedures may share a name, for the reason two operations may: one
 routine composed two ways is two procedures, and which one an execution
 cites is what says how it was composed. So this returns a page, and a
 caller asking by name has to decide what more than one means. That

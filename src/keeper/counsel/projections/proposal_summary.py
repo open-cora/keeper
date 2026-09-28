@@ -70,7 +70,7 @@ _ADOPTED_EVENT_TYPE = "ProposalAdopted"
 
 _INSERT_SQL = f"""
 INSERT INTO {PROJECTION_NAME} (
-    proposal_id, actor_id, plan_id, execution_id, step_id, created_at,
+    proposal_id, actor_id, operation_id, execution_id, step_id, created_at,
     taken_at, adopted_at
 ) VALUES ($1, $2, $3, NULL, NULL, $4, NULL, NULL)
 ON CONFLICT (proposal_id) DO NOTHING
@@ -118,7 +118,7 @@ class ProposalSummaryProjection:
     async def _insert(self, event: StoredEvent, conn: ConnectionLike) -> None:
         """Write the genesis row, open.
 
-        `actor_id` and `plan_id` are parsed back into UUIDs because a
+        `actor_id` and `operation_id` are parsed back into UUIDs because a
         payload holds primitives and the columns hold uuids.
         `proposal_id` comes off the envelope rather than the payload: the
         stream id is what both statements here agree on, and reading it
@@ -134,7 +134,7 @@ class ProposalSummaryProjection:
             _INSERT_SQL,
             event.stream_id,
             UUID(payload["actor_id"]),
-            UUID(payload["plan_id"]),
+            UUID(payload["operation_id"]),
             event.occurred_at,
         )
 

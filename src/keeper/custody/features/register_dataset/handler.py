@@ -7,15 +7,15 @@ The execution is loaded and then only tested: that it exists, and that it
 holds the step this dataset names. The handler fetches the sibling,
 refuses a missing one itself, and passes nothing across to the decision.
 `define_procedure` builds a context dataclass because its decider reads
-the schemas of the plans it cites; this one has nothing to read, so there
+the schemas of the operations it cites; this one has nothing to read, so there
 is no context to build.
 
 Two checks rather than one, and the second is what a step reference costs.
 A step is an entity inside the Execution aggregate rather than a stream of
 its own, so nothing can load one by itself: establishing that a step
 exists means loading the execution around it. That is the price of
-pointing at the acquisition instead of the traversal, and it is worth
-paying: data belongs to one acquisition, and a reference to the whole
+pointing at the run instead of the traversal, and it is worth
+paying: data belongs to one run, and a reference to the whole
 execution would lose which.
 
 `ExecutionNotFoundError` and `ExecutionStepNotFoundError` are Execution's

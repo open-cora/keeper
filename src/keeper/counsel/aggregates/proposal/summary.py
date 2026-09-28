@@ -35,7 +35,7 @@ it is what tells you which id to read.
 ## Why the filter is openness and not the other three
 
 `is_open` is the question this table was built for. Filters on the
-proposer, on the plan, and on a date range are each a column that
+proposer, on the operation, and on a date range are each a column that
 already exists and a parameter that does not, and none has a caller: an
 agent holds the ids of its own proposals, and an operator asking what
 nobody acted on is asking exactly what `is_open` answers. Each is a
@@ -62,7 +62,7 @@ class ProposalSummary:
     never a caller's claim: making one is an act this system performs, so
     the envelope's domain time is this system's own clock reading.
 
-    `taken_at` is when an acquisition took it, and None unless that is
+    `taken_at` is when a run took it, and None unless that is
     how it closed. This is the caller's claim, because the step was
     driven somewhere else. `adopted_at` is when this system chose it and
     dispatched work, and can only ever be this system's own clock
@@ -78,7 +78,7 @@ class ProposalSummary:
 
     proposal_id: UUID
     actor_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     status: ProposalStatus
     execution_id: UUID | None
     step_id: UUID | None
@@ -116,7 +116,7 @@ class ProposalSummaryLookup(Protocol):
     ) -> ProposalSummaryPage:
         """Return one page of proposals, newest first.
 
-        `is_open` narrows to proposals with no acquisition against them,
+        `is_open` narrows to proposals with no run against them,
         which is the question this context exists to answer. False
         narrows to the ones a step took, and None asks for every
         proposal.

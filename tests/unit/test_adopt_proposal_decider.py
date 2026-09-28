@@ -3,7 +3,7 @@
 The slice writes a procedure, an execution and this, and the other two
 are decided by Execution's own deciders. So what is checked here is the
 proposal's half: that it is refused unless the proposal is open, and
-that what it writes is the acquisition the same transaction is about to
+that what it writes is the run the same transaction is about to
 create.
 
 What is deliberately NOT checked here is the beamline and the devices.
@@ -45,7 +45,7 @@ def _live(*, taken: bool = False, adopted: bool = False) -> Proposal:
         ProposalMade(
             proposal_id=_ID,
             actor_id=_ACTOR_ID,
-            plan_id=_PLAN_ID,
+            operation_id=_PLAN_ID,
             parameters={},
             occurred_at=_NOW,
         )

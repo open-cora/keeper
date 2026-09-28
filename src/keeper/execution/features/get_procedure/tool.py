@@ -15,7 +15,7 @@ from uuid import UUID
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
-from keeper.execution.aggregates.procedure import ComposedStep, MoveStep
+from keeper.execution.aggregates.procedure import ComposedStep, SetStep
 from keeper.execution.features.get_procedure.handler import Handler
 from keeper.execution.features.get_procedure.query import GetProcedure
 from keeper.infrastructure.observability import current_correlation_id
@@ -23,26 +23,26 @@ from keeper.infrastructure.request import get_mcp_surface_id
 from keeper.infrastructure.slices.principal import get_mcp_principal_id
 
 
-class MoveStepOutput(BaseModel):
+class SetStepOutput(BaseModel):
     """A step that sends one record to one value."""
 
-    kind: Literal["move"] = "move"
+    kind: Literal["set"] = "set"
     step_id: UUID
     record: str
     to: float
 
 
-class AcquireStepOutput(BaseModel):
-    """A step that asks an engine to run a plan."""
+class RunStepOutput(BaseModel):
+    """A step that asks an engine to run an operation."""
 
-    kind: Literal["acquire"] = "acquire"
+    kind: Literal["run"] = "run"
     step_id: UUID
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any]
     scopes: list[str]
 
 
-StepOutput = Annotated[MoveStepOutput | AcquireStepOutput, Field(discriminator="kind")]
+StepOutput = Annotated[SetStepOutput | RunStepOutput, Field(discriminator="kind")]
 
 
 class GetProcedureOutput(BaseModel):
@@ -54,18 +54,18 @@ class GetProcedureOutput(BaseModel):
     steps: list[StepOutput]
 
 
-def _to_output_step(composed: ComposedStep) -> MoveStepOutput | AcquireStepOutput:
+def _to_output_step(composed: ComposedStep) -> SetStepOutput | RunStepOutput:
     """Render one stored step for a reader, under the id it was composed with.
 
     `step_id` is what an execution's step cites, so it is what a reader
     comparing a traversal against the routine it came from joins on.
     """
     step = composed.step
-    if isinstance(step, MoveStep):
-        return MoveStepOutput(step_id=composed.id, record=step.record, to=step.to)
-    return AcquireStepOutput(
+    if isinstance(step, SetStep):
+        return SetStepOutput(step_id=composed.id, record=step.record, to=step.to)
+    return RunStepOutput(
         step_id=composed.id,
-        plan_id=step.plan_id,
+        operation_id=step.operation_id,
         parameters=step.parameters,
         scopes=list(step.scopes),
     )

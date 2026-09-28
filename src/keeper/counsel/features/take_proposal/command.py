@@ -1,4 +1,4 @@
-"""The intent: record that an acquisition took this proposal."""
+"""The intent: record that a run took this proposal."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,7 +9,7 @@ from keeper.shared.instant import normalize_occurred_at
 
 @dataclass(frozen=True)
 class TakeProposal:
-    """Record that this acquisition was performed against this proposal.
+    """Record that this run was performed against this proposal.
 
     Take, not accept. Accepting says a party considered the proposal and
     said yes; nobody did. This records that a step exists that ran what
@@ -31,7 +31,7 @@ class TakeProposal:
     for.
 
     The caller is a messenger rather than a party to the fact, so
-    nothing on this command says who sent it. The acquisition is what is
+    nothing on this command says who sent it. The run is what is
     being recorded.
     """
 

@@ -36,7 +36,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
             "Relay what an engine did to the run one step opened: Started, "
             "Paused, Resumed, Completed, Aborted or Failed. This is the "
             "engine's account, which is separate from what the driver saw and "
-            "may disagree with it. A move opens no run and has none of this."
+            "may disagree with it. A set opens no run and has none of this."
         ),
     )
     async def report_step_run_tool(  # pyright: ignore[reportUnusedFunction]

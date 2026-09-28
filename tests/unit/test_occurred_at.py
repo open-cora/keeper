@@ -30,11 +30,11 @@ from keeper.execution.aggregates.execution import (
     StepOutcome,
     load_execution,
 )
-from keeper.execution.aggregates.procedure import AcquireStep
+from keeper.execution.aggregates.procedure import RunStep
 from keeper.execution.features.claim_execution import ClaimExecution
 from keeper.execution.features.claim_execution import bind as bind_claim
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -90,13 +90,13 @@ def _kernel() -> Kernel:
 
 
 async def _an_execution(deps: Kernel) -> tuple[UUID, UUID]:
-    """A plan, a procedure acquiring with it, and one dispatch of that.
+    """An operation, a procedure running with it, and one dispatch of that.
 
     All three stamped by the clock, so a reported time asserted below can
     only have come from the command under test.
     """
-    plan_id = await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -105,8 +105,8 @@ async def _an_execution(deps: Kernel) -> tuple[UUID, UUID]:
             name="one_scan",
             beamline="2-bm",
             steps=(
-                AcquireStep(
-                    plan_id=plan_id,
+                RunStep(
+                    operation_id=operation_id,
                     parameters={"exposure_seconds": 0.25},
                     scopes=("2bmb:det:",),
                 ),

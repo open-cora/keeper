@@ -1,4 +1,4 @@
-"""The seam two contexts reach for to dispatch one run of one plan.
+"""The seam two contexts reach for to dispatch one run of one operation.
 
 Adoption and a pursuit's advance both call this, so it is tested here
 rather than only through whichever of them happens to exercise a branch.
@@ -12,7 +12,7 @@ statement about the appends rather than about a database.
 
 What is deliberately not retested is what Execution's own deciders
 refuse. A procedure with no steps and a parameter set that fails its
-plan's schema are checked where those deciders are, and repeating them
+operation's schema are checked where those deciders are, and repeating them
 here would pin this module to refusals it does not make.
 """
 
@@ -24,7 +24,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from keeper.execution.aggregates.execution import EXECUTION_STREAM_TYPE
-from keeper.execution.aggregates.plan import Plan, PlanName
+from keeper.execution.aggregates.operation import Operation, OperationName
 from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE
 from keeper.execution.composing import compose_one_run
 from keeper.infrastructure.ports.event_store import NewEvent, StreamAppend
@@ -37,8 +37,8 @@ _SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/sch
 _CALLER = "SomebodysCommand"
 
 
-def _a_plan() -> Plan:
-    return Plan(id=uuid4(), name=PlanName("count"), parameters_schema=_SCHEMA)
+def _an_operation() -> Operation:
+    return Operation(id=uuid4(), name=OperationName("count"), parameters_schema=_SCHEMA)
 
 
 class _CountingIds:
@@ -68,7 +68,7 @@ def _envelope(event_type: str, payload: dict[str, Any], occurred_at: datetime) -
 
 def _composed(**overrides: Any) -> Any:
     fields: dict[str, Any] = {
-        "plan": _a_plan(),
+        "operation": _an_operation(),
         "parameters": {"exposure_time_s": 2},
         "beamline": "2-bm",
         "scopes": ("2bmb:det:",),
@@ -135,17 +135,17 @@ def test_the_step_handed_back_is_the_dispatched_one_and_not_the_composed_one() -
 
 
 def test_the_procedure_is_named_for_the_plan_and_runs_it() -> None:
-    plan = _a_plan()
+    operation = _an_operation()
 
-    run = _composed(plan=plan)
+    run = _composed(operation=operation)
 
     defined = run.appends[0].events[0].payload
-    assert defined["procedure_name"] == plan.name.value
-    assert defined["steps"][0]["plan_id"] == str(plan.id)
+    assert defined["procedure_name"] == operation.name.value
+    assert defined["steps"][0]["operation_id"] == str(operation.id)
 
 
 def test_the_beamline_and_the_scopes_are_the_callers_and_nothing_else() -> None:
-    """The two safety-bearing facts. Neither is inferred from the plan, the
+    """The two safety-bearing facts. Neither is inferred from the operation, the
     parameters or anything this module could reach."""
     run = _composed(beamline="7-bm", scopes=("7bma:det:", "7bma:m1"))
 
@@ -182,10 +182,10 @@ def test_the_parameters_reach_the_acquisition_as_they_were_given() -> None:
 def test_the_same_inputs_and_the_same_generator_compose_the_same_run() -> None:
     """Ids arrive from the caller's port rather than from anything reached
     for here, so a decision is reproducible on replay."""
-    plan = _a_plan()
+    operation = _an_operation()
 
-    first = _composed(plan=plan, new_id=_CountingIds())
-    second = _composed(plan=plan, new_id=_CountingIds())
+    first = _composed(operation=operation, new_id=_CountingIds())
+    second = _composed(operation=operation, new_id=_CountingIds())
 
     assert (first.execution_id, first.step_id) == (second.execution_id, second.step_id)
     assert [append.stream_id for append in first.appends] == [

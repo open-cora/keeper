@@ -51,7 +51,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
     @mcp.tool(
         name="adopt_proposal",
         description=(
-            "Adopt an open proposal: compose a one-step procedure that runs the plan "
+            "Adopt an open proposal: compose a one-step procedure that runs the operation "
             "it proposes, at the named beamline, over the devices given as scopes, and "
             "dispatch it. Returns the execution, which something will then walk. "
             "Refused if the proposal is no longer open."

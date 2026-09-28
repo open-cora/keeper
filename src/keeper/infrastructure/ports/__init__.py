@@ -22,7 +22,7 @@ while leaving no import for `tach.toml` to constrain: both sides name only
 `keeper.infrastructure`, which every module does.
 
 What the contexts produced instead is a set of read ports that are not
-cross-BC at all. `ExecutionSummaryLookup`, `PlanSummaryLookup` and
+cross-BC at all. `ExecutionSummaryLookup`, `OperationSummaryLookup` and
 `DatasetSummaryLookup` are each declared beside the aggregate they summarize,
 in that context's own summary module, and each is consumed only by the
 context that declares it.

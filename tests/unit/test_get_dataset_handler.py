@@ -17,9 +17,9 @@ from keeper.custody.features.get_dataset import bind as bind_get_dataset
 from keeper.custody.features.register_dataset import RegisterDataset
 from keeper.custody.features.register_dataset import bind as bind_register_dataset
 from keeper.execution.aggregates.execution import load_execution
-from keeper.execution.aggregates.procedure import AcquireStep
-from keeper.execution.features.define_plan import DefinePlan
-from keeper.execution.features.define_plan import bind as bind_define_plan
+from keeper.execution.aggregates.procedure import RunStep
+from keeper.execution.features.define_operation import DefineOperation
+from keeper.execution.features.define_operation import bind as bind_define_operation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -73,15 +73,15 @@ def _kernel(*, authz: object | None = None) -> Kernel:
 
 
 async def _a_dataset(deps: Kernel) -> tuple[UUID, UUID]:
-    """Register one dataset against a real acquisition, and hand back both ids.
+    """Register one dataset against a real run, and hand back both ids.
 
     The whole chain has to be real, because the registering handler
     checks that the execution holds the step: a step is an entity inside
     that aggregate rather than a stream of its own, so there is nothing
     to fake short of dispatching something.
     """
-    plan_id = await bind_define_plan(deps)(
-        DefinePlan(name="count", parameters_schema=_SCHEMA),
+    operation_id = await bind_define_operation(deps)(
+        DefineOperation(name="count", parameters_schema=_SCHEMA),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
@@ -89,7 +89,7 @@ async def _a_dataset(deps: Kernel) -> tuple[UUID, UUID]:
         DefineProcedure(
             name="one_scan",
             beamline="2-bm",
-            steps=(AcquireStep(plan_id=plan_id, parameters={}, scopes=("2bmb:det:",)),),
+            steps=(RunStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),

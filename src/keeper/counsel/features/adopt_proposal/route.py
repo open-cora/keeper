@@ -11,7 +11,7 @@ records where taking one only joins two that existed.
 The body is required, and both of its fields are, because a proposal
 does not carry either and nothing here can derive them. That is not a
 gap in the proposal: a beamline is implied by a device prefix this
-system deliberately does not parse, and an acquisition that declared no
+system deliberately does not parse, and a run that declared no
 devices would be a step believed to touch nothing, which is a step that
 can run beside another over the same motor.
 """
@@ -61,7 +61,7 @@ router = APIRouter(tags=["counsel"])
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
             "description": "The beamline or the devices fall outside what a procedure "
-            "stores, or the proposal's values no longer satisfy its plan's schema.",
+            "stores, or the proposal's values no longer satisfy its operation's schema.",
         },
         status.HTTP_403_FORBIDDEN: {
             "model": ErrorResponse,
@@ -69,7 +69,7 @@ router = APIRouter(tags=["counsel"])
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "No proposal has that id, or its plan is gone.",
+            "description": "No proposal has that id, or its operation is gone.",
         },
         status.HTTP_409_CONFLICT: {
             "model": ErrorResponse,

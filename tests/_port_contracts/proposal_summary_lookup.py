@@ -20,7 +20,7 @@ everything else.
 
 **The aggregate has a second event.** Every other summary in this tree
 is written once and never changes, or changes only a status word. This
-one gains three columns when an acquisition takes the proposal, and the two
+one gains three columns when a run takes the proposal, and the two
 adapters reach that state by completely different routes: the Postgres
 side runs an UPDATE the worker applied, the in-memory side folds the
 second event. That a proposal moves from one side of the filter to the
@@ -48,7 +48,7 @@ class ProposalWriter(Protocol):
         *,
         proposal_id: UUID,
         actor_id: UUID,
-        plan_id: UUID,
+        operation_id: UUID,
         at: datetime,
     ) -> None:
         """Write a proposal down."""
@@ -57,7 +57,7 @@ class ProposalWriter(Protocol):
     async def take(
         self, *, proposal_id: UUID, execution_id: UUID, step_id: UUID, at: datetime
     ) -> None:
-        """Record that one acquisition took it."""
+        """Record that one run took it."""
         ...
 
     async def adopt(
@@ -86,13 +86,13 @@ async def _one_proposal(
     *,
     minute: int,
     actor_id: UUID | None = None,
-    plan_id: UUID | None = None,
+    operation_id: UUID | None = None,
 ) -> UUID:
     proposal_id = uuid4()
     await writer.make(
         proposal_id=proposal_id,
         actor_id=actor_id or uuid4(),
-        plan_id=plan_id or uuid4(),
+        operation_id=operation_id or uuid4(),
         at=_EPOCH + timedelta(minutes=minute),
     )
     return proposal_id
@@ -110,15 +110,17 @@ async def check_an_empty_read_model_returns_an_empty_page(
 async def check_a_new_proposal_shows_with_its_proposer_plan_and_time(
     lookup: ProposalSummaryLookup, writer: ProposalWriter
 ) -> None:
-    actor_id, plan_id = uuid4(), uuid4()
-    proposal_id = await _one_proposal(writer, minute=0, actor_id=actor_id, plan_id=plan_id)
+    actor_id, operation_id = uuid4(), uuid4()
+    proposal_id = await _one_proposal(
+        writer, minute=0, actor_id=actor_id, operation_id=operation_id
+    )
 
     page = await lookup.list_proposals(is_open=None, limit=_PAGE, cursor=None)
 
     (summary,) = page.items
     assert summary.proposal_id == proposal_id
     assert summary.actor_id == actor_id
-    assert summary.plan_id == plan_id
+    assert summary.operation_id == operation_id
     assert summary.created_at == _EPOCH
 
 

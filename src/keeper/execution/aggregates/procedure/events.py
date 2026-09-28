@@ -14,8 +14,8 @@ under pressure.
 The rule in docs/reference/modeling.md is primitives on events, and its
 narrower carve-out is what applies here: a `dict`-typed field is opaque
 as a whole, so a carrier mixing closed leaves with open ones loses the
-closed ones too. A step list is exactly that mix. An acquisition's
-`plan_id` is a reference to a sibling stream and its `parameters` are
+closed ones too. A step list is exactly that mix. A run's
+`operation_id` is a reference to a sibling stream and its `parameters` are
 freeform, and flattening the list to `list[dict[str, Any]]` would make
 the reference as unreadable as the freeform half.
 
@@ -47,23 +47,23 @@ from typing import Any, assert_never
 from uuid import UUID
 
 from keeper.execution.aggregates.procedure.state import (
-    AcquireStep,
     ComposedStep,
-    MoveStep,
     ProcedureStep,
+    RunStep,
+    SetStep,
 )
 from keeper.infrastructure.ports.event_store import StoredEvent
 from keeper.infrastructure.slices.payload import deserialize_or_raise
 
-_MOVE_KIND = "move"
-_ACQUIRE_KIND = "acquire"
+_SET_KIND = "set"
+_RUN_KIND = "run"
 
 
 @dataclass(frozen=True)
 class ProcedureDefined:
     """A routine was composed here, in this order, over these devices.
 
-        Defined rather than registered, the way a plan is: nothing anywhere
+        Defined rather than registered, the way an operation is: nothing anywhere
         holds this sequence until this event says so, and the record IS the
         procedure.
 
@@ -106,12 +106,12 @@ def _step_to_payload(composed: ComposedStep) -> dict[str, Any]:
     """Render one composed step as the primitives that get stored."""
     step = composed.step
     match step:
-        case MoveStep():
-            body: dict[str, Any] = {"kind": _MOVE_KIND, "record": step.record, "to": step.to}
-        case AcquireStep():
+        case SetStep():
+            body: dict[str, Any] = {"kind": _SET_KIND, "record": step.record, "to": step.to}
+        case RunStep():
             body = {
-                "kind": _ACQUIRE_KIND,
-                "plan_id": str(step.plan_id),
+                "kind": _RUN_KIND,
+                "operation_id": str(step.operation_id),
                 "parameters": step.parameters,
                 "scopes": list(step.scopes),
             }
@@ -132,11 +132,11 @@ def _step_from_payload(raw: dict[str, Any]) -> ComposedStep:
     """
     step: ProcedureStep
     match raw.get("kind"):
-        case "move":
-            step = MoveStep(record=raw["record"], to=float(raw["to"]))
-        case "acquire":
-            step = AcquireStep(
-                plan_id=UUID(raw["plan_id"]),
+        case "set":
+            step = SetStep(record=raw["record"], to=float(raw["to"]))
+        case "run":
+            step = RunStep(
+                operation_id=UUID(raw["operation_id"]),
                 parameters=dict(raw["parameters"]),
                 scopes=tuple(raw["scopes"]),
             )
@@ -171,9 +171,9 @@ def from_stored(stored: StoredEvent) -> ProcedureEvent:
     than the event.
 
     The parameters come back as whatever the row holds, with no check
-    against the plan's schema as it stands today. They were checked when
+    against the operation's schema as it stands today. They were checked when
     they were written and the row cannot have changed since; re-checking
-    here would mean a plan that later grew stricter could stop an old
+    here would mean an operation that later grew stricter could stop an old
     procedure from loading at all.
     """
     payload = stored.payload

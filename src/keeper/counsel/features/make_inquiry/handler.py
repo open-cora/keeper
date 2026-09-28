@@ -5,7 +5,7 @@ and `state=None` goes straight to the decider.
 
 The execution is loaded and handed across on a context, which is
 `make_proposal`'s shape. The difference is what the decision takes off it:
-that one reads a plan's schema, and this one counts the steps the execution
+that one reads an operation's schema, and this one counts the steps the execution
 was dispatched with. Both are data the decider needs and neither is
 something a pure function can go and fetch.
 

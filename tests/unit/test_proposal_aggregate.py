@@ -35,7 +35,7 @@ def _made(**overrides: object) -> ProposalMade:
     fields: dict[str, object] = {
         "proposal_id": uuid4(),
         "actor_id": uuid4(),
-        "plan_id": uuid4(),
+        "operation_id": uuid4(),
         "parameters": dict(_PARAMETERS),
         "occurred_at": _WHEN,
     }
@@ -83,7 +83,7 @@ def test_folding_a_genesis_gives_a_proposal_with_no_acquisition() -> None:
     assert state == Proposal(
         id=made.proposal_id,
         actor_id=made.actor_id,
-        plan_id=made.plan_id,
+        operation_id=made.operation_id,
         parameters=_PARAMETERS,
         execution_id=None,
         step_id=None,
@@ -128,10 +128,10 @@ def test_taking_leaves_every_other_field_unchanged() -> None:
     state = fold([made, _taken(made.proposal_id)])
 
     assert state is not None
-    assert (state.id, state.actor_id, state.plan_id) == (
+    assert (state.id, state.actor_id, state.operation_id) == (
         made.proposal_id,
         made.actor_id,
-        made.plan_id,
+        made.operation_id,
     )
     assert state.parameters == _PARAMETERS
 
@@ -200,7 +200,7 @@ def test_a_malformed_payload_names_the_event_and_not_the_field() -> None:
         version=stored.version,
         event_type="ProposalMade",
         schema_version=stored.schema_version,
-        payload={**stored.payload, "plan_id": "not-a-uuid"},
+        payload={**stored.payload, "operation_id": "not-a-uuid"},
         correlation_id=stored.correlation_id,
         causation_id=stored.causation_id,
         occurred_at=stored.occurred_at,

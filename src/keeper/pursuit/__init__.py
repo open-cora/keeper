@@ -8,7 +8,7 @@ until the objective is met or a stopping condition is reached.
 
 ## Why this context exists
 
-Advice can already become work. A proposal names a plan and its values,
+Advice can already become work. A proposal names an operation and its values,
 and adopting one composes a procedure and dispatches an execution in a
 single transaction. What adopting cannot do is decide that it should
 happen: two of the three facts a procedure needs beyond the proposal are

@@ -51,10 +51,12 @@ class _DrainingProposalWriter:
         *,
         proposal_id: UUID,
         actor_id: UUID,
-        plan_id: UUID,
+        operation_id: UUID,
         at: datetime,
     ) -> None:
-        await self._writer.make(proposal_id=proposal_id, actor_id=actor_id, plan_id=plan_id, at=at)
+        await self._writer.make(
+            proposal_id=proposal_id, actor_id=actor_id, operation_id=operation_id, at=at
+        )
         await self._drain()
 
     async def take(
@@ -116,7 +118,7 @@ async def test_a_proposal_event_does_not_move_another_contexts_bookmark(
     its own bookmark and its own subscription, so a proposal landing does
     not advance Execution's cursors past events they have not seen."""
     await EventStoreProposalWriter(PostgresEventStore(db_pool)).make(
-        proposal_id=uuid4(), actor_id=uuid4(), plan_id=uuid4(), at=_WHEN
+        proposal_id=uuid4(), actor_id=uuid4(), operation_id=uuid4(), at=_WHEN
     )
 
     assert await advance_subscriber_once(db_pool, ProposalSummaryProjection()) == 1
@@ -139,7 +141,7 @@ async def test_replaying_a_batch_of_both_events_leaves_the_table_as_it_was(
     row first, which is what makes a second pass a no-op."""
     writer = _DrainingProposalWriter(db_pool)
     proposal_id = uuid4()
-    await writer.make(proposal_id=proposal_id, actor_id=uuid4(), plan_id=uuid4(), at=_WHEN)
+    await writer.make(proposal_id=proposal_id, actor_id=uuid4(), operation_id=uuid4(), at=_WHEN)
     await writer.take(
         proposal_id=proposal_id,
         execution_id=uuid4(),
@@ -194,7 +196,7 @@ async def test_a_take_arriving_before_its_genesis_does_not_wedge_the_projection(
     )
     later = uuid4()
     await EventStoreProposalWriter(PostgresEventStore(db_pool)).make(
-        proposal_id=later, actor_id=uuid4(), plan_id=uuid4(), at=_WHEN
+        proposal_id=later, actor_id=uuid4(), operation_id=uuid4(), at=_WHEN
     )
 
     while await advance_subscriber_once(db_pool, ProposalSummaryProjection()):

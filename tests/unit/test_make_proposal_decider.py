@@ -24,7 +24,7 @@ from keeper.counsel.features.make_proposal import (
     MakeProposalContext,
     decide,
 )
-from keeper.execution.aggregates.plan import Plan, PlanName
+from keeper.execution.aggregates.operation import Operation, OperationName
 
 pytestmark = pytest.mark.unit
 
@@ -40,16 +40,16 @@ _TYPED_SCHEMA: dict[str, Any] = {
 
 def _context(schema: dict[str, Any]) -> MakeProposalContext:
     return MakeProposalContext(
-        plan=Plan(id=uuid4(), name=PlanName("count"), parameters_schema=schema)
+        operation=Operation(id=uuid4(), name=OperationName("count"), parameters_schema=schema)
     )
 
 
 def test_proposing_on_an_empty_stream_emits_one_event() -> None:
-    plan_id, actor_id, new_id = uuid4(), uuid4(), uuid4()
+    operation_id, actor_id, new_id = uuid4(), uuid4(), uuid4()
 
     events = decide(
         None,
-        MakeProposal(plan_id=plan_id, parameters={"exposure_time_s": 0.1}),
+        MakeProposal(operation_id=operation_id, parameters={"exposure_time_s": 0.1}),
         context=_context(_TYPED_SCHEMA),
         actor_id=actor_id,
         now=_NOW,
@@ -60,7 +60,7 @@ def test_proposing_on_an_empty_stream_emits_one_event() -> None:
         ProposalMade(
             proposal_id=new_id,
             actor_id=actor_id,
-            plan_id=plan_id,
+            operation_id=operation_id,
             parameters={"exposure_time_s": 0.1},
             occurred_at=_NOW,
         )
@@ -73,7 +73,7 @@ def test_the_proposer_comes_from_the_parameter_and_not_from_the_command() -> Non
 
     events = decide(
         None,
-        MakeProposal(plan_id=uuid4(), parameters={}),
+        MakeProposal(operation_id=uuid4(), parameters={}),
         context=_context(_OPEN_SCHEMA),
         actor_id=actor_id,
         now=_NOW,
@@ -84,12 +84,12 @@ def test_the_proposer_comes_from_the_parameter_and_not_from_the_command() -> Non
 
 
 def test_proposing_onto_a_live_stream_is_refused() -> None:
-    existing = Proposal(id=uuid4(), actor_id=uuid4(), plan_id=uuid4(), parameters={})
+    existing = Proposal(id=uuid4(), actor_id=uuid4(), operation_id=uuid4(), parameters={})
 
     with pytest.raises(ProposalAlreadyExistsError):
         decide(
             existing,
-            MakeProposal(plan_id=uuid4(), parameters={}),
+            MakeProposal(operation_id=uuid4(), parameters={}),
             context=_context(_OPEN_SCHEMA),
             actor_id=uuid4(),
             now=_NOW,
@@ -101,7 +101,7 @@ def test_values_the_plans_schema_refuses_are_refused_here() -> None:
     with pytest.raises(InvalidProposalParametersError):
         decide(
             None,
-            MakeProposal(plan_id=uuid4(), parameters={"exposure_time_s": "half a second"}),
+            MakeProposal(operation_id=uuid4(), parameters={"exposure_time_s": "half a second"}),
             context=_context(_TYPED_SCHEMA),
             actor_id=uuid4(),
             now=_NOW,
@@ -114,7 +114,7 @@ def test_sending_no_values_at_all_is_accepted_even_where_the_schema_requires_som
 
     Documented behaviour rather than an oversight here: that helper
     defers `required` to the point where values are finally resolved and
-    acted on. So a proposal naming a plan that requires an exposure time,
+    acted on. So a proposal naming an operation that requires an exposure time,
     and proposing nothing, is recorded. `define_procedure` has the same
     hole against the same validator, and closing it for one and not the
     other would make two rules out of one. Pinned so that a change to the
@@ -123,7 +123,7 @@ def test_sending_no_values_at_all_is_accepted_even_where_the_schema_requires_som
     """
     events = decide(
         None,
-        MakeProposal(plan_id=uuid4(), parameters={}),
+        MakeProposal(operation_id=uuid4(), parameters={}),
         context=_context(_TYPED_SCHEMA),
         actor_id=uuid4(),
         now=_NOW,
@@ -136,7 +136,7 @@ def test_sending_no_values_at_all_is_accepted_even_where_the_schema_requires_som
 def test_a_schema_that_constrains_nothing_accepts_anything() -> None:
     events = decide(
         None,
-        MakeProposal(plan_id=uuid4(), parameters={"anything": [1, 2, 3]}),
+        MakeProposal(operation_id=uuid4(), parameters={"anything": [1, 2, 3]}),
         context=_context(_OPEN_SCHEMA),
         actor_id=uuid4(),
         now=_NOW,
@@ -152,7 +152,7 @@ def test_the_command_carries_no_reported_time_for_the_decision_to_use() -> None:
 
     events = decide(
         None,
-        MakeProposal(plan_id=uuid4(), parameters={}),
+        MakeProposal(operation_id=uuid4(), parameters={}),
         context=_context(_OPEN_SCHEMA),
         actor_id=uuid4(),
         now=_NOW,

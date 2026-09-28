@@ -39,7 +39,7 @@ class PursuitStarted:
 
     Started rather than opened, defined or created. Opening is what happens
     to an inquiry and says a thing is now awaiting an answer, which is not
-    what this is. Defining is what happens to a plan and a procedure and
+    what this is. Defining is what happens to an operation and a procedure and
     says a shape was written down for later, which is also not what this
     is: a pursuit is running from the moment it exists. Started is the word
     for a loop that begins turning when you say so, and "start a pursuit"

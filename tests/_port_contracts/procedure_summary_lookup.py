@@ -1,11 +1,11 @@
 """Behaviour every `ProcedureSummaryLookup` adapter owes its callers.
 
-The plan lookup's contract, for the other authored aggregate, and the
+The operation lookup's contract, for the other authored aggregate, and the
 same reason for existing: one side reads a table a worker maintains, the
 other folds every stream, and nothing about the code on one resembles the
 other.
 
-One thing differs from the plan contract. A procedure carries a step
+One thing differs from the operation contract. A procedure carries a step
 count, so there is a derived number the two sides have to agree on rather
 than only fields copied off a payload. An in-memory adapter counts the
 folded steps and a Postgres one reads a column a projection wrote, which

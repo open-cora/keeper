@@ -2,7 +2,7 @@
 
 Eight, in four pairs, and each pair is the two halves of one question.
 The ports are declared with the aggregates they summarise, because a
-plan, a procedure, a run and an execution summary are all Execution's to
+operation, a procedure, a run and an execution summary are all Execution's to
 define. The Postgres half of each reads the projection a deployment
 maintains; the in-memory half folds the streams when there is no database
 to project into.
@@ -16,8 +16,8 @@ summary.
 from keeper.execution.adapters.in_memory_execution_summary_lookup import (
     InMemoryExecutionSummaryLookup,
 )
-from keeper.execution.adapters.in_memory_plan_summary_lookup import (
-    InMemoryPlanSummaryLookup,
+from keeper.execution.adapters.in_memory_operation_summary_lookup import (
+    InMemoryOperationSummaryLookup,
 )
 from keeper.execution.adapters.in_memory_procedure_summary_lookup import (
     InMemoryProcedureSummaryLookup,
@@ -25,8 +25,8 @@ from keeper.execution.adapters.in_memory_procedure_summary_lookup import (
 from keeper.execution.adapters.postgres_execution_summary_lookup import (
     PostgresExecutionSummaryLookup,
 )
-from keeper.execution.adapters.postgres_plan_summary_lookup import (
-    PostgresPlanSummaryLookup,
+from keeper.execution.adapters.postgres_operation_summary_lookup import (
+    PostgresOperationSummaryLookup,
 )
 from keeper.execution.adapters.postgres_procedure_summary_lookup import (
     PostgresProcedureSummaryLookup,
@@ -34,9 +34,9 @@ from keeper.execution.adapters.postgres_procedure_summary_lookup import (
 
 __all__ = [
     "InMemoryExecutionSummaryLookup",
-    "InMemoryPlanSummaryLookup",
+    "InMemoryOperationSummaryLookup",
     "InMemoryProcedureSummaryLookup",
     "PostgresExecutionSummaryLookup",
-    "PostgresPlanSummaryLookup",
+    "PostgresOperationSummaryLookup",
     "PostgresProcedureSummaryLookup",
 ]

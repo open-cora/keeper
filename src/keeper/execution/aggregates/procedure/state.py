@@ -3,29 +3,29 @@
 A Procedure is a routine this system composed: an ordered list of steps,
 each naming what it touches.
 
-## What a procedure is, against what a plan is
+## What a procedure is, against what an operation is
 
-A plan names a routine some engine already has, so its name is a handle
+An operation names a routine some engine already has, so its name is a handle
 in that engine's vocabulary and this system holds a reference to a thing
 it did not write. A procedure is authored here. Nothing anywhere holds
-this sequence of moves and acquisitions until this record says so, which
-is the same split between citing and composing that separates `PlanName`
+this sequence of sets and runs until this record says so, which
+is the same split between citing and composing that separates `OperationName`
 from the steps below.
 
-The two compose rather than compete. An acquisition step cites a plan,
+The two compose rather than compete. A run step cites an operation,
 because asking an engine to run something means naming something the
 engine already knows.
 
 ## Two kinds of step, and only one of them declares what it touches
 
-A move sends one record to one value, so what it touches is the record
-it names and deriving that is exact. An acquisition hands a routine to
+A set sends one record to one value, so what it touches is the record
+it names and deriving that is exact. A run hands a routine to
 an engine, and nothing here can see inside the routine to work out which
-devices it will drive. So an acquisition declares its scopes and a move
+devices it will drive. So a run declares its scopes and a set
 does not have the option, which is not an inconsistency: one is derivable
 and the other is not.
 
-An acquisition that declared nothing would be a step this system believes
+A run that declared nothing would be a step this system believes
 touches no hardware, which is the belief that lets two of them run at
 once over one motor. Declaring at least one scope is required for that
 reason.
@@ -52,10 +52,10 @@ same command replayed produces the same record.
 
 ## Definition time is where the parameters are checked
 
-An acquisition's parameters are validated against the schema its plan
+A run's parameters are validated against the schema its operation
 declares, and the check runs when the procedure is defined rather than
 when it is walked. That is earlier and cheaper: a procedure with a
-malformed acquisition is refused before anything is dispatched, instead
+malformed run is refused before anything is dispatched, instead
 of failing partway through a traversal that has already moved motors.
 
 The check reads a sibling stream, so it happens in the handler and
@@ -73,7 +73,7 @@ from keeper.shared.bounded_text import bounded_name
 PROCEDURE_NAME_MAX_LENGTH = 200
 """How long a procedure name may be after trimming.
 
-Matches `PLAN_NAME_MAX_LENGTH`, because the two are the same kind of
+Matches `OPERATION_NAME_MAX_LENGTH`, because the two are the same kind of
 thing at two scales and a reader comparing them should not find one
 bound where they expected the other.
 """
@@ -95,13 +95,13 @@ about what is too long.
 """
 
 PROCEDURE_RECORD_MAX_LENGTH = 200
-"""How long the record a move names may be."""
+"""How long the record a set names may be."""
 
 PROCEDURE_SCOPE_MAX_LENGTH = 200
 """How long one declared scope may be."""
 
 PROCEDURE_MAX_SCOPES_PER_STEP = 100
-"""How many scopes one acquisition may declare.
+"""How many scopes one run may declare.
 
 A bound rather than no bound, because the list rides an append-only row
 and nothing else limits it. The number is generous: a tomography scan
@@ -112,7 +112,7 @@ declares a motor, a detector namespace and a shutter.
 class InvalidProcedureNameError(ValueError):
     """A procedure name was empty, whitespace-only, or over the bound.
 
-    A `ValueError`, like its sibling on a plan and for the same reason:
+    A `ValueError`, like its sibling on an operation and for the same reason:
     it says the input was never well-formed rather than that a rule about
     existing state was broken, which is the split that sends this to 400
     while the two below map to 404 and 409.
@@ -139,8 +139,8 @@ class InvalidProcedureStepsError(ValueError):
     """The step list is not one this system will store.
 
     Covers the list and the steps in it: an empty procedure, one over the
-    length bound, a move naming no record, a move sent to a value JSON
-    cannot carry, and an acquisition declaring no scopes.
+    length bound, a set naming no record, a set sent to a value JSON
+    cannot carry, and a run declaring no scopes.
 
     One class for all of them rather than one per shape. They arrive from
     the same field on the same command, a caller fixing any of them is
@@ -150,16 +150,16 @@ class InvalidProcedureStepsError(ValueError):
 
 
 class InvalidProcedureParametersError(ValueError):
-    """An acquisition's parameters do not satisfy the plan's schema.
+    """A run's parameters do not satisfy the operation's schema.
 
     Carries the reason the shared validator gave, which names the field
     and the constraint it failed, and the index of the step it came from,
-    because a procedure may hold several acquisitions and a caller told
+    because a procedure may hold several runs and a caller told
     only that one of them is wrong has to check each.
     """
 
     def __init__(self, index: int, reason: str) -> None:
-        super().__init__(f"Step {index} does not satisfy the plan it cites: {reason}")
+        super().__init__(f"Step {index} does not satisfy the operation it cites: {reason}")
         self.index = index
         self.reason = reason
 
@@ -243,7 +243,7 @@ class ProcedureBeamline:
 
     ## Why this is not derived from the steps
 
-    It could be. A move names a record and an acquisition declares
+    It could be. A set names a record and a run declares
     scopes, and both carry a prefix that says where they are. Deriving it
     would mean parsing that prefix, and the module docstring above says
     why this system does not: the grammar belongs to whatever drives the
@@ -258,10 +258,10 @@ class ProcedureBeamline:
 
 
 @dataclass(frozen=True)
-class MoveStep:
+class SetStep:
     """Send one record to one value.
 
-    No declared scopes. What a move touches is the record it names, and
+    No declared scopes. What a set touches is the record it names, and
     the driver derives the claim from that, so a field here would be a
     second chance to say the same thing differently.
     """
@@ -271,21 +271,21 @@ class MoveStep:
 
 
 @dataclass(frozen=True)
-class AcquireStep:
-    """Ask an engine to run a plan, over devices this step declares.
+class RunStep:
+    """Ask an engine to run an operation, over devices this step declares.
 
-    `parameters` is checked against the cited plan's schema at definition
+    `parameters` is checked against the cited operation's schema at definition
     time. What is stored is what the caller sent, not a normalised form:
     an engine fills its own defaults, and a record of what was asked for
     is more useful than a record of what some validator made of it.
     """
 
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any] = field(default_factory=dict[str, Any])
     scopes: tuple[str, ...] = ()
 
 
-ProcedureStep = MoveStep | AcquireStep
+ProcedureStep = SetStep | RunStep
 """What a procedure is made of.
 
 Closed at two. A third kind is a class added here and to this alias, and
@@ -317,7 +317,7 @@ class ComposedStep:
     asserted nowhere.
 
     Citing it rather than copying out of it means the whole step is
-    reachable from the execution: the plan, the parameters it was
+    reachable from the execution: the operation, the parameters it was
     composed with, and the devices it declares. Nothing edits a
     procedure, so the reference cannot come to describe something other
     than what was dispatched.
@@ -327,11 +327,11 @@ class ComposedStep:
     step: ProcedureStep
 
 
-def _validated_move(index: int, step: MoveStep) -> MoveStep:
-    """Trim a move and refuse one this system will not store."""
+def _validated_set(index: int, step: SetStep) -> SetStep:
+    """Trim a set and refuse one this system will not store."""
     record = step.record.strip()
     if not record:
-        msg = f"Step {index} is a move that names no record"
+        msg = f"Step {index} is a set that names no record"
         raise InvalidProcedureStepsError(msg)
     if len(record) > PROCEDURE_RECORD_MAX_LENGTH:
         msg = (
@@ -341,19 +341,19 @@ def _validated_move(index: int, step: MoveStep) -> MoveStep:
         raise InvalidProcedureStepsError(msg)
     if not math.isfinite(step.to):
         msg = (
-            f"Step {index} moves {record} to {step.to}, which JSON cannot carry, "
+            f"Step {index} sets {record} to {step.to}, which JSON cannot carry, "
             "so the row would not survive a round trip through the log"
         )
         raise InvalidProcedureStepsError(msg)
-    return MoveStep(record=record, to=step.to)
+    return SetStep(record=record, to=step.to)
 
 
-def _validated_acquire(index: int, step: AcquireStep) -> AcquireStep:
-    """Trim an acquisition and refuse one this system will not store."""
+def _validated_run(index: int, step: RunStep) -> RunStep:
+    """Trim a run and refuse one this system will not store."""
     if not step.scopes:
         msg = (
-            f"Step {index} is an acquisition declaring no devices; nothing here can "
-            "derive them from the plan, and a step believed to touch nothing is one "
+            f"Step {index} is a run declaring no devices; nothing here can "
+            "derive them from the operation, and a step believed to touch nothing is one "
             "that can run beside another over the same motor"
         )
         raise InvalidProcedureStepsError(msg)
@@ -376,8 +376,8 @@ def _validated_acquire(index: int, step: AcquireStep) -> AcquireStep:
             )
             raise InvalidProcedureStepsError(msg)
         trimmed.append(cleaned)
-    return AcquireStep(
-        plan_id=step.plan_id,
+    return RunStep(
+        operation_id=step.operation_id,
         parameters=dict(step.parameters),
         scopes=tuple(trimmed),
     )
@@ -392,7 +392,7 @@ def validated_steps(raw: tuple[ProcedureStep, ...]) -> tuple[ProcedureStep, ...]
     validated is the list, and a type per step would have to be unwrapped
     everywhere a reader wants a step.
 
-    Says nothing about whether the plans the acquisitions cite exist.
+    Says nothing about whether the operations the runs cite exist.
     That needs a store and this is pure; the handler loads them and the
     decider checks what it is handed.
     """
@@ -408,10 +408,10 @@ def validated_steps(raw: tuple[ProcedureStep, ...]) -> tuple[ProcedureStep, ...]
     validated: list[ProcedureStep] = []
     for index, step in enumerate(raw):
         match step:
-            case MoveStep():
-                validated.append(_validated_move(index, step))
-            case AcquireStep():
-                validated.append(_validated_acquire(index, step))
+            case SetStep():
+                validated.append(_validated_set(index, step))
+            case RunStep():
+                validated.append(_validated_run(index, step))
     return tuple(validated)
 
 
@@ -443,36 +443,36 @@ def describes(step: ProcedureStep) -> str:
     for display: a reader parsing one back into its parts is reading a
     sentence that this function is free to rewrite.
 
-    An acquisition names its plan by id rather than by name. The name
+    A run names its operation by id rather than by name. The name
     would read better and would mean loading a second stream per
-    acquisition to build a string nothing acts on. The id appearing here
-    is not how anything finds it; `runs_plan` below is.
+    run to build a string nothing acts on. The id appearing here
+    is not how anything finds it; `runs_operation` below is.
     """
     match step:
-        case MoveStep():
-            return f"move {step.record} to {step.to}"
-        case AcquireStep():
-            return f"acquire {step.plan_id} over {', '.join(step.scopes)}"
+        case SetStep():
+            return f"set {step.record} to {step.to}"
+        case RunStep():
+            return f"run {step.operation_id} over {', '.join(step.scopes)}"
 
 
-def runs_plan(step: ProcedureStep) -> UUID | None:
-    """The plan an acquisition hands to an engine, or None for a move.
+def runs_operation(step: ProcedureStep) -> UUID | None:
+    """The operation a run hands to an engine, or None for a set.
 
     What anything holding a step of an execution ends up asking, after
     following that step's reference back to the definition here. Counsel
-    is the caller today: it compares this against the plan a proposal
+    is the caller today: it compares this against the operation a proposal
     named, and a None means the step was composed to drive a motor
     rather than to ask an engine for anything.
 
     A function here rather than an attribute test at the call site, so
     the answer moves with the step union. A third kind of step that runs
-    no plan gets an arm returning None and nothing downstream changes.
+    no operation gets an arm returning None and nothing downstream changes.
     """
     match step:
-        case MoveStep():
+        case SetStep():
             return None
-        case AcquireStep():
-            return step.plan_id
+        case RunStep():
+            return step.operation_id
 
 
 @dataclass(frozen=True)
@@ -482,13 +482,13 @@ class Procedure:
     No status field. Nothing retires a procedure yet, so a status would
     have one reachable value, and a one-valued field says less than no
     field while inviting a reader to believe a lifecycle is being
-    enforced. It arrives with the command that flips it, the way a plan's
+    enforced. It arrives with the command that flips it, the way an operation's
     would.
 
     `steps` are composed steps, so each carries the id this system minted
     for it at definition. That is what an execution's step cites, and it
-    is why a reader here writes `composed.step` to reach the move or the
-    acquisition itself.
+    is why a reader here writes `composed.step` to reach the set or the
+    run itself.
     """
 
     id: UUID
@@ -513,13 +513,11 @@ __all__ = [
     "PROCEDURE_NAME_MAX_LENGTH",
     "PROCEDURE_RECORD_MAX_LENGTH",
     "PROCEDURE_SCOPE_MAX_LENGTH",
-    "AcquireStep",
     "ComposedStep",
     "InvalidProcedureBeamlineError",
     "InvalidProcedureNameError",
     "InvalidProcedureParametersError",
     "InvalidProcedureStepsError",
-    "MoveStep",
     "Procedure",
     "ProcedureAlreadyExistsError",
     "ProcedureBeamline",
@@ -527,8 +525,10 @@ __all__ = [
     "ProcedureNotFoundError",
     "ProcedureStep",
     "ProcedureStepNotFoundError",
+    "RunStep",
+    "SetStep",
     "describes",
-    "runs_plan",
+    "runs_operation",
     "validated_composition",
     "validated_steps",
 ]

@@ -4,7 +4,7 @@ The third summary contract, and the same reason for existing as the two
 beside it: one side reads a table a worker maintains, the other folds
 every stream, and nothing about the code on one resembles the other.
 
-What differs here is the filter. A plan name is not unique and a step's
+What differs here is the filter. An operation name is not unique and a step's
 external reference is meant to be; a step id is neither, it is a real
 one-to-many. How many datasets a step produces is the reporting side's
 policy rather than a rule in the model, so the several-matches case is
@@ -210,7 +210,7 @@ async def check_a_cursor_narrows_within_a_filter(
     lookup: DatasetSummaryLookup, writer: DatasetWriter
 ) -> None:
     """Paging and filtering compose, which matters here for the same
-    reason it does on the plan side: several rows under one filter value
+    reason it does on the operation side: several rows under one filter value
     is the ordinary case, so the second page has to stay under it."""
     wanted_step = uuid4()
     await _one_dataset(writer, step_id=uuid4(), minute=0)

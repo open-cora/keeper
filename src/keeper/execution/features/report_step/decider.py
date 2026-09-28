@@ -45,7 +45,7 @@ Allowed, not required. `cause` says nothing useful when absent and is
 required in its own arm below, where the message can say what is
 missing: a break that does not name what was raised is a report a reader
 cannot act on. A done step may legitimately carry no engine reference,
-because a move opens no run.
+because a set opens no run.
 
 Two outcomes now carry nothing. A refusal joined skipped there when the
 holder and the overlap came off the step, for the reason `state.py`

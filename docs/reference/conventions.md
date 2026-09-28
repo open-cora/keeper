@@ -146,9 +146,9 @@ Two timestamps ride every event, and they answer different questions.
 
 `recorded_at` is written by the `events` table's own default and is never sent from application code. That is what makes the other one safe to take on trust: however wrong a claimed time is, the row still says truthfully when it arrived.
 
-**Which commands may carry a time is decided by R8 in [Naming](naming.md#r8-ask-whether-the-record-makes-the-fact-or-describes-one).** A command whose record MAKES the fact must not accept one: `register_actor`, `define_policy` and `define_plan` are acts this system performs, so the moment it writes one is the moment it happened, and a supplied time would be fiction. A command whose record DESCRIBES a fact something else produced may accept one, because the caller was there and this system was not.
+**Which commands may carry a time is decided by R8 in [Naming](naming.md#r8-ask-whether-the-record-makes-the-fact-or-describes-one).** A command whose record MAKES the fact must not accept one: `register_actor`, `define_policy` and `define_operation` are acts this system performs, so the moment it writes one is the moment it happened, and a supplied time would be fiction. A command whose record DESCRIBES a fact something else produced may accept one, because the caller was there and this system was not.
 
-Execution's six run commands are the first to take it. `define_plan`, in the same context, does not.
+Execution's six run commands are the first to take it. `define_operation`, in the same context, does not.
 
 **A supplied timestamp must carry an offset, and is converted to UTC.** Both halves earn their place:
 

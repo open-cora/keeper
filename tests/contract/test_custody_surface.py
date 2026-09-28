@@ -37,14 +37,14 @@ def client() -> TestClient:
 
 
 def _an_acquisition(client: TestClient) -> tuple[str, str]:
-    """A plan, a procedure acquiring it, and one dispatch, over HTTP.
+    """An operation, a procedure running it, and one dispatch, over HTTP.
 
     The whole chain, because a dataset names a step and a step exists
     only inside an execution, so the registering route has something real
     to check against.
     """
-    plan = client.post("/plans", json={"name": "count", "parameters_schema": _SCHEMA})
-    assert plan.status_code == 201, plan.text
+    operation = client.post("/operations", json={"name": "count", "parameters_schema": _SCHEMA})
+    assert operation.status_code == 201, operation.text
     procedure = client.post(
         "/procedures",
         json={
@@ -52,8 +52,8 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
             "beamline": "2-bm",
             "steps": [
                 {
-                    "kind": "acquire",
-                    "plan_id": plan.json()["plan_id"],
+                    "kind": "run",
+                    "operation_id": operation.json()["operation_id"],
                     "parameters": {},
                     "scopes": ["2bmb:det:"],
                 }
@@ -70,8 +70,8 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
     return execution_id, step_id
 
 
-def _a_dataset(client: TestClient, acquisition: tuple[str, str]) -> str:
-    execution_id, step_id = acquisition
+def _a_dataset(client: TestClient, run: tuple[str, str]) -> str:
+    execution_id, step_id = run
     response = client.post(
         "/datasets",
         json={"execution_id": execution_id, "step_id": step_id, "external_ref": _REF},

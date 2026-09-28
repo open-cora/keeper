@@ -53,14 +53,14 @@ def evolve(state: Proposal | None, event: ProposalEvent) -> Proposal:
         case ProposalMade(
             proposal_id=proposal_id,
             actor_id=actor_id,
-            plan_id=plan_id,
+            operation_id=operation_id,
             parameters=parameters,
         ):
             _ = state
             return Proposal(
                 id=proposal_id,
                 actor_id=actor_id,
-                plan_id=plan_id,
+                operation_id=operation_id,
                 parameters=dict(parameters),
                 status=ProposalStatus.OPEN,
                 execution_id=None,

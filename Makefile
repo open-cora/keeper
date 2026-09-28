@@ -1,6 +1,6 @@
 .PHONY: install dev db-up db-down db-reset lint typecheck test test-unit test-int \
         test-contract test-noio test-db test-coverage diff-coverage \
-        docs-serve docs-build \
+        docs-serve docs-build docs-surface \
         fmt clean help migrate-status migrate-apply migrate-new migrate-hash \
         precommit precommit-run arch-check arch-show
 
@@ -8,7 +8,7 @@
 # than looping over a tree, which is the difference between this Makefile and
 # the one it was split out of. The root Makefile now calls these targets
 # rather than repeating them, so a lane has one spelling wherever it runs.
-STYLED := src tests
+STYLED := src tests scripts
 
 COMPOSE := docker compose -f infra/docker-compose.yml
 ATLAS_DIR := infra/atlas
@@ -69,7 +69,7 @@ fmt:
 	uv run ruff format $(STYLED)
 
 typecheck:
-	uv run pyright src tests
+	uv run pyright src tests scripts
 
 # pytest-xdist with `--dist=worksteal -n 4`: worksteal is the scheduler of
 # choice for mixed-duration suites (50ms unit alongside 200ms+ integration).
@@ -172,5 +172,8 @@ docs-serve:
 	$(MKDOCS) serve -a 127.0.0.1:8024
 
 # `--strict` is what makes a broken cross-link fail rather than warn.
+docs-surface:
+	uv run python scripts/generate_surface.py
+
 docs-build:
 	$(MKDOCS) build --strict

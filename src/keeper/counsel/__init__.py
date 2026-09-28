@@ -1,8 +1,8 @@
 """Counsel: advice put forward, and advice asked for.
 
 Two aggregates. A Proposal is a run an actor put forward before anything
-has run it: which plan, with what values, who advised it, and the
-acquisition that took it if one has. An Inquiry is a question an actor put
+has run it: which operation, with what values, who advised it, and the
+run that took it if one has. An Inquiry is a question an actor put
 to a thinker about one execution: what they wanted to know, and what came
 back. An actor is whoever authenticated in both, so a person and a piece
 of software make the same record and nothing on either says which.
@@ -37,9 +37,9 @@ listing, and records the result here.
 ## What it reaches across for
 
 Execution, in one direction, and nothing reaches back. Making a
-proposal loads a plan, because the decision checks the proposed values
-against the schema the plan declares. Taking one loads a run, because
-the decision compares the plan the run actually ran against the plan
+proposal loads an operation, because the decision checks the proposed values
+against the schema the operation declares. Taking one loads a run, because
+the decision compares the operation the run actually ran against the operation
 that was proposed. Making an inquiry loads an execution, because the
 record keeps how many steps there were to see when the question was put.
 

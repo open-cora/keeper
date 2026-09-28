@@ -1,6 +1,6 @@
 """HTTP door for making a proposal.
 
-`POST /proposals`, carrying the plan a run is proposed of and the values
+`POST /proposals`, carrying the operation a run is proposed of and the values
 proposed for it.
 
 A POST that creates the thing it names, unlike `POST /runs` and
@@ -32,13 +32,13 @@ from keeper.infrastructure.request import (
 class MakeProposalRequest(BaseModel):
     """The run being put forward.
 
-    `parameters` defaults to empty, matching a plan whose schema
+    `parameters` defaults to empty, matching an operation whose schema
     constrains nothing. A caller proposing a routine that takes no
     values sends nothing rather than an empty object it had to know to
     write.
     """
 
-    plan_id: UUID
+    operation_id: UUID
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -63,7 +63,7 @@ router = APIRouter(tags=["counsel"])
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
-            "description": "The values do not satisfy the plan's schema.",
+            "description": "The values do not satisfy the operation's schema.",
         },
         status.HTTP_403_FORBIDDEN: {
             "model": ErrorResponse,
@@ -71,7 +71,7 @@ router = APIRouter(tags=["counsel"])
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "No plan has that id.",
+            "description": "No operation has that id.",
         },
     },
     summary="Make a proposal",
@@ -91,7 +91,7 @@ async def post_proposals(
     ] = None,
 ) -> MakeProposalResponse:
     proposal_id = await handler(
-        MakeProposal(plan_id=body.plan_id, parameters=body.parameters),
+        MakeProposal(operation_id=body.operation_id, parameters=body.parameters),
         principal_id=principal_id,
         correlation_id=cid,
         surface_id=surface_id,

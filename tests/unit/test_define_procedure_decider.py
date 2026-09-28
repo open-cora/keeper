@@ -1,8 +1,8 @@
 """The decision behind defining a procedure.
 
 Pure, so every case here is a value in and a value or a refusal out. The
-one worth reading closely is the parameter check: a procedure may acquire
-several times, and a caller told only that one of its acquisitions is
+one worth reading closely is the parameter check: a procedure may hold
+several runs, and a caller told only that one of them is
 wrong has to check each by hand.
 """
 
@@ -12,20 +12,20 @@ from uuid import uuid4
 
 import pytest
 
-from keeper.execution.aggregates.plan import Plan, PlanName
+from keeper.execution.aggregates.operation import Operation, OperationName
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
     ComposedStep,
     InvalidProcedureBeamlineError,
     InvalidProcedureNameError,
     InvalidProcedureParametersError,
     InvalidProcedureStepsError,
-    MoveStep,
     Procedure,
     ProcedureAlreadyExistsError,
     ProcedureBeamline,
     ProcedureName,
     ProcedureStep,
+    RunStep,
+    SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
 from keeper.execution.features.define_procedure.context import DefineProcedureContext
@@ -47,17 +47,19 @@ _SCHEMA: dict[str, Any] = {
 
 def _context() -> DefineProcedureContext:
     return DefineProcedureContext(
-        plans={_PLAN_ID: Plan(id=_PLAN_ID, name=PlanName("count"), parameters_schema=_SCHEMA)}
+        operations={
+            _PLAN_ID: Operation(id=_PLAN_ID, name=OperationName("count"), parameters_schema=_SCHEMA)
+        }
     )
 
 
-def _acquire(**overrides: Any) -> AcquireStep:
+def _acquire(**overrides: Any) -> RunStep:
     fields: dict[str, Any] = {
-        "plan_id": _PLAN_ID,
+        "operation_id": _PLAN_ID,
         "parameters": {"exposure_seconds": 0.2},
         "scopes": ("2bmb:m1",),
     }
-    return AcquireStep(**(fields | overrides))
+    return RunStep(**(fields | overrides))
 
 
 def _command(
@@ -66,7 +68,7 @@ def _command(
     return DefineProcedure(
         name=name,
         beamline=beamline,
-        steps=steps if steps else (MoveStep(record="2bmb:m1", to=1.0),),
+        steps=steps if steps else (SetStep(record="2bmb:m1", to=1.0),),
     )
 
 
@@ -82,15 +84,15 @@ def _decide(command: DefineProcedure) -> list[Any]:
 
 
 def test_defining_a_procedure_produces_one_genesis_event() -> None:
-    (event,) = _decide(_command(MoveStep(record="2bmb:m1", to=1.0), _acquire()))
+    (event,) = _decide(_command(SetStep(record="2bmb:m1", to=1.0), _acquire()))
     assert event.procedure_id == _NEW_ID
     assert event.procedure_name == "tomography"
     assert event.occurred_at == _NOW
 
 
 def test_the_event_carries_every_step_in_the_order_it_was_given() -> None:
-    first = MoveStep(record="2bmb:m1", to=1.0)
-    second = MoveStep(record="2bmb:m2", to=2.0)
+    first = SetStep(record="2bmb:m1", to=1.0)
+    second = SetStep(record="2bmb:m2", to=2.0)
     (event,) = _decide(_command(first, second, _acquire()))
     assert tuple(composed.step for composed in event.steps) == (first, second, _acquire())
 
@@ -116,7 +118,7 @@ def test_defining_against_an_id_that_already_has_a_history_is_refused() -> None:
         id=_NEW_ID,
         name=ProcedureName("tomography"),
         beamline=ProcedureBeamline("2-bm"),
-        steps=(ComposedStep(id=uuid4(), step=MoveStep(record="2bmb:m1", to=1.0)),),
+        steps=(ComposedStep(id=uuid4(), step=SetStep(record="2bmb:m1", to=1.0)),),
     )
     with pytest.raises(ProcedureAlreadyExistsError):
         decide(
@@ -157,12 +159,12 @@ def test_an_acquisition_supplying_no_parameters_at_all_is_accepted() -> None:
 
 
 def test_the_refusal_names_which_step_failed() -> None:
-    """A procedure may acquire several times. A caller told only that one
+    """A procedure may hold several runs. A caller told only that one
     of them is wrong has to check each."""
     with pytest.raises(InvalidProcedureParametersError) as caught:
         _decide(
             _command(
-                MoveStep(record="2bmb:m1", to=1.0),
+                SetStep(record="2bmb:m1", to=1.0),
                 _acquire(),
                 _acquire(parameters={"exposure_seconds": -1}),
             )
@@ -170,13 +172,13 @@ def test_the_refusal_names_which_step_failed() -> None:
     assert caught.value.index == 2
 
 
-def test_a_procedure_of_moves_alone_needs_no_plans_at_all() -> None:
-    """The context is empty and nothing looks in it, because a move cites
+def test_a_procedure_of_sets_alone_needs_no_operations_at_all() -> None:
+    """The context is empty and nothing looks in it, because a set cites
     nothing."""
     events = decide(
         None,
-        _command(MoveStep(record="2bmb:m1", to=1.0)),
-        context=DefineProcedureContext(plans={}),
+        _command(SetStep(record="2bmb:m1", to=1.0)),
+        context=DefineProcedureContext(operations={}),
         now=_NOW,
         new_id=_NEW_ID,
         step_ids=[uuid4()],
@@ -185,7 +187,7 @@ def test_a_procedure_of_moves_alone_needs_no_plans_at_all() -> None:
 
 
 def test_every_step_is_named_with_the_id_it_was_given_in_order() -> None:
-    command = _command(MoveStep(record="2bmb:m1", to=1.0), _acquire())
+    command = _command(SetStep(record="2bmb:m1", to=1.0), _acquire())
     step_ids = [uuid4(), uuid4()]
     (event,) = decide(
         None,
@@ -201,7 +203,7 @@ def test_every_step_is_named_with_the_id_it_was_given_in_order() -> None:
 def test_two_steps_that_are_identical_are_still_named_apart() -> None:
     """What the ids buy over a position: a procedure may repeat a step,
     and an execution of it has to be able to say which one it means."""
-    same = MoveStep(record="2bmb:m1", to=1.0)
+    same = SetStep(record="2bmb:m1", to=1.0)
     (event,) = _decide(_command(same, same))
     first, second = event.steps
     assert first.step == second.step
@@ -212,7 +214,7 @@ def test_a_definition_given_the_wrong_number_of_step_ids_is_a_caller_bug() -> No
     with pytest.raises(ValueError, match="one id per step"):
         decide(
             None,
-            _command(MoveStep(record="2bmb:m1", to=1.0), _acquire()),
+            _command(SetStep(record="2bmb:m1", to=1.0), _acquire()),
             context=_context(),
             now=_NOW,
             new_id=_NEW_ID,

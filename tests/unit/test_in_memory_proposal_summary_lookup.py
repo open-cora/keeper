@@ -14,9 +14,9 @@ import pytest
 from keeper.counsel.adapters.in_memory_proposal_summary_lookup import (
     InMemoryProposalSummaryLookup,
 )
-from keeper.execution.aggregates.plan.state import PlanName
+from keeper.execution.aggregates.operation.state import OperationName
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
-from tests._port_contracts._writers import EventStorePlanWriter, EventStoreProposalWriter
+from tests._port_contracts._writers import EventStoreOperationWriter, EventStoreProposalWriter
 from tests._port_contracts.proposal_summary_lookup import (
     CHECKS,
     Check,
@@ -49,17 +49,17 @@ async def test_the_in_memory_proposal_summary_lookup_keeps_the_port_contract(
 
 async def test_a_plan_stream_in_the_same_store_is_not_read_as_a_proposal() -> None:
     """Every aggregate in the process shares one store, and this adapter
-    enumerates it. Enumerating by stream type is what keeps a plan out of a
+    enumerates it. Enumerating by stream type is what keeps an operation out of a
     list of proposals, and the Postgres side gets that for free from
     subscribing to proposal event types only."""
     event_store = InMemoryEventStore()
-    await EventStorePlanWriter(event_store).define(
-        plan_id=uuid4(), name=PlanName("count"), at=datetime.now(tz=UTC)
+    await EventStoreOperationWriter(event_store).define(
+        operation_id=uuid4(), name=OperationName("count"), at=datetime.now(tz=UTC)
     )
     await EventStoreProposalWriter(event_store).make(
         proposal_id=uuid4(),
         actor_id=uuid4(),
-        plan_id=uuid4(),
+        operation_id=uuid4(),
         at=datetime.now(tz=UTC),
     )
 

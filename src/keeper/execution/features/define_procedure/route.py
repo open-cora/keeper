@@ -29,9 +29,9 @@ from keeper.execution.aggregates.procedure import (
     PROCEDURE_NAME_MAX_LENGTH,
     PROCEDURE_RECORD_MAX_LENGTH,
     PROCEDURE_SCOPE_MAX_LENGTH,
-    AcquireStep,
-    MoveStep,
     ProcedureStep,
+    RunStep,
+    SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
 from keeper.execution.features.define_procedure.handler import IdempotentHandler
@@ -43,20 +43,20 @@ from keeper.infrastructure.request import (
 )
 
 
-class MoveStepRequest(BaseModel):
+class SetStepRequest(BaseModel):
     """Send one record to one value.
 
-    No scopes. What a move touches is the record it names, and whatever
+    No scopes. What a set touches is the record it names, and whatever
     drives the procedure derives the claim from that.
     """
 
-    kind: Literal["move"]
+    kind: Literal["set"]
     record: str = Field(min_length=1, max_length=PROCEDURE_RECORD_MAX_LENGTH)
     to: float
 
 
-class AcquireStepRequest(BaseModel):
-    """Ask an engine to run a plan, over the devices this step declares.
+class RunStepRequest(BaseModel):
+    """Ask an engine to run an operation, over the devices this step declares.
 
     `scopes` is required and must name at least one device. Nothing here
     can look inside a routine to work out what it will drive, so a step
@@ -64,15 +64,15 @@ class AcquireStepRequest(BaseModel):
     hardware.
     """
 
-    kind: Literal["acquire"]
-    plan_id: UUID
+    kind: Literal["run"]
+    operation_id: UUID
     parameters: dict[str, Any] = Field(default_factory=dict[str, Any])
     scopes: list[Annotated[str, Field(min_length=1, max_length=PROCEDURE_SCOPE_MAX_LENGTH)]] = (
         Field(min_length=1, max_length=PROCEDURE_MAX_SCOPES_PER_STEP)
     )
 
 
-StepRequest = Annotated[MoveStepRequest | AcquireStepRequest, Field(discriminator="kind")]
+StepRequest = Annotated[SetStepRequest | RunStepRequest, Field(discriminator="kind")]
 
 
 class DefineProcedureRequest(BaseModel):
@@ -94,12 +94,12 @@ class DefineProcedureResponse(BaseModel):
     procedure_id: UUID
 
 
-def to_step(body: MoveStepRequest | AcquireStepRequest) -> ProcedureStep:
+def to_step(body: SetStepRequest | RunStepRequest) -> ProcedureStep:
     """Turn one parsed request step into the step the domain holds."""
-    if isinstance(body, MoveStepRequest):
-        return MoveStep(record=body.record, to=body.to)
-    return AcquireStep(
-        plan_id=body.plan_id,
+    if isinstance(body, SetStepRequest):
+        return SetStep(record=body.record, to=body.to)
+    return RunStep(
+        operation_id=body.operation_id,
         parameters=body.parameters,
         scopes=tuple(body.scopes),
     )
@@ -120,7 +120,7 @@ router = APIRouter(tags=["execution"])
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "model": ErrorResponse,
-            "description": "The name, the beamline, the steps, or an acquisition's "
+            "description": "The name, the beamline, the steps, or a run's "
             "parameters are not well-formed.",
         },
         status.HTTP_403_FORBIDDEN: {
@@ -129,7 +129,7 @@ router = APIRouter(tags=["execution"])
         },
         status.HTTP_404_NOT_FOUND: {
             "model": ErrorResponse,
-            "description": "An acquisition cites a plan that does not exist.",
+            "description": "A run cites an operation that does not exist.",
         },
     },
     summary="Define a procedure",

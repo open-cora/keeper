@@ -32,7 +32,7 @@ writes it, and `Identifier` does no more than trim and bound what arrives.
 Nothing withdraws, moves or supersedes a dataset yet, so a status would
 have one reachable value, and a one-valued field says less than no field
 while inviting a reader to believe a lifecycle is being enforced. It
-arrives with the command that flips it, the way a plan's would.
+arrives with the command that flips it, the way an operation's would.
 
 That is also the answer to the obvious question about a moved node. A
 record saying where data was at a moment stays true when the data moves;
@@ -71,12 +71,12 @@ class DatasetAlreadyExistsError(Exception):
 
 @dataclass(frozen=True)
 class Dataset:
-    """A body of data one acquisition produced, as the fold leaves it.
+    """A body of data one run produced, as the fold leaves it.
 
     ## Why this points at a step and not at a whole execution
 
-    An execution may hold a thousand steps and acquire several times, and
-    each acquisition produces its own data. A reference to the execution
+    An execution may hold a thousand steps and run several times, and
+    each run produces its own data. A reference to the execution
     alone would say that these five datasets came out of this traversal
     and nothing about which came from where, which at a tomography
     beamline is the sample position: the one thing that makes the data

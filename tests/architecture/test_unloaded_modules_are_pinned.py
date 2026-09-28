@@ -1,7 +1,7 @@
 """Modules the application never loads, written down so the set can shrink.
 
 The chassis was copied from a sibling project with more domains in it.
-Some of what came along has no user here yet, which was the plan: the
+Some of what came along has no user here yet, which was the operation: the
 alternative was deciding in advance which pieces the first bounded
 context would want. That decision is now due, one piece at a time, and
 the moment it is due for any given module is the moment something starts
@@ -53,7 +53,7 @@ NEVER_LOADED: frozenset[str] = frozenset(
 """Every module the running application does not execute. 174 lines.
 
 Three entries left, down from eight. The Execution context took the
-other five across two landings: the Plan holds a bounded name and
+other five across two landings: the Operation holds a bounded name and
 declares a JSON Schema, which loaded `bounded_text` and the three
 `json_schema` modules, and the Run carries an external reference, which
 loaded `identifier`. That is the shape the entries above are waiting

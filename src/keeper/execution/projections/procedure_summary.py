@@ -1,6 +1,6 @@
 """Keep `proj_execution_procedure_summary` in step with the procedure streams.
 
-The Plan projection's sibling, and the same shape for the same reason: a
+The Operation projection's sibling, and the same shape for the same reason: a
 procedure has one event. There are no transitions to fold, so there is no
 status column and no update statement, and a procedure stream is a single
 row that arrives once and never moves.
