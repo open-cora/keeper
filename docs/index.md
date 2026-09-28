@@ -30,29 +30,35 @@ The model is split into seven bounded contexts. Each answers one question, and t
 | [Equipment](bounded-contexts/equipment.md) | What hardware exists, and what it was last reported doing |
 | [Pursuit](bounded-contexts/pursuit.md) | What a person allowed a machine to go and do alone, and how far it may get |
 
-## Running one
+## The pages
 
-Whoever has to stand this up and keep it running starts at [Running one](running.md): what it needs, the order the authorization bootstrap has to happen in, and what refuses to boot.
+**Running one**, if you have to stand this up and keep it running.
 
-[The surface](surface.md) is every route and MCP tool in one list, generated from the code and checked by a test, so it cannot be out of date.
+| Page | What it answers |
+| --- | --- |
+| [Running one](running.md) | What it needs, the order the authorization bootstrap has to happen in, and what refuses to boot |
 
-## Reference
+**Understanding it**, if you want to know what it holds and why.
 
-| Page | Subject | State |
-| --- | --- | --- |
-| [Running one](running.md) | What it needs, how to start it, and how to turn authorization on | Current |
-| [The surface](surface.md) | Every route and MCP tool in one list | Generated |
-| [Workflow](reference/workflow.md) | Reading order, commits, migrations, tests, mutation runs | Current |
-| [Conventions](reference/conventions.md) | Identifiers, units, personal data, stored names, documentation | Current |
-| [Layout](reference/layout.md) | How a context is laid out, and what may import what | Carried, examples now from this tree |
-| [Modeling](reference/modeling.md) | Events, value objects, grouping fields | Carried, examples are placeholders |
-| [Patterns](reference/patterns.md) | The read side, queries, projections, repeated requests | Carried, examples now from this tree |
-| [Naming](reference/naming.md) | What to call an event, a command, a port, a URL | Carried, examples now from this tree |
-| [Runtime](reference/runtime.md) | Hardening, logging, HTTP errors | Current, written against the shipped wiring |
-| [Contract](reference/client-contract.md) | What a caller may rely on, and what it may not | Current |
-| [Glossary](reference/glossary.md) | Terms used the same way in code and prose | Carried |
+| Page | What it answers |
+| --- | --- |
+| [The surface](surface.md) | Every route and MCP tool in one list. Generated, so it cannot be out of date |
+| [Contract](reference/client-contract.md) | What a caller may rely on, and what it may not |
+| [Glossary](reference/glossary.md) | Terms used the same way in code and prose |
+| The seven contexts | One page each, listed above |
 
-The reference pages came with the chassis and describe rules that are real. Most now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders.
+**Changing it**, if you are editing the code. These came with the chassis and describe rules that are real. Most now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders.
+
+| Page | What it answers |
+| --- | --- |
+| [Overview](reference/index.md) | What these rules are for, and how they guard their own reach |
+| [Naming](reference/naming.md) | What to call an aggregate, an event, a command, a port, a URL |
+| [Conventions](reference/conventions.md) | Identifiers, units, personal data, stored names, documentation |
+| [Workflow](reference/workflow.md) | Reading order, commits, migrations, tests, mutation runs |
+| [Layout](reference/layout.md) | How a context is laid out, and what may import what |
+| [Modeling](reference/modeling.md) | Events, value objects, grouping fields |
+| [Patterns](reference/patterns.md) | The read side, queries, projections, repeated requests |
+| [Runtime](reference/runtime.md) | Hardening, logging, HTTP errors |
 
 ## What the code looks like today
 

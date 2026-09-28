@@ -59,31 +59,24 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Running one: running.md
-  - The surface: surface.md
-  - Bounded contexts:
-      - Access: bounded-contexts/access.md
-      - Authority: bounded-contexts/authority.md
-      - Execution: bounded-contexts/execution.md
-      - Custody: bounded-contexts/custody.md
-      - Counsel: bounded-contexts/counsel.md
-      - Equipment: bounded-contexts/equipment.md
-      - Pursuit: bounded-contexts/pursuit.md
-  - Reference:
+  - Understanding it:
+      - The surface: surface.md
+      - Contract: reference/client-contract.md
+      - Glossary: reference/glossary.md
+      - Bounded contexts:
+          - Access: bounded-contexts/access.md
+          - Authority: bounded-contexts/authority.md
+          - Execution: bounded-contexts/execution.md
+          - Custody: bounded-contexts/custody.md
+          - Counsel: bounded-contexts/counsel.md
+          - Equipment: bounded-contexts/equipment.md
+          - Pursuit: bounded-contexts/pursuit.md
+  - Changing it:
       - Overview: reference/index.md
+      - Naming: reference/naming.md
+      - Conventions: reference/conventions.md
       - Workflow: reference/workflow.md
       - Layout: reference/layout.md
       - Modeling: reference/modeling.md
       - Patterns: reference/patterns.md
-      - Conventions: reference/conventions.md
-      - Naming: reference/naming.md
       - Runtime: reference/runtime.md
-      - Contract: reference/client-contract.md
-      - Glossary: reference/glossary.md
-
-markdown_extensions:
-  - admonition
-  - tables
-  - toc:
-      permalink: true
-  - pymdownx.superfences
-  - pymdownx.highlight
