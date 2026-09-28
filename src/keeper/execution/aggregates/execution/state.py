@@ -3,7 +3,7 @@
 An Execution is one traversal of a procedure: the record this system opens when
 it dispatches one, and how far the thing driving it got.
 
-## What an execution is, and what became of the Run aggregate
+## What an execution is
 
 An execution is one traversal of a procedure, and a procedure is a
 routine composed here: sets and runs in an order, each declaring
@@ -64,8 +64,8 @@ and the fastest way to be confused is to meet them one at a time.
 
 The first is this system's own and is new with the dispatch. The second
 belongs to whatever drove the step. The third is the engine's, relayed
-by whatever watches it, and it is the five states the retired Run
-aggregate held, unchanged and one scale down.
+by whatever watches it, and is the only one of the three this system did
+not choose: see `EngineState` for whose lifecycle it is.
 
 They sit on different things: the status on the execution, the outcome
 and the engine state on each step. The last two are two observers of one
@@ -238,10 +238,18 @@ class EngineState(StrEnum):
     a winner between two claims it cannot check. A set carries None
     here, because a set opens no run for anything to watch.
 
-    Five values, deliberately the five the retired Run aggregate held.
-    It is the same engine reporting the same lifecycle, one scale down
-    from a whole run to one step's run, and a reader who has learned
-    those words should not have to learn a second set for them.
+    Five values, and they are one engine's lifecycle rather than a
+    universal one. They arrived from the engine this system was first
+    built against, relayed by whatever watches it, and nothing checks
+    that a second engine has the same five.
+
+    An engine that cannot be paused simply never reports two of them.
+    That costs nothing, because every terminal report is reachable from
+    `RUNNING` directly, so the machine below accommodates an engine with
+    no pause without a value going unused in a way anything notices. What
+    would need more than a value is an engine with a state none of these
+    covers, and that is a change to this enum, its reports and the
+    transitions between them rather than an extension of any of them.
     """
 
     RUNNING = "Running"
@@ -288,12 +296,11 @@ class StepRunCannotBeReportedError(Exception):
     does not line up with what this system was already told. The message
     names the step, the state it is in, and the one that was reported.
 
-    One class rather than a conflict class per verb, which is where this
-    parted company with the retired Run aggregate. A run's five
-    transitions were five slices and so five errors, each named for the
-    verb its caller called. This is one slice taking a discriminator, so
-    the verb is a value rather than a call site, and five classes would
-    be five names for one refusal nobody can tell apart by `isinstance`.
+    One class rather than a conflict class per verb. R6 is about not
+    collapsing several verbs into one class, and this is one slice taking
+    a discriminator, so the verb is a value rather than a call site. Five
+    classes would be five names for one refusal nobody can tell apart by
+    `isinstance`.
 
     A 409 and not a 400, which is the correction that matters to whoever
     relays these. The split `InvalidStepReportError` states is that a
