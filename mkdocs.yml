@@ -58,6 +58,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Running one: running.md
+  - The surface: surface.md
   - Bounded contexts:
       - Access: bounded-contexts/access.md
       - Authority: bounded-contexts/authority.md
