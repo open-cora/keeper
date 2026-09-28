@@ -411,9 +411,9 @@ visibility = ["keeper.pursuit"]
 # conclusion, and on the conclusion that proposes something, writes the
 # proposal being adopted.
 #
-# Seven names, and the shape of the list is the shape of the round. Two to
+# Nine names, and the shape of the list is the shape of the round. Two to
 # write an inquiry, three to read one and refuse a round whose question is
-# unanswered, and three more for the proposal on the arm that adopts.
+# unanswered, and four more for the proposal on the arm that adopts.
 #
 # `InquiryConclusion` is the only closed type here and is the one name
 # this door exists for. Closing a round is a translation between two

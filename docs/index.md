@@ -10,7 +10,7 @@ An event-sourced system of record, built on a chassis inherited from an earlier 
 
 ## Where the documentation stands
 
-Seven bounded contexts exist. Access, Execution, Custody, Counsel and Equipment have pages below; Authority and Pursuit do not yet, and are readable only from their code. Two pages were written the other way round, before their code rather than after: Counsel's, which has since been corrected against what landed, and Conducting, which describes a direction the code has only started on and says throughout which parts are not there. The reference pages were carried over with the chassis and describe rules that are real. Most of them now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders, and the table below says which is which.
+Seven bounded contexts exist. Six have pages below; Authority does not yet, and is readable only from its code. One page was written the other way round, before its code rather than after: Counsel's, which has since been corrected against what landed. The reference pages were carried over with the chassis and describe rules that are real. Most of them now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders, and the table below says which is which.
 
 | Page | Subject | State |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ Seven bounded contexts exist. Access, Execution, Custody, Counsel and Equipment 
 | [Custody](bounded-contexts/custody.md) | The Dataset aggregate, and where the data one acquisition produced is being kept | Current, written against the shipped code |
 | [Counsel](bounded-contexts/counsel.md) | The Proposal and Inquiry aggregates, what an actor put forward to run next and whether an acquisition took it, and what an actor asked a thinker about one execution | Current, written against the shipped code |
 | [Equipment](bounded-contexts/equipment.md) | The Device aggregate, what hardware this system knows about, and what it was last reported doing | Current, written against the shipped code |
+| [Pursuit](bounded-contexts/pursuit.md) | The Pursuit aggregate, the standing authorization a person gives a machine, and the bounded loop it may run within it | Current, written against the shipped code |
 | [Workflow](reference/workflow.md) | Reading order, commits, migrations, tests, mutation runs | Current |
 | [Conventions](reference/conventions.md) | Identifiers, units, personal data, stored names, documentation | Current |
 | [Layout](reference/layout.md) | BC structure, slice shapes, imports | Carried, examples now from this tree |
@@ -30,7 +31,7 @@ Seven bounded contexts exist. Access, Execution, Custody, Counsel and Equipment 
 
 ## What is missing
 
-A page on the Authority context, which holds the Policy aggregate and the four slices that author a policy, edit one and read one. A page on the Pursuit context, which holds the standing authorization a person gives a machine and is the newest thing here. No tutorial and no how-to guides. The beamline page describes 2-BM's descriptor and the one script that reads it; nothing is running there, and its device register is still empty. There is no page on the chassis itself, so how the event store, the idempotency wrapper and the kernel fit together is currently readable only from the code and its docstrings.
+A page on the Authority context, which holds the Policy aggregate and the four slices that author a policy, edit one and read one. No tutorial and no how-to guides. The beamline page describes 2-BM's descriptor and the one script that reads it; nothing is running there, and its device register is still empty. There is no page on the chassis itself, so how the event store, the idempotency wrapper and the kernel fit together is currently readable only from the code and its docstrings.
 
 ## What the code looks like today
 

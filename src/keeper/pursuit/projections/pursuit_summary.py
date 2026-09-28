@@ -20,7 +20,7 @@ The status arm is the other. It writes the status the outcome implies
 rather than reading what is there and moving it, so a close delivered
 twice leaves the row where the first one left it.
 
-## Why this one stores a status where its siblings derive one
+## Why this one stores a status where the inquiry table refused to
 
 An inquiry's three states only ever go forwards, so two nullable
 timestamps carry the whole of it and a status column would be one fact
@@ -29,10 +29,14 @@ somebody resumes, and may become held again next round. Timestamps would
 have to record the last of an unbounded sequence rather than whether
 something happened.
 
-That makes this the one read model here that can disagree with the fold
-rather than being unable to. Both sides answer one port contract suite and
-neither can see the other, which is the only thing that makes the claim
-checkable.
+That is the split across the read models here, and it is not stored
+against derived: the execution and device summaries both carry a status
+column too, and a device recovers much the way a pursuit resumes. What
+decides it is whether the states go one way.
+
+A written status can disagree with the fold, which is the cost all three
+pay. Both sides here answer one port contract suite and neither can see
+the other, which is the only thing that makes the claim checkable.
 """
 
 from typing import Any

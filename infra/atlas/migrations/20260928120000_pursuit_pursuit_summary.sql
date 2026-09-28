@@ -31,10 +31,15 @@
 -- may be held again, so a pair of timestamps would have to record the last of
 -- an unbounded sequence rather than whether something happened.
 --
--- That makes this the one read model in the tree whose status is written
--- rather than derived, and so the one that can disagree with the fold. What
--- keeps it honest is that both sides answer one port contract suite and
--- neither can see the other.
+-- It is the third table here to carry a status, after the execution and the
+-- device summaries, and the second whose states revisit: a device recovers
+-- much the way a pursuit resumes. So the split across the five read models
+-- is not stored against derived. It is whether the states go one way, and
+-- the two that refuse a column are the two that do.
+--
+-- A written status can disagree with the fold, which is the cost all three
+-- pay. What keeps this one honest is that both sides answer one port
+-- contract suite and neither can see the other.
 --
 -- `held_for` is set only while the status is Held. It says which of the two
 -- answerable conclusions stopped the loop, because a person triaging a page

@@ -114,7 +114,7 @@ Six slices, six routes, six tools.
 
 A verb in the path rather than a `PATCH` with a status field. The two are not equivalent: a `PATCH` says what the device should look like afterwards and invites a caller to set the status at will, while each of these names one transition the domain either allows or refuses. The status is derived from the stream in any case, so there is nothing for a `PATCH` to write. Retirement is a `POST` rather than a `DELETE` for the same reason the word is retire: the record is not going anywhere.
 
-All six are published on the MCP surface, which is unlike the sibling contexts. Counsel publishes the three an agent holds and leaves the rest to Execution. Here the agent and the reporter are the same kind of client, something watching a beamline, and both halves of what it does are in this context: resolve an address, then say what happened at it.
+All six are published on the MCP surface, which is what every context here does with every slice it has. What is worth noting is that the default costs nothing in this one. The agent and the reporter are the same kind of client, something watching a beamline, and both halves of what it does are in this context: resolve an address, then say what happened at it.
 
 ## The listing, and why it has two filters
 

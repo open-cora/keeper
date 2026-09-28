@@ -22,7 +22,7 @@ in-memory adapters and no database. A tool that refuses because there is
 no pool fails the walk, and one answering "nothing is running" while loops
 run is worse, because it is wrong rather than unavailable.
 
-## Why the status is a column here and was derived next door
+## Why the status is a column here and was not on the inquiry table
 
 An inquiry's three states are written into two nullable timestamps,
 because they only ever go one way: claimed then answered, and never back.
@@ -41,8 +41,10 @@ can see the other.
 **The budget and what has been spent against it.** Five numbers against
 five limits, and one of the five depends on the clock at the moment of
 asking, so a row could not hold it and a page of fifty would be mostly
-arithmetic. The single read gives all of it, and the list exists to find
-the pursuit rather than to report on it.
+arithmetic. The single read gives the limits and not what has been spent
+against them, which no surface here reports yet. That is a gap rather than
+something this row decided: a list exists to find a pursuit, and finding
+one is all this does.
 
 **The rounds.** A pursuit accumulates them without bound and a list that
 carried them would grow without bound with it. `round_count` is the part a

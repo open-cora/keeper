@@ -222,11 +222,12 @@ class Budget:
     At least one is required: a loop with no limit at all is the thing this
     aggregate exists to make impossible.
 
-    Nothing reads this yet. The two verbs that would spend against it are
-    not here, so what this holds is a statement of intent that the record
-    keeps and does not yet enforce. That is the honest description and it
-    is written down so a reader does not infer an enforcement that is not
-    running.
+    Enforced in exactly one place, and a reader should not infer more than
+    that. Opening a round refuses when any bounded dimension has run out,
+    so what a budget limits is how many more times the loop may turn.
+    Nothing stops a round already open from closing, and nothing refuses a
+    charge that carries a dimension past its limit, because both of those
+    describe consumption that already happened.
     """
 
     limits: Mapping[BudgetDimension, int]
