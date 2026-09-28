@@ -25,8 +25,8 @@ from keeper.counsel.features.take_proposal import (
 from keeper.execution.aggregates.procedure import (
     AcquireStep,
     ComposedStep,
-    MoveStep,
     ProcedureStep,
+    SetStep,
 )
 
 pytestmark = pytest.mark.unit
@@ -62,7 +62,7 @@ def _acquisition_of(plan_id: UUID | None) -> TakeProposalContext:
     drive a motor rather than to ask an engine for anything.
     """
     step: ProcedureStep = (
-        MoveStep(record="2bmb:m1", to=0.0)
+        SetStep(record="2bmb:m1", to=0.0)
         if plan_id is None
         else AcquireStep(plan_id=plan_id, parameters={}, scopes=("2bmb:det:",))
     )

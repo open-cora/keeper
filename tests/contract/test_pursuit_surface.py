@@ -263,7 +263,7 @@ def _an_execution(client: TestClient) -> str:
         json={
             "name": "park",
             "beamline": "2-bm",
-            "steps": [{"kind": "move", "record": "2bmb:m1", "to": 0.0}],
+            "steps": [{"kind": "set", "record": "2bmb:m1", "to": 0.0}],
         },
     )
     assert defined.status_code == 201, defined.text

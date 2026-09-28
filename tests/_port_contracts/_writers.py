@@ -59,9 +59,9 @@ from keeper.execution.aggregates.procedure.events import to_payload as procedure
 from keeper.execution.aggregates.procedure.read import PROCEDURE_STREAM_TYPE
 from keeper.execution.aggregates.procedure.state import (
     ComposedStep,
-    MoveStep,
     ProcedureBeamline,
     ProcedureName,
+    SetStep,
 )
 from keeper.infrastructure.ports.event_store import EventStore
 from keeper.infrastructure.slices.envelope import to_new_event
@@ -462,7 +462,7 @@ class EventStoreProcedureWriter:
             procedure_name=name.value,
             beamline=ProcedureBeamline(beamline).value,
             steps=tuple(
-                ComposedStep(id=uuid4(), step=MoveStep(record=f"2bmb:m{i}", to=float(i)))
+                ComposedStep(id=uuid4(), step=SetStep(record=f"2bmb:m{i}", to=float(i)))
                 for i in range(steps)
             ),
             occurred_at=at,

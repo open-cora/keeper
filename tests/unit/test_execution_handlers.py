@@ -25,7 +25,7 @@ from keeper.execution.aggregates.execution import (
     StepOutcome,
     load_execution,
 )
-from keeper.execution.aggregates.procedure import MoveStep, ProcedureNotFoundError
+from keeper.execution.aggregates.procedure import ProcedureNotFoundError, SetStep
 from keeper.execution.features.claim_execution import ClaimExecution
 from keeper.execution.features.claim_execution import bind as bind_claim
 from keeper.execution.features.define_procedure import DefineProcedure
@@ -48,7 +48,7 @@ from keeper.shared.unauthorized import UnauthorizedError
 pytestmark = pytest.mark.unit
 
 _WHEN = datetime(2026, 9, 23, 9, 30, tzinfo=UTC)
-_STEPS = ("move 2bmb:m1 to 0.0", "acquire tomo_scan", "move 2bmb:m2 to 5.0")
+_STEPS = ("set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0")
 
 
 class _FixedClock:
@@ -95,9 +95,9 @@ async def _a_procedure(deps: Kernel) -> UUID:
             name="align_then_scan",
             beamline="2-bm",
             steps=(
-                MoveStep(record="2bmb:m1", to=0.0),
-                MoveStep(record="2bmb:m2", to=5.0),
-                MoveStep(record="2bmb:m3", to=1.0),
+                SetStep(record="2bmb:m1", to=0.0),
+                SetStep(record="2bmb:m2", to=5.0),
+                SetStep(record="2bmb:m3", to=1.0),
             ),
         ),
         principal_id=uuid4(),
@@ -123,9 +123,9 @@ async def test_dispatching_a_walk_copies_the_procedures_whole_step_list() -> Non
     execution = await load_execution(deps.event_store, execution_id)
     assert execution is not None
     assert [step.describes for step in execution.steps] == [
-        "move 2bmb:m1 to 0.0",
-        "move 2bmb:m2 to 5.0",
-        "move 2bmb:m3 to 1.0",
+        "set 2bmb:m1 to 0.0",
+        "set 2bmb:m2 to 5.0",
+        "set 2bmb:m3 to 1.0",
     ]
     assert execution.status is ExecutionStatus.DISPATCHED
 

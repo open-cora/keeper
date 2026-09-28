@@ -227,20 +227,18 @@ The Execution feature door is one name, and it would have been six. `compose_one
 
 **Nothing reaches into Pursuit.** There is no door pointing this way and no sibling imports this package, which is what being the top of the stack looks like. The context reads three others and is read by none.
 
-## The surface
+## The operations
 
-Eight slices, eight routes, eight tools.
-
-```
-   POST   /pursuits                                         start_pursuit
-   GET    /pursuits                                         list_pursuits
-   GET    /pursuits/{pursuit_id}                            get_pursuit
-   POST   /pursuits/{pursuit_id}/rounds                     open_pursuit_round
-   POST   /pursuits/{pursuit_id}/rounds/{round_index}/close close_pursuit_round
-   POST   /pursuits/{pursuit_id}/charges                    charge_pursuit
-   POST   /pursuits/{pursuit_id}/resume                     resume_pursuit
-   POST   /pursuits/{pursuit_id}/withdraw                   withdraw_pursuit
-```
+| What it does | HTTP | MCP tool | On success |
+| --- | --- | --- | --- |
+| Authorize a loop | `POST /pursuits` | `start_pursuit` | `201` with the new id |
+| Find them | `GET /pursuits` | `list_pursuits` | `200` with a page of pursuits |
+| Read one back | `GET /pursuits/{pursuit_id}` | `get_pursuit` | `200` with the pursuit |
+| Ask the next question | `POST /pursuits/{pursuit_id}/rounds` | `open_pursuit_round` | `201` with the question to answer |
+| Act on the answer | `POST /pursuits/{pursuit_id}/rounds/{round_index}/close` | `close_pursuit_round` | `200` with what the round came to |
+| Record what it spent | `POST /pursuits/{pursuit_id}/charges` | `charge_pursuit` | `201` with the running total |
+| Let a held one carry on | `POST /pursuits/{pursuit_id}/resume` | `resume_pursuit` | `204` |
+| Take the authorization back | `POST /pursuits/{pursuit_id}/withdraw` | `withdraw_pursuit` | `204` |
 
 Rounds are a subcollection rather than a verb, because opening one creates something that is then addressable, and closing is a verb on the round rather than on the pursuit. Charges are a collection for the same reason: each call adds one to a list rather than transitioning anything. Both answer 201, beside the genesis, because all three create something. Resuming and withdrawing are verbs on the pursuit and answer 204, because neither creates anything and handing the record back would make the common case pay for the rare one.
 

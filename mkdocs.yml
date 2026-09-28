@@ -1,5 +1,5 @@
 site_name: Keeper
-site_description: The system of record for the experiment.
+site_description: Holds the record, and who may add to it.
 repo_url: https://github.com/open-cora/keeper
 repo_name: open-cora/keeper
 edit_uri: ""
@@ -60,6 +60,7 @@ nav:
   - Home: index.md
   - Bounded contexts:
       - Access: bounded-contexts/access.md
+      - Authority: bounded-contexts/authority.md
       - Execution: bounded-contexts/execution.md
       - Custody: bounded-contexts/custody.md
       - Counsel: bounded-contexts/counsel.md
@@ -74,7 +75,7 @@ nav:
       - Conventions: reference/conventions.md
       - Naming: reference/naming.md
       - Runtime: reference/runtime.md
-      - Client contract: reference/client-contract.md
+      - Contract: reference/client-contract.md
       - Glossary: reference/glossary.md
 
 markdown_extensions:

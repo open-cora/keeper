@@ -82,7 +82,7 @@ a notify fired while nothing is listening is lost. Sleeping here is what
 makes these tests about the trigger rather than about that race.
 """
 
-_STEPS = ["move 2bmb:m1 to 0.0", "acquire tomo_scan"]
+_STEPS = ["set 2bmb:m1 to 0.0", "acquire tomo_scan"]
 
 
 async def _read(pool: asyncpg.Pool, beamline: str) -> ExecutionSummaryPage:

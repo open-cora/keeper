@@ -31,7 +31,7 @@ from keeper.counsel.features.answer_inquiry import bind as bind_answer
 from keeper.counsel.features.make_proposal import MakeProposal
 from keeper.counsel.features.make_proposal import bind as bind_make_proposal
 from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
-from keeper.execution.aggregates.procedure import MoveStep
+from keeper.execution.aggregates.procedure import SetStep
 from keeper.execution.features.define_plan import DefinePlan
 from keeper.execution.features.define_plan import bind as bind_define_plan
 from keeper.execution.features.define_procedure import DefineProcedure
@@ -333,7 +333,7 @@ async def _an_execution(deps: Kernel) -> UUID:
         DefineProcedure(
             name="align_then_scan",
             beamline="2-bm",
-            steps=(MoveStep(record="2bmb:m1", to=0.0), MoveStep(record="2bmb:m2", to=5.0)),
+            steps=(SetStep(record="2bmb:m1", to=0.0), SetStep(record="2bmb:m2", to=5.0)),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),

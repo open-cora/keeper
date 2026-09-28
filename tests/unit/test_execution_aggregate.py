@@ -46,7 +46,7 @@ pytestmark = pytest.mark.unit
 _WHEN = datetime(2026, 9, 23, 9, 30, tzinfo=UTC)
 _PROCEDURE_ID = UUID(int=7)
 _PLAN_ID = UUID(int=9)
-_STEPS = ["move 2bmb:m1 to 0.0", "acquire tomo_scan", "move 2bmb:m2 to 5.0"]
+_STEPS = ["set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0"]
 _COMPOSED = [uuid4(), uuid4(), uuid4()]
 """The ids of the procedure steps these were dispatched from.
 

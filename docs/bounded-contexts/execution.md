@@ -2,7 +2,7 @@
 
 Execution is the bounded context that answers three questions: what can this system be asked to run, what did it compose out of that, and what happened when the composition was carried out.
 
-It holds three aggregates and fourteen operations across them. A Plan names a routine an engine already has. A Procedure is a routine composed here, out of moves and acquisitions in an order. An Execution is one traversal of a procedure.
+It holds three aggregates, with a handful of things you can do to each. A Plan names a routine an engine already has. A Procedure is a routine composed here, out of sets and acquisitions in an order. An Execution is one traversal of a procedure.
 
 The difference between a plan and a procedure is who composed the routine. A plan is a reference to a thing this system did not write. A procedure is authored here, and nothing anywhere holds that sequence until the record says so.
 
@@ -44,7 +44,7 @@ A procedure is a routine this system composed: an ordered list of steps, each na
      id        a UUID minted at definition, never reused
      name      what this system calls the routine
      beamline  where it runs, such as 2-bm
-     steps     moves and acquisitions, in order, each under an id
+     steps     sets and acquisitions, in order, each under an id
                minted for it at definition
 ```
 
@@ -69,11 +69,11 @@ A step is named when it is composed, and that name is what an execution's step c
 Two kinds of step, and only one of them declares what it touches.
 
 ```
-   Move      record, to           what it touches is the record it names
+   Set       record, to           what it touches is the record it names
    Acquire   plan_id, parameters, scopes
 ```
 
-A move sends one record to one value, so deriving what it touches is exact and a declared field would be a second chance to say the same thing differently. An acquisition hands a routine to an engine, and nothing here can see inside that routine to work out which devices it will drive. So an acquisition declares its scopes and a move does not have the option, which is not an inconsistency: one is derivable and the other is not.
+A set sends one record to one value, so deriving what it touches is exact and a declared field would be a second chance to say the same thing differently. An acquisition hands a routine to an engine, and nothing here can see inside that routine to work out which devices it will drive. So an acquisition declares its scopes and a set does not have the option, which is not an inconsistency: one is derivable and the other is not.
 
 An acquisition must declare at least one scope. A step that declared none would be one this system believes touches no hardware, and that belief is what lets two of them run at once over one motor.
 
@@ -95,7 +95,7 @@ There was a fourth aggregate here: a Run, one carrying-out of one plan, opened b
 
 The duplication only became visible when Procedure and Execution arrived. Before them, a run was the only record of anything having happened, and a step was a conductor's internal business this system never saw. Once the keeper composed the work and dispatched it, every step passed through here in the keeper's own vocabulary, and a run was a second record of the same act at a coarser scale.
 
-**The collapse went this direction because most steps are not acquisitions.** A move drives a motor and opens nothing in any engine, so recording an execution as a run would have lost every step that was not an acquisition, which is most of them. There is no corresponding loss in the other direction.
+**The collapse went this direction because most steps are not acquisitions.** A set drives a motor and opens nothing in any engine, so recording an execution as a run would have lost every step that was not an acquisition, which is most of them. There is no corresponding loss in the other direction.
 
 **What did not collapse is the lifecycle.** A run had five statuses and a step has an outcome, and they are not the same observation: the outcome is what the driver saw when the call returned, and the lifecycle is what the engine said about itself. So a step carries both, and they are allowed to disagree. See [Two observers of one step, kept apart](#two-observers-of-one-step-kept-apart).
 
@@ -103,7 +103,7 @@ The duplication only became visible when Procedure and Execution arrived. Before
 
 **Two things came free.** The standing hole where two runs could name one engine run closed by construction, because nothing outside opens a record any more. And a Walk's `reference`, which existed because a driver had no handle before starting, disappeared: this system creates the record first, so the execution's id is the handle.
 
-## The fourteen operations
+## The operations
 
 | What it does | HTTP | MCP tool | On success |
 | --- | --- | --- | --- |
@@ -121,7 +121,7 @@ The duplication only became visible when Procedure and Execution arrived. Before
 | Read one back | `GET /executions/{execution_id}` | `get_execution` | `200` with the execution and its steps |
 | Find executions | `GET /executions` | `list_executions` | `200` with a page of executions |
 
-All fourteen are published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/execution/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/execution/routes.py`.
 
 The four operations that move an existing execution take an optional `occurred_at`. The three that mint a record do not: defining a plan, composing a procedure and dispatching an execution all happen here, at the moment the record is written, so there is no earlier instant for a caller to report. That split is R8's, and it is explained under [When a report says it happened](#when-a-report-says-it-happened) below.
 
@@ -157,7 +157,7 @@ A step outcome is addressed by index and an engine report by step id, which look
 
 One event on a plan and one on a procedure, because nothing changes either yet. Retiring one arrives as a new class when the command that does lands, never as a field edited onto the genesis.
 
-A procedure's whole step list rides its genesis, as a list of objects rather than flat fields, which makes it the only payload here holding a nested structure. Each step carries a `kind` discriminating a move from an acquisition. That key is on the wire and not on either class in the model, because there the class IS the kind and a field saying so again is a second thing to get wrong.
+A procedure's whole step list rides its genesis, as a list of objects rather than flat fields, which makes it the only payload here holding a nested structure. Each step carries a `kind` discriminating a set from an acquisition. That key is on the wire and not on either class in the model, because there the class IS the kind and a field saying so again is a second thing to get wrong.
 
 Every event after the genesis carries the same two fields. What is running is already on the stream, so a later event adds when, and which thing happened, and nothing else.
 
@@ -243,7 +243,7 @@ A report that does not follow is a 409 and not a 400, and that correction was ma
 | `InvalidPlanNameError` | 400 | Empty after trimming, or over the length bound. |
 | `InvalidPlanParametersSchemaError` | 400 | Not a Draft 2020-12 document, or outside the stored subset. |
 | `InvalidProcedureNameError` | 400 | Empty after trimming, or over the length bound. |
-| `InvalidProcedureStepsError` | 400 | No steps, too many, a move naming no record or sent to a value JSON cannot carry, or an acquisition declaring no devices. |
+| `InvalidProcedureStepsError` | 400 | No steps, too many, a set naming no record or sent to a value JSON cannot carry, or an acquisition declaring no devices. |
 | `InvalidProcedureParametersError` | 400 | An acquisition's parameters do not satisfy the plan it cites. Names which step. |
 | `InvalidExecutionProcedureNameError` | 400 | The procedure's name falls outside what an execution stores. |
 | `InvalidExecutionStepsError` | 400 | The rendered step list is empty, too long, or holds a blank step. |
@@ -363,7 +363,7 @@ A step has an id at all so that something outside can name one. A dataset is pro
 
 ```
    Procedure R1                    Execution E1, on Tuesday
-     T1  move 2bmb:m1 to 0.0  <------  S1  from T1
+     T1  set 2bmb:m1 to 0.0   <------  S1  from T1
      T2  acquire plan P1      <------  S2  from T2
            exposure 0.25
            touches 2bmb:det:         Execution E2, on Wednesday
@@ -436,7 +436,7 @@ An acquisition step gets talked about twice, by two clients that do not know abo
 
 They are two fields because they can disagree, and the disagreement is the point. A spike drove four collisions into a real scan and every one of them ended `exit_status: "success"`, so neither observer is reliable and collapsing the two would make this system pick a winner between claims it cannot check. A step whose call returned while its engine reported a failure reads as `Done` and `Failed`, which is the honest record.
 
-A move carries no engine state at all, because a move opens no run for anything to watch.
+A set carries no engine state at all, because a set opens no run for anything to watch.
 
 The five engine values are deliberately the five a run has. It is the same engine reporting the same lifecycle one scale down, and a reader who has learned one should not have to learn a second vocabulary for it. The transitions are the same too: all three endings are reachable from `Paused` as well as from `Running`, a resume is the only edge pointing backwards, and nothing follows an ending.
 

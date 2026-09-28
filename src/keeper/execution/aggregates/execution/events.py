@@ -185,7 +185,7 @@ class ExecutionStepDone:
     the one into the other.
 
     `engine_reference` is what the engine calls the run this step opened,
-    for an acquisition step that opened one. None for a move, which opens
+    for an acquisition step that opened one. None for a set, which opens
     nothing, and None for an acquisition whose engine had no name to
     give.
     """

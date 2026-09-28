@@ -6,7 +6,7 @@ it dispatches one, and how far the thing driving it got.
 ## What an execution is, and what became of the Run aggregate
 
 An execution is one traversal of a procedure, and a procedure is a
-routine composed here: moves and acquisitions in an order, each declaring
+routine composed here: sets and acquisitions in an order, each declaring
 the devices it touches.
 
 There used to be a Run aggregate beside it, one carrying-out of one plan,
@@ -17,7 +17,7 @@ step cites a plan and carries the parameters it was dispatched with,
 which is all a run's genesis held beyond the engine's own reference for
 it. That reference is on the step too, as `engine_reference`.
 
-Most steps cause no run in any engine at all. A move drives a motor and
+Most steps cause no run in any engine at all. A set drives a motor and
 opens nothing, so recording an execution as a run would have lost every
 step that was not an acquisition, which is most of them. That asymmetry
 is why the collapse went this direction rather than the other.
@@ -235,8 +235,8 @@ class EngineState(StrEnum):
     a spike drove four collisions into a real scan
     and every one of them ended `exit_status: "success"`, so neither
     observer is reliable and collapsing them would make this system pick
-    a winner between two claims it cannot check. A move carries None
-    here, because a move opens no run for anything to watch.
+    a winner between two claims it cannot check. A set carries None
+    here, because a set opens no run for anything to watch.
 
     Five values, deliberately the five the retired Run aggregate held.
     It is the same engine reporting the same lifecycle, one scale down
@@ -536,7 +536,7 @@ class DispatchedStep:
     because the sentence in `describes` already carries the same fact in
     a form nothing should parse.
 
-    Never None, where the copied plan id was. A move comes from a
+    Never None, where the copied plan id was. A set comes from a
     composed step as surely as an acquisition does, so every step here
     has a definition to point at, and it is the definition that says
     which kind it was.
@@ -629,7 +629,7 @@ class ExecutionStep:
 
     `engine_state` is the other observer. Everything above it is what the
     driver saw; this is what the engine said about the run the step
-    opened, relayed by whatever watches that engine. It is None on a move
+    opened, relayed by whatever watches that engine. It is None on a set
     and on an acquisition nothing has reported yet, and it can disagree
     with `outcome`, which is why they are two fields.
 

@@ -28,8 +28,8 @@ from keeper.execution.aggregates.procedure import (
     PROCEDURE_MAX_STEPS,
     PROCEDURE_SCOPE_MAX_LENGTH,
     AcquireStep,
-    MoveStep,
     ProcedureStep,
+    SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
 from keeper.execution.features.define_procedure.handler import IdempotentHandler
@@ -38,10 +38,10 @@ from keeper.infrastructure.request import get_mcp_surface_id
 from keeper.infrastructure.slices.principal import get_mcp_principal_id
 
 
-class MoveStepInput(BaseModel):
+class SetStepInput(BaseModel):
     """Send one record to one value."""
 
-    kind: Literal["move"]
+    kind: Literal["set"]
     record: str
     to: float
 
@@ -57,7 +57,7 @@ class AcquireStepInput(BaseModel):
     )
 
 
-StepInput = Annotated[MoveStepInput | AcquireStepInput, Field(discriminator="kind")]
+StepInput = Annotated[SetStepInput | AcquireStepInput, Field(discriminator="kind")]
 
 
 class DefineProcedureOutput(BaseModel):
@@ -66,10 +66,10 @@ class DefineProcedureOutput(BaseModel):
     procedure_id: UUID
 
 
-def _to_step(step: MoveStepInput | AcquireStepInput) -> ProcedureStep:
+def _to_step(step: SetStepInput | AcquireStepInput) -> ProcedureStep:
     """Turn one parsed tool step into the step the domain holds."""
-    if isinstance(step, MoveStepInput):
-        return MoveStep(record=step.record, to=step.to)
+    if isinstance(step, SetStepInput):
+        return SetStep(record=step.record, to=step.to)
     return AcquireStep(
         plan_id=step.plan_id,
         parameters=step.parameters,
@@ -83,7 +83,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
     @mcp.tool(
         name="define_procedure",
         description=(
-            "Compose a routine out of ordered steps and return its id. A move "
+            "Compose a routine out of ordered steps and return its id. A set "
             "sends one record to one value; an acquisition runs a plan and must "
             "declare the devices it touches. The beamline says where the routine "
             "runs, which is what routes a dispatch of it to a conductor."

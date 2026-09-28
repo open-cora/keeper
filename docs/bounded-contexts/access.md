@@ -2,7 +2,7 @@
 
 Access is the bounded context that answers one question: who is this?
 
-It holds one aggregate, the Actor, and four operations on it. Nothing else in the keeper knows who anybody is, so anything that needs to record who did something asks Access for an actor id and stores that.
+It holds one aggregate, the Actor, and four things you can do to it. Nothing else in the keeper knows who anybody is, so anything that needs to record who did something asks Access for an actor id and stores that.
 
 ## What an Actor is
 
@@ -28,7 +28,7 @@ A display name is the first field a reader expects here, and its absence is a de
 
 This is enforced, not just intended. `tests/architecture/test_events_carry_no_personal_data.py` reads every event class and every payload builder across every bounded context and refuses a field whose name looks like personal data.
 
-## The four operations
+## The operations
 
 | What it does | HTTP | MCP tool | On success |
 | --- | --- | --- | --- |
@@ -120,6 +120,6 @@ Each write operation is a vertical slice: its own command, its own decision func
 
 ## What is not here yet
 
-Access has no notion of roles, permissions, or groups. Authorization is a port every handler calls before deciding anything, but the only implementation today permits every command. That is a development default rather than a production posture: booting the production tier without a real one is refused outright, instead of being allowed to fall back to the permissive one.
+Access has no notion of roles, permissions, or groups, and will not grow one. Who may issue which command is [Authority](authority.md)'s question, and the two contexts meet in one direction only: Authority reads an actor to check that it exists and is switched on, and nothing here ever reads a policy. So deactivating an actor takes their permissions out of effect without removing any of them, and reactivating puts them all back with nothing re-granted.
 
 Actors also cannot be listed or searched, only fetched by id. None of this is designed yet, and none of it should be until something asks for it.

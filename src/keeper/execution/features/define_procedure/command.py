@@ -7,7 +7,7 @@ from keeper.execution.aggregates.procedure import ProcedureStep
 
 @dataclass(frozen=True)
 class DefineProcedure:
-    """Compose a routine out of moves and acquisitions, in this order.
+    """Compose a routine out of sets and acquisitions, in this order.
 
     Both fields are the caller's and the id is not: the new procedure id,
     the timestamp and the correlation id all come from the handler's

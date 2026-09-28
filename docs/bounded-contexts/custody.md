@@ -2,7 +2,7 @@
 
 Custody is the bounded context that answers one question: where is the data one acquisition produced, and who is keeping it?
 
-It holds one aggregate, the Dataset, and three operations on it. The record is deliberately small, and most of this page is about what is not on it.
+It holds one aggregate, the Dataset, and three things you can do to it. The record is deliberately small, and most of this page is about what is not on it.
 
 ## What a Dataset is
 
@@ -40,7 +40,7 @@ Provenance is the word most people reach for, and it claims more than this conte
 
 Custody says what this one can back: where the thing is, and on whose word. It is also the right word for what comes next, because data that moves, is withdrawn, or is superseded by a reprocessing are all custody events and none of them is a provenance event.
 
-## The three operations
+## The operations
 
 | What it does | HTTP | MCP tool | On success |
 | --- | --- | --- | --- |
@@ -48,7 +48,7 @@ Custody says what this one can back: where the thing is, and on whose word. It i
 | Read one back | `GET /datasets/{dataset_id}` | `get_dataset` | `200` with the dataset |
 | Find what one acquisition produced | `GET /datasets` | `list_datasets` | `200` with a page of datasets |
 
-All three are published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/custody/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/custody/routes.py`.
 
 `POST /datasets` creates a record of something that already exists elsewhere, not the data. Nothing here reaches the store and nothing here could: a caller that can see the data is the one that knows its address.
 

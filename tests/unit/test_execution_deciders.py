@@ -41,11 +41,11 @@ from keeper.execution.aggregates.execution import (
 from keeper.execution.aggregates.procedure import (
     AcquireStep,
     ComposedStep,
-    MoveStep,
     Procedure,
     ProcedureBeamline,
     ProcedureName,
     ProcedureStep,
+    SetStep,
 )
 from keeper.execution.features.claim_execution import ClaimExecution
 from keeper.execution.features.claim_execution import decide as decide_claim
@@ -63,7 +63,7 @@ _ID = UUID(int=1)
 _PROCEDURE_ID = UUID(int=7)
 _STEP_ID = UUID(int=8)
 _PLAN_ID = UUID(int=9)
-_STEPS = ("move 2bmb:m1 to 0.0", "acquire tomo_scan", "move 2bmb:m2 to 5.0")
+_STEPS = ("set 2bmb:m1 to 0.0", "acquire tomo_scan", "set 2bmb:m2 to 5.0")
 
 
 def _live(*, ended: bool = False, reported: tuple[int, ...] = ()) -> Execution:
@@ -103,7 +103,7 @@ def _report(**overrides: object) -> ReportExecutionStep:
 def _procedure(*steps: ProcedureStep, beamline: str = "2-bm") -> DispatchExecutionContext:
     composed = tuple(
         ComposedStep(id=uuid4(), step=step)
-        for step in (steps if steps else (MoveStep(record="2bmb:m1", to=0.0),))
+        for step in (steps if steps else (SetStep(record="2bmb:m1", to=0.0),))
     )
     return DispatchExecutionContext(
         procedure=Procedure(
@@ -116,7 +116,7 @@ def _procedure(*steps: ProcedureStep, beamline: str = "2-bm") -> DispatchExecuti
 
 
 def test_dispatching_a_walk_on_an_empty_stream_emits_one_event() -> None:
-    context = _procedure(MoveStep(record="2bmb:m1", to=0.0))
+    context = _procedure(SetStep(record="2bmb:m1", to=0.0))
     events = decide_dispatch(
         None,
         DispatchExecution(procedure_id=_PROCEDURE_ID),
@@ -134,7 +134,7 @@ def test_dispatching_a_walk_on_an_empty_stream_emits_one_event() -> None:
             steps=[
                 DispatchedStep(
                     id=_STEP_ID,
-                    describes="move 2bmb:m1 to 0.0",
+                    describes="set 2bmb:m1 to 0.0",
                     procedure_step_id=context.procedure.steps[0].id,
                 )
             ],
@@ -152,8 +152,8 @@ def test_dispatching_with_the_wrong_number_of_step_ids_is_a_caller_bug() -> None
             None,
             DispatchExecution(procedure_id=_PROCEDURE_ID),
             context=_procedure(
-                MoveStep(record="2bmb:m1", to=0.0),
-                MoveStep(record="2bmb:m2", to=5.0),
+                SetStep(record="2bmb:m1", to=0.0),
+                SetStep(record="2bmb:m2", to=5.0),
             ),
             now=_NOW,
             new_id=_ID,
@@ -168,16 +168,16 @@ def test_the_dispatched_walk_copies_the_procedures_steps_in_order() -> None:
         None,
         DispatchExecution(procedure_id=_PROCEDURE_ID),
         context=_procedure(
-            MoveStep(record="2bmb:m1", to=0.0),
-            MoveStep(record="2bmb:m2", to=5.0),
+            SetStep(record="2bmb:m1", to=0.0),
+            SetStep(record="2bmb:m2", to=5.0),
         ),
         now=_NOW,
         new_id=_ID,
         step_ids=[uuid4(), uuid4()],
     )
     assert [step.describes for step in events[0].steps] == [
-        "move 2bmb:m1 to 0.0",
-        "move 2bmb:m2 to 5.0",
+        "set 2bmb:m1 to 0.0",
+        "set 2bmb:m2 to 5.0",
     ]
 
 
@@ -191,7 +191,7 @@ def test_every_dispatched_step_cites_the_composed_step_it_came_from() -> None:
     definition's to say, whichever kind it is.
     """
     context = _procedure(
-        MoveStep(record="2bmb:m1", to=0.0),
+        SetStep(record="2bmb:m1", to=0.0),
         AcquireStep(plan_id=_PLAN_ID, parameters={}, scopes=("2bmb:det:",)),
     )
     events = decide_dispatch(
@@ -213,7 +213,7 @@ def test_a_dispatch_copies_the_beamline_the_procedure_was_composed_for() -> None
     events = decide_dispatch(
         None,
         DispatchExecution(procedure_id=_PROCEDURE_ID),
-        context=_procedure(MoveStep(record="7bmb:m1", to=0.0), beamline="7-bm"),
+        context=_procedure(SetStep(record="7bmb:m1", to=0.0), beamline="7-bm"),
         now=_NOW,
         new_id=_ID,
         step_ids=[_STEP_ID],
@@ -225,7 +225,7 @@ def test_a_dispatched_step_is_named_apart_from_the_step_it_cites() -> None:
     """Two ids on one step, and they are not interchangeable: one names
     this traversal's step and the other the definition every traversal of
     the procedure shares."""
-    context = _procedure(MoveStep(record="2bmb:m1", to=0.0))
+    context = _procedure(SetStep(record="2bmb:m1", to=0.0))
     events = decide_dispatch(
         None,
         DispatchExecution(procedure_id=_PROCEDURE_ID),

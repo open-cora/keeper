@@ -30,8 +30,8 @@ from keeper.execution.aggregates.procedure import (
     PROCEDURE_RECORD_MAX_LENGTH,
     PROCEDURE_SCOPE_MAX_LENGTH,
     AcquireStep,
-    MoveStep,
     ProcedureStep,
+    SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
 from keeper.execution.features.define_procedure.handler import IdempotentHandler
@@ -43,14 +43,14 @@ from keeper.infrastructure.request import (
 )
 
 
-class MoveStepRequest(BaseModel):
+class SetStepRequest(BaseModel):
     """Send one record to one value.
 
-    No scopes. What a move touches is the record it names, and whatever
+    No scopes. What a set touches is the record it names, and whatever
     drives the procedure derives the claim from that.
     """
 
-    kind: Literal["move"]
+    kind: Literal["set"]
     record: str = Field(min_length=1, max_length=PROCEDURE_RECORD_MAX_LENGTH)
     to: float
 
@@ -72,7 +72,7 @@ class AcquireStepRequest(BaseModel):
     )
 
 
-StepRequest = Annotated[MoveStepRequest | AcquireStepRequest, Field(discriminator="kind")]
+StepRequest = Annotated[SetStepRequest | AcquireStepRequest, Field(discriminator="kind")]
 
 
 class DefineProcedureRequest(BaseModel):
@@ -94,10 +94,10 @@ class DefineProcedureResponse(BaseModel):
     procedure_id: UUID
 
 
-def to_step(body: MoveStepRequest | AcquireStepRequest) -> ProcedureStep:
+def to_step(body: SetStepRequest | AcquireStepRequest) -> ProcedureStep:
     """Turn one parsed request step into the step the domain holds."""
-    if isinstance(body, MoveStepRequest):
-        return MoveStep(record=body.record, to=body.to)
+    if isinstance(body, SetStepRequest):
+        return SetStep(record=body.record, to=body.to)
     return AcquireStep(
         plan_id=body.plan_id,
         parameters=body.parameters,

@@ -2,7 +2,7 @@
 
 Counsel is the bounded context of advice: what was put forward to run next and was it taken, and what somebody asked a thinker about one execution and what came back.
 
-It holds two aggregates. The Proposal came first and has five operations on it; most of the argument about it is which of two neighbouring contexts each piece does NOT belong in. The Inquiry came second and has five, and the argument about it is mostly about where it stops: it records the asking and the answer, and nothing about the thinking.
+It holds two aggregates. The Proposal came first; most of the argument about it is which of two neighbouring contexts each piece does NOT belong in. The Inquiry came second, and the argument about it is mostly about where it stops: it records the asking and the answer, and nothing about the thinking.
 
 **This page was written before the code and then corrected against it.** That is the reverse of every other page under this heading, and two things it claimed turned out to be wrong when the code was written: the cross-context door is seven names wide rather than two, and the refusals on a take needed a discriminator the design had not named. Both are fixed below. Where a sentence is still about something unbuilt, it says so.
 
@@ -223,7 +223,7 @@ The fact Access genuinely cannot hold is which version of the deciding software 
 
 An Agent aggregate earns its place when something needs to ask a question about an agent across proposals. Nothing does yet, and until then the version is a field on the genesis if it is anything.
 
-## The four operations
+## The operations on a Proposal
 
 | What it does | HTTP | MCP tool | On success |
 | --- | --- | --- | --- |
@@ -233,7 +233,7 @@ An Agent aggregate earns its place when something needs to ask a question about 
 | Adopt one, and dispatch the work | `POST /proposals/{proposal_id}/adopt` | `adopt_proposal` | `201` with the execution |
 | Find them | `GET /proposals` | `list_proposals` | `200` with a page |
 
-All four are published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `apps/keeper/src/keeper/counsel/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `apps/keeper/src/keeper/counsel/routes.py`.
 
 The MCP surface is not incidental here. An agent holding this context's tools can read what plans exist, put a run forward, and later record what came of it, which is the first time the agent surface carries a conversation rather than a single call.
 
@@ -320,7 +320,7 @@ The plan is read off the procedure rather than off the execution, and that is th
 
 It does not compare parameters, and that is now a limit of the record rather than a choice. An execution copies each step's rendered description and the plan it runs; what it was dispatched with stays on the procedure. So there is nothing here to compare against, and there would be little point if there were: an engine normalizes values and fills defaults, so a dict comparison would refuse legitimate joins to catch a case nobody has seen.
 
-**A step can also be a move, which a run could never be.** A move runs no plan, so it cannot have run this one, and the refusal says exactly that rather than reporting a plan mismatch against nothing.
+**A step can also be a set, which a run could never be.** A set runs no plan, so it cannot have run this one, and the refusal says exactly that rather than reporting a plan mismatch against nothing.
 
 ## Why the verb is take
 
@@ -362,7 +362,7 @@ Its three causes share a class and a status because the caller's next move is th
 
 **Writing it added something the design had not.** Causes on one class need a discriminator, or a caller is told only that something is wrong. Which attribute is set is it: `taken_by` set means the proposal already has a step, and the error carries which; `step_plan_id` set means the step ran a different plan, and the error carries both plan ids; neither set means the step runs no plan at all.
 
-**The third cause arrived with the step reference.** A run was always a run, so there were two ways to be refused. A step is a move or an acquisition, so a caller can now name something real that could never take a proposal, and that is worth a message of its own: told only that the plan did not match, a caller goes looking for a closer acquisition when what it needs is to stop looking.
+**The third cause arrived with the step reference.** A run was always a run, so there were two ways to be refused. A step is a set or an acquisition, so a caller can now name something real that could never take a proposal, and that is worth a message of its own: told only that the plan did not match, a caller goes looking for a closer acquisition when what it needs is to stop looking.
 
 ## What an Inquiry is
 
@@ -446,7 +446,7 @@ What that trades away is a field that can be set wrong, and the decider is where
 
 The four words are spelled the same on both sides of the wire, because they are the thinker's own. There is no shared package holding them, which is the same arrangement the conductor has with this system.
 
-## The five operations on an Inquiry
+## The operations on an Inquiry
 
 | What it does | HTTP | MCP tool | On success |
 | --- | --- | --- | --- |

@@ -23,7 +23,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 
-from keeper.execution.aggregates.procedure import ComposedStep, MoveStep
+from keeper.execution.aggregates.procedure import ComposedStep, SetStep
 from keeper.execution.features.get_procedure.handler import Handler
 from keeper.execution.features.get_procedure.query import GetProcedure
 from keeper.infrastructure.request import (
@@ -34,10 +34,10 @@ from keeper.infrastructure.request import (
 )
 
 
-class MoveStepResponse(BaseModel):
+class SetStepResponse(BaseModel):
     """A step that sends one record to one value."""
 
-    kind: Literal["move"] = "move"
+    kind: Literal["set"] = "set"
     step_id: UUID
     record: str
     to: float
@@ -53,7 +53,7 @@ class AcquireStepResponse(BaseModel):
     scopes: list[str]
 
 
-StepResponse = Annotated[MoveStepResponse | AcquireStepResponse, Field(discriminator="kind")]
+StepResponse = Annotated[SetStepResponse | AcquireStepResponse, Field(discriminator="kind")]
 
 
 class GetProcedureResponse(BaseModel):
@@ -65,15 +65,15 @@ class GetProcedureResponse(BaseModel):
     steps: list[StepResponse]
 
 
-def to_response_step(composed: ComposedStep) -> MoveStepResponse | AcquireStepResponse:
+def to_response_step(composed: ComposedStep) -> SetStepResponse | AcquireStepResponse:
     """Render one stored step for a reader, under the id it was composed with.
 
     `step_id` is what an execution's step cites, so it is what a reader
     comparing a traversal against the routine it came from joins on.
     """
     step = composed.step
-    if isinstance(step, MoveStep):
-        return MoveStepResponse(step_id=composed.id, record=step.record, to=step.to)
+    if isinstance(step, SetStep):
+        return SetStepResponse(step_id=composed.id, record=step.record, to=step.to)
     return AcquireStepResponse(
         step_id=composed.id,
         plan_id=step.plan_id,

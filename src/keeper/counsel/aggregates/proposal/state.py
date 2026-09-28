@@ -160,7 +160,7 @@ class ProposalCannotBeTakenError(Exception):
     means the proposal already has a step against it. `step_plan_id` set
     means the cited step ran a different plan from the one proposed, and
     the two plan ids say which. Neither set means the cited step runs no
-    plan at all, which is a move.
+    plan at all, which is a set.
 
     The third cause arrived with the step reference and is genuinely
     distinct rather than a mismatch against nothing. A mismatch tells a
@@ -217,7 +217,7 @@ class ProposalCannotBeTakenError(Exception):
     def not_an_acquisition(cls, proposal_id: UUID, step_id: UUID) -> "ProposalCannotBeTakenError":
         """The cited step runs no plan, so it cannot have run this one.
 
-        A move, today. What makes this refusable rather than merely
+        A set, today. What makes this refusable rather than merely
         false is that a proposal proposes running a plan, and a step
         that hands nothing to an engine has not run one whatever else it
         did.

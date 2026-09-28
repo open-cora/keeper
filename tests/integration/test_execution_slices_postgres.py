@@ -44,7 +44,7 @@ from keeper.execution.aggregates.execution import (
 from keeper.execution.aggregates.plan import PlanName, PlanNotFoundError, load_plan
 from keeper.execution.aggregates.procedure import (
     AcquireStep,
-    MoveStep,
+    SetStep,
     load_procedure,
     runs_plan,
 )
@@ -117,7 +117,7 @@ async def _a_procedure(handlers: ExecutionHandlers) -> UUID:
             name="align_then_scan",
             beamline="2-bm",
             steps=(
-                MoveStep(record="2bmb:m1", to=0.0),
+                SetStep(record="2bmb:m1", to=0.0),
                 AcquireStep(
                     plan_id=plan_id,
                     parameters={"exposure_seconds": 0.25, "detector": "eiger"},
@@ -249,7 +249,7 @@ async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
 
     A plan's schema is a document this system stores and never reads
     back into types. A procedure's steps are a discriminated union: they
-    go out as dictionaries and have to come back as `MoveStep` and
+    go out as dictionaries and have to come back as `SetStep` and
     `AcquireStep` with their floats still floats and their ids still
     ids. A fold from objects it never serialised proves none of that.
 
@@ -264,7 +264,7 @@ async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
 
     assert procedure is not None
     move, acquire = procedure.steps
-    assert move.step == MoveStep(record="2bmb:m1", to=0.0)
+    assert move.step == SetStep(record="2bmb:m1", to=0.0)
     assert isinstance(acquire.step, AcquireStep)
     assert acquire.step.parameters == {"exposure_seconds": 0.25, "detector": "eiger"}
     assert acquire.step.scopes == ("2bmb:det:",)
@@ -289,7 +289,7 @@ async def test_an_execution_copies_the_steps_its_procedure_holds(
 
     assert execution is not None
     assert procedure is not None
-    assert execution.steps[0].describes == "move 2bmb:m1 to 0.0"
+    assert execution.steps[0].describes == "set 2bmb:m1 to 0.0"
     assert [step.procedure_step_id for step in execution.steps] == [
         composed.id for composed in procedure.steps
     ]

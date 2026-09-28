@@ -8,7 +8,7 @@ each naming what it touches.
 A plan names a routine some engine already has, so its name is a handle
 in that engine's vocabulary and this system holds a reference to a thing
 it did not write. A procedure is authored here. Nothing anywhere holds
-this sequence of moves and acquisitions until this record says so, which
+this sequence of sets and acquisitions until this record says so, which
 is the same split between citing and composing that separates `PlanName`
 from the steps below.
 
@@ -18,10 +18,10 @@ engine already knows.
 
 ## Two kinds of step, and only one of them declares what it touches
 
-A move sends one record to one value, so what it touches is the record
+A set sends one record to one value, so what it touches is the record
 it names and deriving that is exact. An acquisition hands a routine to
 an engine, and nothing here can see inside the routine to work out which
-devices it will drive. So an acquisition declares its scopes and a move
+devices it will drive. So an acquisition declares its scopes and a set
 does not have the option, which is not an inconsistency: one is derivable
 and the other is not.
 
@@ -95,7 +95,7 @@ about what is too long.
 """
 
 PROCEDURE_RECORD_MAX_LENGTH = 200
-"""How long the record a move names may be."""
+"""How long the record a set names may be."""
 
 PROCEDURE_SCOPE_MAX_LENGTH = 200
 """How long one declared scope may be."""
@@ -139,7 +139,7 @@ class InvalidProcedureStepsError(ValueError):
     """The step list is not one this system will store.
 
     Covers the list and the steps in it: an empty procedure, one over the
-    length bound, a move naming no record, a move sent to a value JSON
+    length bound, a set naming no record, a set sent to a value JSON
     cannot carry, and an acquisition declaring no scopes.
 
     One class for all of them rather than one per shape. They arrive from
@@ -243,7 +243,7 @@ class ProcedureBeamline:
 
     ## Why this is not derived from the steps
 
-    It could be. A move names a record and an acquisition declares
+    It could be. A set names a record and an acquisition declares
     scopes, and both carry a prefix that says where they are. Deriving it
     would mean parsing that prefix, and the module docstring above says
     why this system does not: the grammar belongs to whatever drives the
@@ -258,10 +258,10 @@ class ProcedureBeamline:
 
 
 @dataclass(frozen=True)
-class MoveStep:
+class SetStep:
     """Send one record to one value.
 
-    No declared scopes. What a move touches is the record it names, and
+    No declared scopes. What a set touches is the record it names, and
     the driver derives the claim from that, so a field here would be a
     second chance to say the same thing differently.
     """
@@ -285,7 +285,7 @@ class AcquireStep:
     scopes: tuple[str, ...] = ()
 
 
-ProcedureStep = MoveStep | AcquireStep
+ProcedureStep = SetStep | AcquireStep
 """What a procedure is made of.
 
 Closed at two. A third kind is a class added here and to this alias, and
@@ -327,11 +327,11 @@ class ComposedStep:
     step: ProcedureStep
 
 
-def _validated_move(index: int, step: MoveStep) -> MoveStep:
-    """Trim a move and refuse one this system will not store."""
+def _validated_move(index: int, step: SetStep) -> SetStep:
+    """Trim a set and refuse one this system will not store."""
     record = step.record.strip()
     if not record:
-        msg = f"Step {index} is a move that names no record"
+        msg = f"Step {index} is a set that names no record"
         raise InvalidProcedureStepsError(msg)
     if len(record) > PROCEDURE_RECORD_MAX_LENGTH:
         msg = (
@@ -341,11 +341,11 @@ def _validated_move(index: int, step: MoveStep) -> MoveStep:
         raise InvalidProcedureStepsError(msg)
     if not math.isfinite(step.to):
         msg = (
-            f"Step {index} moves {record} to {step.to}, which JSON cannot carry, "
+            f"Step {index} sets {record} to {step.to}, which JSON cannot carry, "
             "so the row would not survive a round trip through the log"
         )
         raise InvalidProcedureStepsError(msg)
-    return MoveStep(record=record, to=step.to)
+    return SetStep(record=record, to=step.to)
 
 
 def _validated_acquire(index: int, step: AcquireStep) -> AcquireStep:
@@ -408,7 +408,7 @@ def validated_steps(raw: tuple[ProcedureStep, ...]) -> tuple[ProcedureStep, ...]
     validated: list[ProcedureStep] = []
     for index, step in enumerate(raw):
         match step:
-            case MoveStep():
+            case SetStep():
                 validated.append(_validated_move(index, step))
             case AcquireStep():
                 validated.append(_validated_acquire(index, step))
@@ -449,14 +449,14 @@ def describes(step: ProcedureStep) -> str:
     is not how anything finds it; `runs_plan` below is.
     """
     match step:
-        case MoveStep():
-            return f"move {step.record} to {step.to}"
+        case SetStep():
+            return f"set {step.record} to {step.to}"
         case AcquireStep():
             return f"acquire {step.plan_id} over {', '.join(step.scopes)}"
 
 
 def runs_plan(step: ProcedureStep) -> UUID | None:
-    """The plan an acquisition hands to an engine, or None for a move.
+    """The plan an acquisition hands to an engine, or None for a set.
 
     What anything holding a step of an execution ends up asking, after
     following that step's reference back to the definition here. Counsel
@@ -469,7 +469,7 @@ def runs_plan(step: ProcedureStep) -> UUID | None:
     no plan gets an arm returning None and nothing downstream changes.
     """
     match step:
-        case MoveStep():
+        case SetStep():
             return None
         case AcquireStep():
             return step.plan_id
@@ -487,7 +487,7 @@ class Procedure:
 
     `steps` are composed steps, so each carries the id this system minted
     for it at definition. That is what an execution's step cites, and it
-    is why a reader here writes `composed.step` to reach the move or the
+    is why a reader here writes `composed.step` to reach the set or the
     acquisition itself.
     """
 
@@ -519,7 +519,6 @@ __all__ = [
     "InvalidProcedureNameError",
     "InvalidProcedureParametersError",
     "InvalidProcedureStepsError",
-    "MoveStep",
     "Procedure",
     "ProcedureAlreadyExistsError",
     "ProcedureBeamline",
@@ -527,6 +526,7 @@ __all__ = [
     "ProcedureNotFoundError",
     "ProcedureStep",
     "ProcedureStepNotFoundError",
+    "SetStep",
     "describes",
     "runs_plan",
     "validated_composition",

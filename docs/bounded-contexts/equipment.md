@@ -6,6 +6,20 @@ It holds one aggregate. The Device is one piece of hardware this system holds a 
 
 The hardware itself lives outside, at a beamline, driven by whatever **control system** the deployment runs. This context holds a record of what that control system publishes and what somebody said about it, never the hardware and never its readings.
 
+## What a Device is
+
+One piece of hardware, and three facts about it.
+
+```
+   Device
+     id            a UUID minted when the device is added
+     external_ref  where the control system publishes it
+     name          a label this system wrote, for a person to read
+     status        Available, Faulted or Retired
+```
+
+The status is not a field anybody sets. It is worked out from the events on the stream each time the device is read, so it cannot disagree with the history behind it.
+
 ## Why the address is the identity
 
 A device's record carries an **external reference**, the same open-scheme `(scheme, value)` pair a dataset carries, and it is required. That is a measured decision rather than a preference, and the measurement is in a spike.
@@ -99,22 +113,57 @@ A device is not registered by a run, not faulted by one, and not cited by one. E
 
 That absence is the model rather than a context waiting to be finished. Whether a run touched a faulted device is a question about both, and the place to answer it is whichever context grows a reason to ask, with a join it writes itself.
 
-## The surface
+## The operations
 
-Six slices, six routes, six tools.
-
-```
-   POST   /devices                             register_device
-   GET    /devices                             list_devices
-   GET    /devices/{device_id}                 get_device
-   POST   /devices/{device_id}/fault           fault_device
-   POST   /devices/{device_id}/recover         recover_device
-   POST   /devices/{device_id}/retire          retire_device
-```
+| What it does | HTTP | MCP tool | On success |
+| --- | --- | --- | --- |
+| Add a device | `POST /devices` | `register_device` | `201` with the new id |
+| Find devices | `GET /devices` | `list_devices` | `200` with a page of devices |
+| Read one back | `GET /devices/{device_id}` | `get_device` | `200` with the device |
+| Say it has gone wrong | `POST /devices/{device_id}/fault` | `fault_device` | `204` |
+| Say it is working again | `POST /devices/{device_id}/recover` | `recover_device` | `204` |
+| Take it out of service | `POST /devices/{device_id}/retire` | `retire_device` | `204` |
 
 A verb in the path rather than a `PATCH` with a status field. The two are not equivalent: a `PATCH` says what the device should look like afterwards and invites a caller to set the status at will, while each of these names one transition the domain either allows or refuses. The status is derived from the stream in any case, so there is nothing for a `PATCH` to write. Retirement is a `POST` rather than a `DELETE` for the same reason the word is retire: the record is not going anywhere.
 
-All six are published on the MCP surface, which is what every context here does with every slice it has. What is worth noting is that the default costs nothing in this one. The agent and the reporter are the same kind of client, something watching a beamline, and both halves of what it does are in this context: resolve an address, then say what happened at it.
+Every one is published on the MCP surface, which is what every context here does with every slice it has. What is worth noting is that the default costs nothing in this one. The agent and the reporter are the same kind of client, something watching a beamline, and both halves of what it does are in this context: resolve an address, then say what happened at it.
+
+## What the stream holds
+
+There is no devices table. A device is worked out by replaying its events every time it is read.
+
+```
+   DeviceRegistered   device_id, external_ref_scheme, external_ref_value,
+                      device_name, occurred_at
+   DeviceFaulted      device_id, occurred_at
+   DeviceRecovered    device_id, occurred_at
+   DeviceRetired      device_id, occurred_at
+```
+
+Only the first carries anything beyond an id and a time, and that is the point. A fault says that something went wrong and when, and nothing about what: no severity, no message, no reason. Recovery is its own event rather than a flag going back, which is what makes the history readable. How many times a device broke and came back, and when, exists only because each change left its own row.
+
+The label is stored as `device_name` rather than `name`. The check that keeps personal data out of events reads field names, and a bare `name` looks the same to it whether it labels a motor or a person.
+
+## What gets refused
+
+| Refusal | Status | What happened |
+| --- | --- | --- |
+| `InvalidDeviceNameError` | 400 | The label is empty, too long, or not text. |
+| `InvalidDeviceFilterError` | 400 | The listing was asked for a status that is not one of the three. |
+| `UnauthorizedError` | 403 | We know who is asking and they may not. Different from 401, where we do not know. |
+| `DeviceNotFoundError` | 404 | The id names no device. |
+| `DeviceAlreadyExistsError` | 409 | Adding was aimed at an id that already has a history. |
+| `DeviceCannotBeFaultedError` | 409 | Already faulted, or retired. |
+| `DeviceCannotBeRecoveredError` | 409 | Not faulted, or retired. |
+| `DeviceCannotBeRetiredError` | 409 | Already retired. |
+| `ConcurrencyError` | 409 | The device changed between the read and the write. Read it again and decide again. |
+| `IdempotencyConflictError` | 422 | The same retry key came back with a different body, so no saved answer can be right. |
+
+Repeating a change is refused rather than quietly working. Two people each reporting what they think is a new fault should not both be told they reported it; one of them is looking at a stale view.
+
+Retired refuses all three transitions, not just retirement. A device this system has stopped counting is not somewhere a fault can be reported, and the three deciders all ask the same question of the status rather than each carrying their own copy of what terminal means.
+
+Adding a device takes a retry key, so sending the same one twice returns the first answer instead of making a second record. The three transitions do not take one: a repeat is already refused by the rules above, so a key would buy a friendlier status code rather than stop a second write.
 
 ## The listing, and why it has two filters
 
@@ -125,3 +174,32 @@ The address filter is what makes the context usable by an adapter at all. A repo
 The status filter is the operator's question, and the one the context exists to answer: what is broken right now.
 
 A row carries every field the single read has, plus two timestamps. That is unlike the three summaries beside it, each of which drops a field for being unbounded. A device has none: the label is bounded and everything else is an id, a word or a time. So a caller that finds what it wanted in a page needs no second call.
+
+## Where the code is
+
+```
+   apps/keeper/src/keeper/equipment/
+     aggregates/device/      the fields, the events, and how one is read back
+     features/
+       register_device/      one directory per operation
+       fault_device/
+       recover_device/
+       retire_device/
+       get_device/           a read, so no decision to make
+       list_devices/
+     projections/            the table the listing reads
+     adapters/               how that table is queried
+     routes.py               HTTP mounting, and which error becomes which status
+     tools.py                MCP tool registration
+     wire.py                 which operation gets a retry key, which gets tracing
+```
+
+Each write is a slice of its own: its own command, its own decision, its own handler, its own route and tool. Slices do not import each other, so a seventh operation is a new directory rather than an edit to six existing ones.
+
+## What is not here yet
+
+**Two devices at one address.** Nothing stops it. Records are independent of each other, so adding the same motor twice makes two of them and nothing notices. That matters more here than elsewhere, because somebody resolving an address is usually about to write to whatever comes back. The listing returns both rather than picking one, so a caller that finds two has to decide.
+
+**No way to ask what was broken at a given moment.** Faults are points in time, and turning two of them into a span would read as precision while resting on a clear that nobody may have sent. One missed clear stretches the span forever. See [What this context does not hold](#what-this-context-does-not-hold).
+
+**Nothing watches.** A fault only reaches the record because something reported it, so a device nobody is watching reads as available forever. That is a property of the system rather than a gap in this context, and the page says it in [The status, and what it does not claim](#the-status-and-what-it-does-not-claim).

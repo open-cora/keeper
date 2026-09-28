@@ -2,36 +2,49 @@
 template: home.html
 ---
 
-# Keeper
+# Holds the record, and who may add to it.
 
-The system of record for the experiment.
+The keeper writes down what happened and decides who is allowed to add to it. It holds what can be asked for, who may ask, what a person has allowed a machine to do on its own, what was run, and where the data went. Nothing is ever edited: each fact is added once and stays.
 
-An event-sourced system of record, built on a chassis inherited from an earlier private tree, and modelling its own domains.
+It is a record and a gate, and the gate matters more as the work stops being watched. Software can suggest anything. Whether a suggestion becomes real work is decided here, against permission a person granted in advance, and that decision is written down next to the work it produced.
 
-## Where the documentation stands
+**It runs nothing.** No hardware is driven from here, no measurement is started, and nothing outside is ever called. Everything talks to it and it talks to nothing, which is what lets it sit near the database while the work happens at the instruments.
 
-Seven bounded contexts exist. Six have pages below; Authority does not yet, and is readable only from its code. One page was written the other way round, before its code rather than after: Counsel's, which has since been corrected against what landed. The reference pages were carried over with the chassis and describe rules that are real. Most of them now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders, and the table below says which is which.
+## What it will not decide
+
+**Whether a run was any good.** A report says what something was told, not what was true. An instrument reporting success is a claim, and treating a claim as a measurement is how a system produces confident wrong data. So the record says `reported` and never `witnessed`.
+
+**What a machine may touch, based on what a machine said.** Two things can never be guessed: which beamline a suggestion runs at, and which equipment it may drive. A person states both once, when they grant the permission, and everything after that uses what the person said rather than what the suggestion implied.
+
+## What it holds
+
+The model is split into seven bounded contexts. Each answers one question, and they share nothing but the event log underneath.
+
+| Context | Answers |
+| --- | --- |
+| [Access](bounded-contexts/access.md) | Who the people and machines are |
+| [Authority](bounded-contexts/authority.md) | Who may issue which command |
+| [Execution](bounded-contexts/execution.md) | What can be run, what was put together to run, and what happened |
+| [Custody](bounded-contexts/custody.md) | Where the data from a measurement is kept |
+| [Counsel](bounded-contexts/counsel.md) | What was suggested to run next, and whether anyone took it up |
+| [Equipment](bounded-contexts/equipment.md) | What hardware exists, and what it was last reported doing |
+| [Pursuit](bounded-contexts/pursuit.md) | What a person allowed a machine to go and do alone, and how far it may get |
+
+## Reference
 
 | Page | Subject | State |
 | --- | --- | --- |
-| [Access](bounded-contexts/access.md) | The Actor aggregate and its four operations | Current, written against the shipped code |
-| [Execution](bounded-contexts/execution.md) | The Plan, Procedure and Execution aggregates, what this system can be asked to run, what it composed out of that, and what happened when it was carried out | Current, written against the shipped code |
-| [Custody](bounded-contexts/custody.md) | The Dataset aggregate, and where the data one acquisition produced is being kept | Current, written against the shipped code |
-| [Counsel](bounded-contexts/counsel.md) | The Proposal and Inquiry aggregates, what an actor put forward to run next and whether an acquisition took it, and what an actor asked a thinker about one execution | Current, written against the shipped code |
-| [Equipment](bounded-contexts/equipment.md) | The Device aggregate, what hardware this system knows about, and what it was last reported doing | Current, written against the shipped code |
-| [Pursuit](bounded-contexts/pursuit.md) | The Pursuit aggregate, the standing authorization a person gives a machine, and the bounded loop it may run within it | Current, written against the shipped code |
 | [Workflow](reference/workflow.md) | Reading order, commits, migrations, tests, mutation runs | Current |
 | [Conventions](reference/conventions.md) | Identifiers, units, personal data, stored names, documentation | Current |
-| [Layout](reference/layout.md) | BC structure, slice shapes, imports | Carried, examples now from this tree |
-| [Modeling](reference/modeling.md) | Event sourcing, value objects, field grouping | Carried, examples are placeholders |
-| [Patterns](reference/patterns.md) | Read side, queries, projections, idempotency | Carried, examples now from this tree |
-| [Naming](reference/naming.md) | Aggregates, events, commands, slices, ports, URLs | Carried, examples now from this tree |
+| [Layout](reference/layout.md) | How a context is laid out, and what may import what | Carried, examples now from this tree |
+| [Modeling](reference/modeling.md) | Events, value objects, grouping fields | Carried, examples are placeholders |
+| [Patterns](reference/patterns.md) | The read side, queries, projections, repeated requests | Carried, examples now from this tree |
+| [Naming](reference/naming.md) | What to call an event, a command, a port, a URL | Carried, examples now from this tree |
 | [Runtime](reference/runtime.md) | Hardening, logging, HTTP errors | Current, written against the shipped wiring |
+| [Contract](reference/client-contract.md) | What a caller may rely on, and what it may not | Current |
 | [Glossary](reference/glossary.md) | Terms used the same way in code and prose | Carried |
 
-## What is missing
-
-A page on the Authority context, which holds the Policy aggregate and the four slices that author a policy, edit one and read one. No tutorial and no how-to guides. The beamline page describes 2-BM's descriptor and the one script that reads it; nothing is running there, and its device register is still empty. There is no page on the chassis itself, so how the event store, the idempotency wrapper and the kernel fit together is currently readable only from the code and its docstrings.
+The reference pages came with the chassis and describe rules that are real. Most now argue from this tree's own contexts; `modeling.md` is the one still working entirely in placeholders.
 
 ## What the code looks like today
 
@@ -49,6 +62,10 @@ A page on the Authority context, which holds the Policy aggregate and the four s
 
 Those three match the integers `test_fitness_scope.py` pins, and `test_docs_match_code_constants.py` compares this block against them, so neither side can drift alone. That check was written after this page said it was pinned and was not: the slice count sat at 15 while the code had 17. Test counts are not quoted here, because a number in prose goes stale on the next commit and nothing notices.
 
-The architecture tier holds more tests than any other, which is out of proportion to the size of the domain and is deliberate. Those tests check the shape of the codebase rather than its behaviour: that every slice carries the modules its shape requires, that no event payload can hold personal data, that a stored name cannot be renamed without noticing, that every bounded context in the tree is actually mounted in the running app, and that every test declares which lane runs it.
+More tests check the shape of the codebase than check its behaviour, which is out of proportion to the size of the domain and is deliberate: that every slice carries the modules it needs, that no stored event can hold personal data, that a stored name cannot be renamed without somebody noticing, that every context is actually mounted in the running app, and that every test says which lane runs it.
 
-Part of the chassis was copied from the sibling project and has no user here yet. Which modules those are is pinned in `test_unloaded_modules_are_pinned.py` rather than left to be rediscovered, so the day a context starts using one, the suite says which one.
+## What is missing
+
+No tutorial and no how-to guides. The beamline page describes 2-BM and the one script that reads it; nothing is running there, and its hardware register is still empty. There is no page on the chassis itself, so how the event log, the repeat-request wrapper and the startup wiring fit together is readable only from the code.
+
+Part of the chassis was copied from an earlier private tree and has no user here yet. Which modules those are is pinned in `test_unloaded_modules_are_pinned.py` rather than left to be rediscovered, so the day a context starts using one, the suite says which one.

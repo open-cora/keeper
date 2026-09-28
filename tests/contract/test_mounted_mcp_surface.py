@@ -372,7 +372,7 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
             "plan_id"
         ]
         steps = [
-            {"kind": "move", "record": "2bmb:m1", "to": 12.5},
+            {"kind": "set", "record": "2bmb:m1", "to": 12.5},
             {
                 "kind": "acquire",
                 "plan_id": plan_id,
@@ -626,9 +626,9 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             name="align_then_scan",
             beamline="2-bm",
             steps=[
-                {"kind": "move", "record": "2bmb:m1", "to": 0.0},
-                {"kind": "move", "record": "2bmb:m2", "to": 5.0},
-                {"kind": "move", "record": "2bmb:m3", "to": 1.0},
+                {"kind": "set", "record": "2bmb:m1", "to": 0.0},
+                {"kind": "set", "record": "2bmb:m2", "to": 5.0},
+                {"kind": "set", "record": "2bmb:m3", "to": 1.0},
             ],
         )["procedure_id"]
         dispatched = _call(client, live, "dispatch_execution", procedure_id=walk_procedure)

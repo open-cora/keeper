@@ -28,11 +28,11 @@ from keeper.execution.aggregates.procedure import (
     InvalidProcedureBeamlineError,
     InvalidProcedureNameError,
     InvalidProcedureStepsError,
-    MoveStep,
     ProcedureBeamline,
     ProcedureDefined,
     ProcedureName,
     ProcedureStep,
+    SetStep,
     fold,
     from_stored,
     to_payload,
@@ -89,7 +89,7 @@ def _defined(
         beamline=beamline,
         steps=steps
         if steps is not None
-        else _composed(MoveStep(record="2bmb:m1", to=1.0), _acquire()),
+        else _composed(SetStep(record="2bmb:m1", to=1.0), _acquire()),
         occurred_at=_WHEN,
     )
 
@@ -150,19 +150,19 @@ def test_a_procedure_with_no_steps_is_refused() -> None:
 
 
 def test_a_procedure_over_the_step_bound_is_refused() -> None:
-    too_many = tuple(MoveStep(record="2bmb:m1", to=1.0) for _ in range(PROCEDURE_MAX_STEPS + 1))
+    too_many = tuple(SetStep(record="2bmb:m1", to=1.0) for _ in range(PROCEDURE_MAX_STEPS + 1))
     with pytest.raises(InvalidProcedureStepsError, match="at most"):
         validated_steps(too_many)
 
 
 def test_a_move_naming_no_record_is_refused() -> None:
     with pytest.raises(InvalidProcedureStepsError, match="names no record"):
-        validated_steps((MoveStep(record="   ", to=1.0),))
+        validated_steps((SetStep(record="   ", to=1.0),))
 
 
 def test_a_move_record_is_trimmed() -> None:
-    (step,) = validated_steps((MoveStep(record="  2bmb:m1  ", to=1.0),))
-    assert isinstance(step, MoveStep)
+    (step,) = validated_steps((SetStep(record="  2bmb:m1  ", to=1.0),))
+    assert isinstance(step, SetStep)
     assert step.record == "2bmb:m1"
 
 
@@ -171,7 +171,7 @@ def test_a_move_to_a_value_json_cannot_carry_is_refused(value: float) -> None:
     """A payload holding one of these does not survive the log. Refusing
     at definition beats writing a row that fails to load."""
     with pytest.raises(InvalidProcedureStepsError, match="JSON cannot carry"):
-        validated_steps((MoveStep(record="2bmb:m1", to=value),))
+        validated_steps((SetStep(record="2bmb:m1", to=value),))
 
 
 def test_an_acquisition_declaring_no_devices_is_refused() -> None:
@@ -196,7 +196,7 @@ def test_an_acquisition_scope_that_is_empty_after_trimming_is_refused() -> None:
 def test_a_move_carries_no_declared_scopes_because_its_record_is_the_claim() -> None:
     """The asymmetry between the two kinds, asserted rather than assumed:
     a move is derivable and an acquisition is not."""
-    assert not hasattr(MoveStep(record="2bmb:m1", to=1.0), "scopes")
+    assert not hasattr(SetStep(record="2bmb:m1", to=1.0), "scopes")
 
 
 def test_the_stored_payload_carries_the_name_under_a_qualified_key() -> None:
@@ -208,7 +208,7 @@ def test_the_stored_payload_carries_the_name_under_a_qualified_key() -> None:
 def test_the_stored_payload_discriminates_the_two_step_kinds() -> None:
     payload = to_payload(_defined())
     steps: list[dict[str, Any]] = payload["steps"]
-    assert [step["kind"] for step in steps] == ["move", "acquire"]
+    assert [step["kind"] for step in steps] == ["set", "acquire"]
 
 
 def test_folding_the_genesis_event_gives_the_procedure_it_describes() -> None:

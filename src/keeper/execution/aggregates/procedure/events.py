@@ -49,13 +49,13 @@ from uuid import UUID
 from keeper.execution.aggregates.procedure.state import (
     AcquireStep,
     ComposedStep,
-    MoveStep,
     ProcedureStep,
+    SetStep,
 )
 from keeper.infrastructure.ports.event_store import StoredEvent
 from keeper.infrastructure.slices.payload import deserialize_or_raise
 
-_MOVE_KIND = "move"
+_SET_KIND = "set"
 _ACQUIRE_KIND = "acquire"
 
 
@@ -106,8 +106,8 @@ def _step_to_payload(composed: ComposedStep) -> dict[str, Any]:
     """Render one composed step as the primitives that get stored."""
     step = composed.step
     match step:
-        case MoveStep():
-            body: dict[str, Any] = {"kind": _MOVE_KIND, "record": step.record, "to": step.to}
+        case SetStep():
+            body: dict[str, Any] = {"kind": _SET_KIND, "record": step.record, "to": step.to}
         case AcquireStep():
             body = {
                 "kind": _ACQUIRE_KIND,
@@ -132,8 +132,8 @@ def _step_from_payload(raw: dict[str, Any]) -> ComposedStep:
     """
     step: ProcedureStep
     match raw.get("kind"):
-        case "move":
-            step = MoveStep(record=raw["record"], to=float(raw["to"]))
+        case "set":
+            step = SetStep(record=raw["record"], to=float(raw["to"]))
         case "acquire":
             step = AcquireStep(
                 plan_id=UUID(raw["plan_id"]),

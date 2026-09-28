@@ -74,7 +74,7 @@ async def test_a_run_stream_in_the_same_store_is_not_read_as_a_walk() -> None:
     await EventStoreExecutionWriter(event_store).dispatch(
         execution_id=uuid4(),
         procedure_id=uuid4(),
-        steps=["move 2bmb:m1 to 0.0"],
+        steps=["set 2bmb:m1 to 0.0"],
         at=datetime.now(tz=UTC),
     )
 

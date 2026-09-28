@@ -34,7 +34,7 @@ def decide(
       - The proposal must not already have a step against it
         -> ProposalCannotBeTakenError
       - The step's definition must run a plan at all, rather than being
-        a move -> ProposalCannotBeTakenError
+        a set -> ProposalCannotBeTakenError
       - That plan must be the one the proposal names
         -> ProposalCannotBeTakenError
 
@@ -45,8 +45,8 @@ def decide(
     direction: allowing it later costs a sentence, and disallowing it
     later costs a migration.
 
-    **A move is refused before the plans are compared**, and the order
-    matters to what the caller is told. A move runs no plan, so a single
+    **A set is refused before the plans are compared**, and the order
+    matters to what the caller is told. A set runs no plan, so a single
     comparison would refuse it anyway, with a message saying the step
     ran a different plan and naming none. That reads as a near miss and
     sends a caller looking for the right acquisition, when what it has

@@ -61,7 +61,7 @@ from keeper.execution.aggregates.execution import (
     ExecutionNotFoundError,
     load_execution,
 )
-from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, MoveStep, load_procedure
+from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, SetStep, load_procedure
 from keeper.execution.features.define_plan import DefinePlan
 from keeper.execution.features.define_plan import bind as bind_define_plan
 from keeper.execution.features.define_procedure import DefineProcedure
@@ -126,7 +126,7 @@ async def _a_pursuit(deps: Kernel, *, rounds: int = 8) -> UUID:
 
 async def _an_execution(deps: Kernel) -> UUID:
     procedure_id = await bind_define_procedure(deps)(
-        DefineProcedure(name="park", beamline="2-bm", steps=(MoveStep(record="2bmb:m1", to=0.0),)),
+        DefineProcedure(name="park", beamline="2-bm", steps=(SetStep(record="2bmb:m1", to=0.0),)),
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )

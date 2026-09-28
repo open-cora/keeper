@@ -20,12 +20,12 @@ from keeper.execution.aggregates.procedure import (
     InvalidProcedureNameError,
     InvalidProcedureParametersError,
     InvalidProcedureStepsError,
-    MoveStep,
     Procedure,
     ProcedureAlreadyExistsError,
     ProcedureBeamline,
     ProcedureName,
     ProcedureStep,
+    SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
 from keeper.execution.features.define_procedure.context import DefineProcedureContext
@@ -66,7 +66,7 @@ def _command(
     return DefineProcedure(
         name=name,
         beamline=beamline,
-        steps=steps if steps else (MoveStep(record="2bmb:m1", to=1.0),),
+        steps=steps if steps else (SetStep(record="2bmb:m1", to=1.0),),
     )
 
 
@@ -82,15 +82,15 @@ def _decide(command: DefineProcedure) -> list[Any]:
 
 
 def test_defining_a_procedure_produces_one_genesis_event() -> None:
-    (event,) = _decide(_command(MoveStep(record="2bmb:m1", to=1.0), _acquire()))
+    (event,) = _decide(_command(SetStep(record="2bmb:m1", to=1.0), _acquire()))
     assert event.procedure_id == _NEW_ID
     assert event.procedure_name == "tomography"
     assert event.occurred_at == _NOW
 
 
 def test_the_event_carries_every_step_in_the_order_it_was_given() -> None:
-    first = MoveStep(record="2bmb:m1", to=1.0)
-    second = MoveStep(record="2bmb:m2", to=2.0)
+    first = SetStep(record="2bmb:m1", to=1.0)
+    second = SetStep(record="2bmb:m2", to=2.0)
     (event,) = _decide(_command(first, second, _acquire()))
     assert tuple(composed.step for composed in event.steps) == (first, second, _acquire())
 
@@ -116,7 +116,7 @@ def test_defining_against_an_id_that_already_has_a_history_is_refused() -> None:
         id=_NEW_ID,
         name=ProcedureName("tomography"),
         beamline=ProcedureBeamline("2-bm"),
-        steps=(ComposedStep(id=uuid4(), step=MoveStep(record="2bmb:m1", to=1.0)),),
+        steps=(ComposedStep(id=uuid4(), step=SetStep(record="2bmb:m1", to=1.0)),),
     )
     with pytest.raises(ProcedureAlreadyExistsError):
         decide(
@@ -162,7 +162,7 @@ def test_the_refusal_names_which_step_failed() -> None:
     with pytest.raises(InvalidProcedureParametersError) as caught:
         _decide(
             _command(
-                MoveStep(record="2bmb:m1", to=1.0),
+                SetStep(record="2bmb:m1", to=1.0),
                 _acquire(),
                 _acquire(parameters={"exposure_seconds": -1}),
             )
@@ -175,7 +175,7 @@ def test_a_procedure_of_moves_alone_needs_no_plans_at_all() -> None:
     nothing."""
     events = decide(
         None,
-        _command(MoveStep(record="2bmb:m1", to=1.0)),
+        _command(SetStep(record="2bmb:m1", to=1.0)),
         context=DefineProcedureContext(plans={}),
         now=_NOW,
         new_id=_NEW_ID,
@@ -185,7 +185,7 @@ def test_a_procedure_of_moves_alone_needs_no_plans_at_all() -> None:
 
 
 def test_every_step_is_named_with_the_id_it_was_given_in_order() -> None:
-    command = _command(MoveStep(record="2bmb:m1", to=1.0), _acquire())
+    command = _command(SetStep(record="2bmb:m1", to=1.0), _acquire())
     step_ids = [uuid4(), uuid4()]
     (event,) = decide(
         None,
@@ -201,7 +201,7 @@ def test_every_step_is_named_with_the_id_it_was_given_in_order() -> None:
 def test_two_steps_that_are_identical_are_still_named_apart() -> None:
     """What the ids buy over a position: a procedure may repeat a step,
     and an execution of it has to be able to say which one it means."""
-    same = MoveStep(record="2bmb:m1", to=1.0)
+    same = SetStep(record="2bmb:m1", to=1.0)
     (event,) = _decide(_command(same, same))
     first, second = event.steps
     assert first.step == second.step
@@ -212,7 +212,7 @@ def test_a_definition_given_the_wrong_number_of_step_ids_is_a_caller_bug() -> No
     with pytest.raises(ValueError, match="one id per step"):
         decide(
             None,
-            _command(MoveStep(record="2bmb:m1", to=1.0), _acquire()),
+            _command(SetStep(record="2bmb:m1", to=1.0), _acquire()),
             context=_context(),
             now=_NOW,
             new_id=_NEW_ID,

@@ -16,8 +16,8 @@ from keeper.execution.aggregates.plan import PlanNotFoundError
 from keeper.execution.aggregates.procedure import (
     PROCEDURE_STREAM_TYPE,
     AcquireStep,
-    MoveStep,
     ProcedureName,
+    SetStep,
     load_procedure,
 )
 from keeper.execution.features.define_plan import DefinePlan
@@ -103,7 +103,7 @@ async def test_composing_returns_the_id_the_procedure_can_be_loaded_by() -> None
     deps = _kernel()
     plan_id = await _a_plan(deps)
     steps = (
-        MoveStep(record="2bmb:m1", to=12.5),
+        SetStep(record="2bmb:m1", to=12.5),
         AcquireStep(
             plan_id=plan_id, parameters={"exposure_seconds": 0.2}, scopes=("2bmb:m1", "2bmb:det:")
         ),
@@ -175,7 +175,7 @@ async def test_the_appended_event_records_the_principal_that_issued_the_command(
 
     procedure_id = await bind(deps)(
         DefineProcedure(
-            name="tomography", beamline="2-bm", steps=(MoveStep(record="2bmb:m1", to=1.0),)
+            name="tomography", beamline="2-bm", steps=(SetStep(record="2bmb:m1", to=1.0),)
         ),
         principal_id=caller,
         correlation_id=uuid4(),
@@ -192,7 +192,7 @@ async def test_a_denied_caller_gets_an_error_and_writes_nothing() -> None:
     with pytest.raises(UnauthorizedError, match="not on the list"):
         await bind(deps)(
             DefineProcedure(
-                name="tomography", beamline="2-bm", steps=(MoveStep(record="2bmb:m1", to=1.0),)
+                name="tomography", beamline="2-bm", steps=(SetStep(record="2bmb:m1", to=1.0),)
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),

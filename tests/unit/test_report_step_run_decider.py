@@ -52,7 +52,7 @@ def _walk(*after: object, ended: bool = False) -> Execution:
             steps=[
                 DispatchedStep(
                     id=_MOVE,
-                    describes="move 2bmb:m1 to 0.0",
+                    describes="set 2bmb:m1 to 0.0",
                     procedure_step_id=UUID(int=4),
                 ),
                 DispatchedStep(

@@ -67,7 +67,7 @@ def _an_acquisition_of(client: TestClient, plan_id: str) -> tuple[str, str]:
             "name": "align_then_scan",
             "beamline": "2-bm",
             "steps": [
-                {"kind": "move", "record": "2bmb:m1", "to": 0.0},
+                {"kind": "set", "record": "2bmb:m1", "to": 0.0},
                 {
                     "kind": "acquire",
                     "plan_id": plan_id,
@@ -94,7 +94,7 @@ def _a_move_in(client: TestClient) -> tuple[str, str]:
         json={
             "name": "park",
             "beamline": "2-bm",
-            "steps": [{"kind": "move", "record": "2bmb:m1", "to": 0.0}],
+            "steps": [{"kind": "set", "record": "2bmb:m1", "to": 0.0}],
         },
     )
     assert defined.status_code == 201, defined.text

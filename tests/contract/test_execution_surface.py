@@ -155,7 +155,7 @@ def _a_procedure(client: TestClient, name: str = "align_then_scan", beamline: st
             "name": name,
             "beamline": beamline,
             "steps": [
-                {"kind": "move", "record": "2bmb:m1", "to": 0.0},
+                {"kind": "set", "record": "2bmb:m1", "to": 0.0},
                 {
                     "kind": "acquire",
                     "plan_id": plan_id,
@@ -190,7 +190,7 @@ def test_a_dispatched_execution_reads_back_with_its_procedure_and_steps(
     assert body["procedure_id"] == procedure_id
     assert body["procedure_name"] == "align_then_scan"
     assert body["status"] == "Dispatched"
-    assert body["steps"][0]["describes"] == "move 2bmb:m1 to 0.0"
+    assert body["steps"][0]["describes"] == "set 2bmb:m1 to 0.0"
 
 
 def test_the_execution_response_carries_exactly_the_fields_an_execution_has(

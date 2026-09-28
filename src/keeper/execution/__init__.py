@@ -7,7 +7,7 @@ and what happened when it was carried out.
                 knows it by, and the schema its parameters must satisfy.
 
     procedure   a routine this system composed: ordered steps, each of
-                them a move or an acquisition citing a plan.
+                them a set or an acquisition citing a plan.
 
     execution   one traversal of a procedure: the steps it was asked to
                 perform, and how each of them ended.
