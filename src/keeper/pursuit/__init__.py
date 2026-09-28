@@ -47,12 +47,14 @@ record is what serializes them, which is why nothing in this context
 leases, locks or elects.
 """
 
+from keeper.pursuit.projections import register_pursuit_projections
 from keeper.pursuit.routes import register_pursuit_routes
 from keeper.pursuit.tools import register_pursuit_tools
 from keeper.pursuit.wire import PursuitHandlers, wire_pursuit
 
 __all__ = [
     "PursuitHandlers",
+    "register_pursuit_projections",
     "register_pursuit_routes",
     "register_pursuit_tools",
     "wire_pursuit",

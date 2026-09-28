@@ -84,6 +84,7 @@ from keeper.infrastructure.projection.lifespan import projection_worker_lifespan
 from keeper.infrastructure.projection.registry import ProjectionRegistry
 from keeper.infrastructure.settings import Settings
 from keeper.pursuit import (
+    register_pursuit_projections,
     register_pursuit_routes,
     register_pursuit_tools,
     wire_pursuit,
@@ -169,6 +170,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             register_custody_projections(registry, deps)
             register_counsel_projections(registry, deps)
             register_equipment_projections(registry, deps)
+            register_pursuit_projections(registry, deps)
             app.state.projections = registry
 
             try:

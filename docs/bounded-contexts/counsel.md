@@ -197,7 +197,7 @@ The context is named for what it keeps rather than for what happens elsewhere, w
 
 Counsel is advice given, and it claims only that. It does not claim the advice was weighed here, or that it was good, or that anything came of it. It also keeps its meaning as the record grows: counsel taken, counsel withdrawn and counsel superseded are all counsel, and the word still fits on the day this system drives the engine itself, because the counsel stays the agent's and the driving is Execution's business.
 
-Two words were rejected. **Direction** reads well until you remember that at a synchrotron a direction is a vector. **Initiative** covers both modes and also means a campaign, which is exactly the aggregate this context defers, so it collides with its own future sibling.
+Two words were rejected. **Direction** reads well until you remember that at a synchrotron a direction is a vector. **Initiative** covers both modes and also means a pursuit, which is exactly the aggregate this context deferred, so it collides with the sibling that has since landed as [Pursuit](pursuit.md).
 
 ## Who may propose
 
@@ -556,7 +556,7 @@ Two stemmers grew by one word between them, both in the test tier. `made` is the
 
 **The basis.** What the agent looked at before it advised: datasets, prior runs, an objective. This is the part people mean when they say an agent has context, and it is deliberately absent from the first design rather than deferred within it. Three things have to be decided together and none is decided: whether ids in a basis are checked to exist, which is an existence check across a context door that does not scale from Custody's one to a set of forty; whether a basis is a field or a table; and what a reference means once the data behind it has changed, which is the question a record of what was pointed at, at a moment, cannot answer on its own.
 
-**The campaign.** What a proposal is in service of, and where a goal and a stopping condition would live. It is an aggregate and probably a context, not a field here, and nothing asks yet.
+**What a proposal is in service of.** This was deferred as an aggregate and probably a context, and it landed as both: [Pursuit](pursuit.md) holds the goal, the budget and the stopping conditions. Nothing came back here. A proposal made inside a pursuit carries no field saying so, because the pursuit's round names the proposal and a second copy of that join would be a fact written twice.
 
 **The agent.** An Actor in Access, as argued above, with the deciding software's version unrecorded. The trigger is something needing to ask a question about an agent across proposals.
 

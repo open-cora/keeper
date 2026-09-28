@@ -64,6 +64,7 @@ nav:
       - Custody: bounded-contexts/custody.md
       - Counsel: bounded-contexts/counsel.md
       - Equipment: bounded-contexts/equipment.md
+      - Pursuit: bounded-contexts/pursuit.md
   - Reference:
       - Overview: reference/index.md
       - Workflow: reference/workflow.md

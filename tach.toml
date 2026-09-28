@@ -249,6 +249,7 @@ depends_on = [
     "keeper.counsel.aggregates",
     "keeper.counsel",
     "keeper.execution.aggregates",
+    "keeper.execution",
 ]
 
 # The cross-BC doors, and how wide each one is.
@@ -323,19 +324,22 @@ visibility = ["keeper.custody"]
 # That last hop is what the extra names buy: the decision asks which plan
 # the step runs, and the answer lives on the definition.
 #
-# Adopting a proposal is the fifth and the only one that writes. It
-# needs the two stream types and the two payload renderers, because the
-# events it appends belong to Execution's aggregates, and it needs
-# `AcquireStep` to compose one and `fold` to turn the procedure it just
-# decided into the value the dispatch decider takes as context.
+# Adopting a proposal is the fifth and the only one that writes, and it
+# is the one that shrank. It once needed six more names here: the two
+# stream types, the two payload renderers, `AcquireStep` to compose a
+# procedure and `fold` to turn the one it had just decided into the value
+# the dispatch decider takes as context. All six were an account of how
+# Execution composes, held in Counsel.
 #
-# That is six names for one slice, and they are here rather than behind
-# some narrower helper because a door is sized by what the consumer
-# imports and pretending otherwise would only move the width somewhere
-# a test cannot see it.
+# The comment they used to carry argued that the width was honest because
+# a door is sized by what the consumer imports. That is true and it was
+# the wrong question. What made those six worth removing is not the
+# count: it is that Counsel knew the sequence, and would have broken when
+# Execution changed it. A second context wanting the same thing is what
+# made two copies of that knowledge worth collapsing into one.
 #
-# Eighteen names where Custody needs three, and the difference is exactly
-# that Custody checks existence and reads nothing off what it loaded. A door
+# Twelve names where Custody needs three, and the difference is that
+# Custody checks existence and reads nothing off what it loaded. A door
 # is sized by what the consumer imports, which is the only honest way to
 # size one, and `test_tach_edges_are_used.py` is what keeps that true.
 #
@@ -360,13 +364,7 @@ expose = [
     "execution.Execution",
     "execution.ExecutionNotFoundError",
     "execution.ExecutionStepNotFoundError",
-    "execution.EXECUTION_STREAM_TYPE",
-    "execution.to_payload",
     "procedure.load_procedure",
-    "procedure.PROCEDURE_STREAM_TYPE",
-    "procedure.AcquireStep",
-    "procedure.fold",
-    "procedure.to_payload",
     "procedure.ComposedStep",
     "procedure.ProcedureNotFoundError",
     "procedure.ProcedureStepNotFoundError",
@@ -374,37 +372,70 @@ expose = [
 ]
 visibility = ["keeper.counsel"]
 
-# Pursuit reads Execution once, to refuse a round naming a run that is not
-# there. Two names, both about that one check, which is the door Custody
-# has minus the step: a pursuit observes a whole execution where a dataset
-# cites one acquisition inside it.
+# Pursuit reads Execution's aggregates twice, for two existence checks and
+# nothing else. A round naming a run that is not there is refused, and so
+# is one closing on a proposal whose plan has gone.
 #
-# `Execution` itself is not on the list, although the value is loaded and
-# used. It is handed straight to Counsel's own decider, which declares the
-# type in its context module, so nothing here writes it down. That is the
-# same sizing rule that kept the type off this door for Counsel until an
-# inquiry started naming it.
+# `Execution` and `Plan` are both absent, although both values are loaded
+# and used. The execution is handed straight to Counsel's decider, which
+# declares the type in its own context module, and the plan goes to the
+# composer, which declares it in its signature. Neither is written down
+# here. That is the same sizing rule that kept `Execution` off Counsel's
+# door until an inquiry started naming it.
 [[interfaces]]
 from = ["keeper.execution.aggregates"]
 expose = [
     "execution.load_execution",
     "execution.ExecutionNotFoundError",
+    "plan.load_plan",
+    "plan.PlanNotFoundError",
 ]
 visibility = ["keeper.pursuit"]
 
-# Pursuit reads Counsel twice and writes it once, and both halves are the
-# same act: opening a round puts a question, and the question is an
-# inquiry. Two names off the aggregate, the stream to write on and the
-# renderer for what goes on it.
+# One name onto Execution's feature layer, and it is the seam rather than
+# the parts. This is the second caller that made extracting it worth
+# doing: a pursuit closing a round on a proposal needs the same dispatch
+# adoption needs, alongside a write of its own.
 #
-# Neither the event classes nor the fold are here. This context never reads
-# an inquiry back, because what it would want from one is the conclusion,
-# and nothing here acts on a conclusion yet.
+# The two doors are identical because the need is identical, which is the
+# whole argument for the seam. Before it, this block would have listed the
+# same six names Counsel's did, and the two contexts would have held two
+# copies of one account of how Execution composes.
+[[interfaces]]
+from = ["keeper.execution"]
+expose = ["composing.compose_one_run"]
+visibility = ["keeper.pursuit"]
+
+# Pursuit reaches Counsel's aggregates for both halves of a round. Opening
+# one writes an inquiry; closing one reads that inquiry back for the
+# conclusion, and on the conclusion that proposes something, writes the
+# proposal being adopted.
+#
+# Nine names, and the shape of the list is the shape of the round. Two to
+# write an inquiry, three to read one and refuse a round whose question is
+# unanswered, and four more for the proposal on the arm that adopts.
+#
+# `InquiryConclusion` is the only closed type here and is the one name
+# this door exists for. Closing a round is a translation between two
+# vocabularies, and a translation needs both sides written down: a handler
+# that matched on strings would go quietly wrong the day a fifth
+# conclusion arrives, which is exactly the day it must not.
+#
+# `Proposal` and `Inquiry` themselves are absent. Both are loaded and read
+# from and neither is ever named, because the handler tests fields off
+# them and passes them to deciders that declare their own types.
 [[interfaces]]
 from = ["keeper.counsel.aggregates"]
 expose = [
     "inquiry.INQUIRY_STREAM_TYPE",
     "inquiry.to_payload",
+    "inquiry.load_inquiry",
+    "inquiry.InquiryConclusion",
+    "inquiry.InquiryNotFoundError",
+    "proposal.PROPOSAL_STREAM_TYPE",
+    "proposal.to_payload",
+    "proposal.load_proposal_with_version",
+    "proposal.ProposalNotFoundError",
 ]
 visibility = ["keeper.pursuit"]
 
@@ -414,20 +445,25 @@ visibility = ["keeper.pursuit"]
 # interface sizes it, and the comment arguing that the aggregate door was
 # honest was describing the half something counted.
 #
-# Three names, and they are the composition: the command, the context it
-# is decided against, and the decider. Opening a round calls the pure half
-# of that slice rather than its handler, because a handler appends on its
-# own and two appends are not the single one this slice exists to make.
+# Five names across two of Counsel's slices, and each is the pure half of
+# one. Opening a round decides an inquiry; closing one on a proposal
+# decides the adoption. Both call the decider rather than the handler,
+# because a handler appends on its own and separate appends are not the
+# single one each of these slices exists to make.
 #
-# Three stays three rather than collapsing behind a helper in Counsel,
-# because there is one consumer and the rule of three in
-# docs/reference/patterns.md is what holds a shape where it is.
+# Five stays five rather than collapsing behind a helper in Counsel. The
+# seam that was worth building sits in Execution, because two contexts
+# wanted the same composed run; nothing yet wants the same composed
+# adoption, and the rule of three in docs/reference/patterns.md is what
+# holds a shape where it is until something does.
 [[interfaces]]
 from = ["keeper.counsel"]
 expose = [
     "features.make_inquiry.MakeInquiry",
     "features.make_inquiry.MakeInquiryContext",
     "features.make_inquiry.decide",
+    "features.adopt_proposal.AdoptProposal",
+    "features.adopt_proposal.decide",
 ]
 visibility = ["keeper.pursuit"]
 
@@ -441,28 +477,19 @@ visibility = ["keeper.pursuit"]
 # is honest because a door is sized by what the consumer imports, and that
 # argument was only ever true of the half of the edge something counted.
 #
-# Six names, and they are the composition. Two commands, the two contexts
-# they are decided against, and the two deciders. Adopting calls the pure
-# half of each slice rather than its handler, because a handler appends on
-# its own and three appends are not the single one that slice exists to
-# make.
+# One name now, and it was six. The six were two commands, the two
+# contexts they are decided against and the two deciders, called by
+# adoption to compose a run because a handler appends on its own and
+# three appends are not the single one that slice needs.
 #
-# Six stays six rather than collapsing behind a helper in Execution,
-# because there is one consumer, and the rule of three in
-# docs/reference/patterns.md is what holds a shape where it is until a
-# second one arrives. What would move it is something else needing to
-# dispatch one run of one plan alongside a write of its own, and that
-# caller is the one that could say what the helper wants to look like.
-# Until then the reach is real, written down, and counted by
-# `test_tach_edges_are_used.py` like every other.
+# What collapsed them was the second caller the old comment here named as
+# the trigger. `composing.compose_one_run` hands back the appends for
+# dispatching one run of one plan, and two contexts now ask for it rather
+# than each assembling it. That the door is narrower is the smaller half
+# of the gain: the larger half is that neither caller any longer knows
+# that a procedure is defined and then dispatched, or that the dispatch
+# needs the procedure folded first.
 [[interfaces]]
 from = ["keeper.execution"]
-expose = [
-    "features.define_procedure.DefineProcedure",
-    "features.define_procedure.DefineProcedureContext",
-    "features.define_procedure.decide",
-    "features.dispatch_execution.DispatchExecution",
-    "features.dispatch_execution.DispatchExecutionContext",
-    "features.dispatch_execution.decide",
-]
+expose = ["composing.compose_one_run"]
 visibility = ["keeper.counsel"]

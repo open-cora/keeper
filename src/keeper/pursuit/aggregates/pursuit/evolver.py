@@ -21,6 +21,8 @@ from keeper.infrastructure.slices.evolver import require_state
 from keeper.pursuit.aggregates.pursuit.events import (
     PursuitCharged,
     PursuitEvent,
+    PursuitResumed,
+    PursuitRoundClosed,
     PursuitRoundOpened,
     PursuitStarted,
     PursuitWithdrawn,
@@ -34,6 +36,7 @@ from keeper.pursuit.aggregates.pursuit.state import (
     PursuitGoal,
     PursuitRound,
     PursuitStatus,
+    RoundOutcome,
     validate_scopes,
 )
 
@@ -61,6 +64,12 @@ def evolve(state: Pursuit | None, event: PursuitEvent) -> Pursuit:
     of what is folded so far. A fold that numbered rounds itself would
     renumber them if one were ever removed, and the number is what a later
     call uses to name the round it is closing.
+
+    Closing a round is the one arm that sets the status from data rather
+    than from which arm ran, and `_after` is the whole of that mapping. The
+    outcome is still reconstructed as the closed type first, so a value
+    that is no longer one of the four fails here rather than reaching a
+    reader as a string nothing checked.
 
     Every closed type is reconstructed rather than carried across as the
     primitives the payload holds. That is what re-validates them on read: a
@@ -113,6 +122,31 @@ def evolve(state: Pursuit | None, event: PursuitEvent) -> Pursuit:
                     ),
                 ),
             )
+        case PursuitRoundClosed(
+            round_index=round_index,
+            outcome=outcome,
+            proposal_id=proposal_id,
+            dispatched_id=dispatched_id,
+        ):
+            closing = require_state(state, "PursuitRoundClosed")
+            ended = RoundOutcome(outcome)
+            return replace(
+                closing,
+                rounds=tuple(
+                    replace(
+                        turn,
+                        outcome=ended,
+                        proposal_id=proposal_id,
+                        dispatched_id=dispatched_id,
+                    )
+                    if turn.index == round_index
+                    else turn
+                    for turn in closing.rounds
+                ),
+                status=_after(ended),
+            )
+        case PursuitResumed():
+            return replace(require_state(state, "PursuitResumed"), status=PursuitStatus.RUNNING)
         case PursuitCharged(dimension=dimension, amount=amount):
             charged = require_state(state, "PursuitCharged")
             spent = BudgetDimension(dimension)
@@ -132,6 +166,21 @@ def evolve(state: Pursuit | None, event: PursuitEvent) -> Pursuit:
             )
         case _:
             assert_never(event)
+
+
+def _after(outcome: RoundOutcome) -> PursuitStatus:
+    """The status a pursuit is in once a round closes this way.
+
+    Three of the four leave the loop unable to turn again on its own, and
+    the difference between them is whether a person can put it back. Only
+    the advancing outcome leaves it running, which is the whole of the
+    control flow written as one function.
+    """
+    if outcome is RoundOutcome.ADVANCED:
+        return PursuitStatus.RUNNING
+    if outcome.holds:
+        return PursuitStatus.HELD
+    return PursuitStatus.STOPPED
 
 
 def fold(events: Sequence[PursuitEvent]) -> Pursuit | None:

@@ -162,7 +162,72 @@ class PursuitCharged:
     occurred_at: datetime
 
 
-PursuitEvent = PursuitStarted | PursuitRoundOpened | PursuitCharged | PursuitWithdrawn
+@dataclass(frozen=True)
+class PursuitRoundClosed:
+    """The answer came back, and the round ended one of four ways.
+
+    One class with an outcome rather than four classes, which is the choice
+    `InquiryConclusion` makes and for its stated reason: these four arrive
+    from one call and three of them carry nothing beyond the round they
+    closed, so the difference between them is one bit rather than four
+    shapes. Four classes earn their place where four payloads differ, which
+    is why an execution's step outcomes are four and these are not.
+
+    `outcome` rides as a plain string and is narrowed back at the fold,
+    which is the ordinary rule for a closed type on a payload.
+
+    `proposal_id` and `dispatched_id` are set on the advancing outcome and
+    on no other. They are the two halves of one fact, the advice taken up
+    and the work it became, and the decider refuses either without the
+    other. That is the one thing this event could carry wrongly.
+
+    Closing is an act performed here: the caller is telling this system to
+    read an answer already on the record and act on it, and the moment this
+    system acts is the moment it happened. So the command behind this
+    accepts no timestamp, beside the three around it and away from the
+    charge.
+    """
+
+    pursuit_id: UUID
+    round_index: int
+    outcome: str
+    proposal_id: UUID | None
+    dispatched_id: UUID | None
+    occurred_at: datetime
+
+
+@dataclass(frozen=True)
+class PursuitResumed:
+    """A person put a held pursuit back to work.
+
+    The counterpart to the two outcomes that hold rather than stop. A
+    thinker with nothing to go on and a thinker asking for a person are
+    both answerable: more data may land, and whoever was referred to can
+    look. Neither is a reason to throw the authorization away, so neither
+    does, and this is how one comes back.
+
+    `actor_id` is whoever resumed it, which need not be whoever authorized
+    it or whoever the referral was aimed at. A pursuit may be held and
+    resumed many times, and each is its own row, so the record keeps the
+    whole sequence rather than a flag that only remembers the last one.
+
+    Nothing about the hold is repeated here. Which round held it and why
+    are on the round, and a copy would be a second account of one fact.
+    """
+
+    pursuit_id: UUID
+    actor_id: UUID
+    occurred_at: datetime
+
+
+PursuitEvent = (
+    PursuitStarted
+    | PursuitRoundOpened
+    | PursuitRoundClosed
+    | PursuitCharged
+    | PursuitResumed
+    | PursuitWithdrawn
+)
 """Every event that can appear on a Pursuit stream.
 
 A new member is a new class added here and to this alias, never a field
@@ -191,6 +256,23 @@ def to_payload(event: PursuitEvent) -> dict[str, Any]:
                 "round_index": event.round_index,
                 "execution_id": str(event.execution_id),
                 "inquiry_id": str(event.inquiry_id),
+                "occurred_at": event.occurred_at.isoformat(),
+            }
+        case PursuitRoundClosed():
+            return {
+                "pursuit_id": str(event.pursuit_id),
+                "round_index": event.round_index,
+                "outcome": event.outcome,
+                "proposal_id": None if event.proposal_id is None else str(event.proposal_id),
+                "dispatched_id": (
+                    None if event.dispatched_id is None else str(event.dispatched_id)
+                ),
+                "occurred_at": event.occurred_at.isoformat(),
+            }
+        case PursuitResumed():
+            return {
+                "pursuit_id": str(event.pursuit_id),
+                "actor_id": str(event.actor_id),
                 "occurred_at": event.occurred_at.isoformat(),
             }
         case PursuitCharged():
@@ -253,6 +335,33 @@ def from_stored(stored: StoredEvent) -> PursuitEvent:
                 ),
                 extra=(ValueError,),
             )
+        case "PursuitRoundClosed":
+            return deserialize_or_raise(
+                "PursuitRoundClosed",
+                lambda: PursuitRoundClosed(
+                    pursuit_id=UUID(payload["pursuit_id"]),
+                    round_index=int(payload["round_index"]),
+                    outcome=str(payload["outcome"]),
+                    proposal_id=(
+                        None if payload["proposal_id"] is None else UUID(payload["proposal_id"])
+                    ),
+                    dispatched_id=(
+                        None if payload["dispatched_id"] is None else UUID(payload["dispatched_id"])
+                    ),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
+        case "PursuitResumed":
+            return deserialize_or_raise(
+                "PursuitResumed",
+                lambda: PursuitResumed(
+                    pursuit_id=UUID(payload["pursuit_id"]),
+                    actor_id=UUID(payload["actor_id"]),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
         case "PursuitCharged":
             return deserialize_or_raise(
                 "PursuitCharged",
@@ -282,6 +391,8 @@ def from_stored(stored: StoredEvent) -> PursuitEvent:
 __all__ = [
     "PursuitCharged",
     "PursuitEvent",
+    "PursuitResumed",
+    "PursuitRoundClosed",
     "PursuitRoundOpened",
     "PursuitStarted",
     "PursuitWithdrawn",

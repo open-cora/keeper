@@ -15,13 +15,25 @@ handler asks the authorization port first.
 """
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 
-from keeper.counsel.aggregates.inquiry import INQUIRY_STREAM_TYPE, load_inquiry
-from keeper.execution.aggregates.execution import ExecutionNotFoundError
+from keeper.counsel.aggregates.inquiry import (
+    INQUIRY_STREAM_TYPE,
+    InquiryConclusion,
+    load_inquiry,
+)
+from keeper.counsel.aggregates.proposal import ProposalStatus, load_proposal
+from keeper.counsel.features.answer_inquiry import AnswerInquiry
+from keeper.counsel.features.answer_inquiry import bind as bind_answer
+from keeper.counsel.features.make_proposal import MakeProposal
+from keeper.counsel.features.make_proposal import bind as bind_make_proposal
+from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
 from keeper.execution.aggregates.procedure import MoveStep
+from keeper.execution.features.define_plan import DefinePlan
+from keeper.execution.features.define_plan import bind as bind_define_plan
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -40,19 +52,26 @@ from keeper.pursuit.aggregates.pursuit import (
     Pursuit,
     PursuitAlreadyExistsError,
     PursuitBeamline,
+    PursuitCannotBeResumedError,
     PursuitCannotBeWithdrawnError,
     PursuitGoal,
     PursuitNotFoundError,
+    PursuitRoundCannotBeClosedError,
     PursuitRoundCannotBeOpenedError,
     PursuitStatus,
+    RoundOutcome,
     load_pursuit,
 )
 from keeper.pursuit.features.charge_pursuit import ChargePursuit
 from keeper.pursuit.features.charge_pursuit import bind as bind_charge
+from keeper.pursuit.features.close_pursuit_round import ANSWERS_TO, ClosePursuitRound
+from keeper.pursuit.features.close_pursuit_round import bind as bind_close
 from keeper.pursuit.features.get_pursuit import GetPursuit
 from keeper.pursuit.features.get_pursuit import bind as bind_get
 from keeper.pursuit.features.open_pursuit_round import OpenPursuitRound
 from keeper.pursuit.features.open_pursuit_round import bind as bind_open_round
+from keeper.pursuit.features.resume_pursuit import ResumePursuit
+from keeper.pursuit.features.resume_pursuit import bind as bind_resume
 from keeper.pursuit.features.start_pursuit import StartPursuit
 from keeper.pursuit.features.start_pursuit import bind as bind_start
 from keeper.pursuit.features.start_pursuit import decide as decide_start
@@ -75,6 +94,7 @@ _GOAL = PursuitGoal("find the edge of the useful exposure range")
 _BEAMLINE = PursuitBeamline("2-bm")
 _SCOPES = ("2bmb:m1", "2bmb:det")
 _BUDGET = Budget({BudgetDimension.ROUNDS: 8, BudgetDimension.TOKENS: 400000})
+_SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/schema"}
 
 
 class _FixedClock:
@@ -582,3 +602,280 @@ async def test_charging_asks_the_authorization_port_first() -> None:
 
     with pytest.raises(UnauthorizedError):
         await _charge(deps, uuid4(), BudgetDimension.TOKENS, 10)
+
+
+async def _answered(
+    deps: Kernel, inquiry_id: UUID, conclusion: InquiryConclusion, **kw: Any
+) -> None:
+    await bind_answer(deps)(
+        AnswerInquiry(
+            inquiry_id=inquiry_id,
+            conclusion=conclusion,
+            observed_step_count=kw.get("observed", 2),
+            execution_ended=True,
+            proposal_id=kw.get("proposal_id"),
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def _a_proposal(deps: Kernel) -> UUID:
+    plan_id = await bind_define_plan(deps)(
+        DefinePlan(name="count", parameters_schema=_SCHEMA),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    return await bind_make_proposal(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def _a_round_awaiting(deps: Kernel) -> tuple[UUID, UUID]:
+    """A pursuit with one open round, and the inquiry it is waiting on."""
+    pursuit_id = await _a_pursuit(deps)
+    inquiry_id = await _a_round(deps, pursuit_id, await _an_execution(deps))
+    return pursuit_id, inquiry_id
+
+
+async def _close(deps: Kernel, pursuit_id: UUID, index: int = 0) -> Any:
+    return await bind_close(deps)(
+        ClosePursuitRound(pursuit_id=pursuit_id, round_index=index),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def test_a_proposing_answer_adopts_dispatches_and_advances_in_one_append() -> None:
+    """The widest write in this tree. Four streams across three contexts,
+    and every one of them has to be there afterwards."""
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    proposal_id = await _a_proposal(deps)
+    await _answered(deps, inquiry_id, InquiryConclusion.PROPOSE, proposal_id=proposal_id)
+
+    closed = await _close(deps, pursuit_id)
+
+    assert closed.outcome is RoundOutcome.ADVANCED
+    assert closed.dispatched_id is not None
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    proposal = await load_proposal(deps.event_store, proposal_id)
+    dispatched = await load_execution(deps.event_store, closed.dispatched_id)
+    assert pursuit is not None
+    assert proposal is not None
+    assert dispatched is not None
+    assert pursuit.status is PursuitStatus.RUNNING
+    assert pursuit.rounds[0].dispatched_id == closed.dispatched_id
+    assert proposal.status is ProposalStatus.ADOPTED
+
+
+async def test_the_run_it_dispatches_uses_the_pursuits_beamline_and_scopes() -> None:
+    """The whole reason a pursuit exists. Nothing in the closing call names
+    either, and neither is inferred: they were stated once by a person when
+    the pursuit was authorized."""
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(
+        deps, inquiry_id, InquiryConclusion.PROPOSE, proposal_id=await _a_proposal(deps)
+    )
+
+    closed = await _close(deps, pursuit_id)
+
+    assert closed.dispatched_id is not None
+    dispatched = await load_execution(deps.event_store, closed.dispatched_id)
+    assert dispatched is not None
+    assert dispatched.beamline.value == _BEAMLINE.value
+
+
+async def test_an_advance_counts_against_the_execution_budget() -> None:
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(
+        deps, inquiry_id, InquiryConclusion.PROPOSE, proposal_id=await _a_proposal(deps)
+    )
+
+    await _close(deps, pursuit_id)
+
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    assert pursuit.spent(now=_CLOCK_NOW)[BudgetDimension.EXECUTIONS] == 1
+
+
+async def test_a_stopping_answer_stops_the_pursuit_and_dispatches_nothing() -> None:
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(deps, inquiry_id, InquiryConclusion.STOP)
+
+    closed = await _close(deps, pursuit_id)
+
+    assert (closed.outcome, closed.dispatched_id) == (RoundOutcome.COMPLETED, None)
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    assert pursuit.status is PursuitStatus.STOPPED
+
+
+@pytest.mark.parametrize(
+    ("conclusion", "outcome"),
+    [
+        (InquiryConclusion.ABSTAIN, RoundOutcome.STALLED),
+        (InquiryConclusion.REFER, RoundOutcome.REFERRED),
+    ],
+    ids=lambda value: str(value),
+)
+async def test_the_two_answers_that_hold_rather_than_stop(
+    conclusion: InquiryConclusion, outcome: RoundOutcome
+) -> None:
+    """Held rather than stopped, because both are answerable: more data may
+    land, and whoever was referred to can look."""
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(deps, inquiry_id, conclusion)
+
+    closed = await _close(deps, pursuit_id)
+
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    assert closed.outcome is outcome
+    assert pursuit.status is PursuitStatus.HELD
+    assert pursuit.held_for is outcome
+
+
+async def test_every_conclusion_a_thinker_can_reach_has_an_outcome() -> None:
+    """The translation is complete by construction. A fifth conclusion
+    would fail the lookup rather than fall through to a default, which is
+    the loud direction when the new one is the one that says to stop."""
+    assert set(ANSWERS_TO) == set(InquiryConclusion)
+
+
+async def test_closing_a_round_whose_inquiry_has_no_answer_yet_is_refused() -> None:
+    """Nobody's fault, so the caller should wait rather than do anything."""
+    deps = _kernel()
+    pursuit_id, _inquiry_id = await _a_round_awaiting(deps)
+
+    with pytest.raises(PursuitRoundCannotBeClosedError, match="no answer yet"):
+        await _close(deps, pursuit_id)
+
+
+async def test_closing_a_round_twice_is_refused() -> None:
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(deps, inquiry_id, InquiryConclusion.ABSTAIN)
+    await _close(deps, pursuit_id)
+    await bind_resume(deps)(
+        ResumePursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+    )
+
+    with pytest.raises(PursuitRoundCannotBeClosedError, match="already closed"):
+        await _close(deps, pursuit_id)
+
+
+async def test_closing_a_round_that_does_not_exist_is_refused() -> None:
+    deps = _kernel()
+    pursuit_id, _inquiry_id = await _a_round_awaiting(deps)
+
+    with pytest.raises(PursuitRoundCannotBeClosedError, match="no such round"):
+        await _close(deps, pursuit_id, index=7)
+
+
+async def test_a_held_pursuit_refuses_to_close_the_rounds_it_still_has_open() -> None:
+    """What makes holding mean something. A driver that carried on
+    regardless is stopped by the record rather than by its own manners."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    first = await _a_round(deps, pursuit_id, await _an_execution(deps))
+    second = await _a_round(deps, pursuit_id, await _an_execution(deps))
+    await _answered(deps, first, InquiryConclusion.REFER)
+    await _answered(deps, second, InquiryConclusion.STOP)
+    await _close(deps, pursuit_id, index=0)
+
+    with pytest.raises(PursuitRoundCannotBeClosedError, match="Held"):
+        await _close(deps, pursuit_id, index=1)
+
+
+async def test_closing_a_pursuit_that_was_never_started_is_not_found() -> None:
+    deps = _kernel()
+
+    with pytest.raises(PursuitNotFoundError):
+        await _close(deps, uuid4())
+
+
+async def test_closing_asks_the_authorization_port_first() -> None:
+    deps = _kernel(authz=_DenyAllAuthorize())
+
+    with pytest.raises(UnauthorizedError):
+        await _close(deps, uuid4())
+
+
+async def test_resuming_puts_a_held_pursuit_back_to_work() -> None:
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(deps, inquiry_id, InquiryConclusion.ABSTAIN)
+    await _close(deps, pursuit_id)
+
+    await bind_resume(deps)(
+        ResumePursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+    )
+
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    assert pursuit.status is PursuitStatus.RUNNING
+    assert pursuit.held_for is None
+
+
+async def test_resuming_a_running_pursuit_is_refused() -> None:
+    """A resume that quietly succeeded would write a row saying something
+    happened when nothing did."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    with pytest.raises(PursuitCannotBeResumedError):
+        await bind_resume(deps)(
+            ResumePursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+        )
+
+
+async def test_resuming_a_completed_pursuit_is_refused() -> None:
+    """The serious one. If a completed pursuit could be resumed then the
+    thinker's Stop would be a suggestion rather than a terminal."""
+    deps = _kernel()
+    pursuit_id, inquiry_id = await _a_round_awaiting(deps)
+    await _answered(deps, inquiry_id, InquiryConclusion.STOP)
+    await _close(deps, pursuit_id)
+
+    with pytest.raises(PursuitCannotBeResumedError, match="Stopped"):
+        await bind_resume(deps)(
+            ResumePursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+        )
+
+
+async def test_a_pursuit_may_be_held_and_resumed_more_than_once() -> None:
+    """Each is its own row, and none overwrites the last."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    for _ in range(2):
+        inquiry_id = await _a_round(deps, pursuit_id, await _an_execution(deps))
+        await _answered(deps, inquiry_id, InquiryConclusion.ABSTAIN)
+        await _close(deps, pursuit_id, index=len(await _rounds(deps, pursuit_id)) - 1)
+        await bind_resume(deps)(
+            ResumePursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+        )
+
+    stored, _version = await deps.event_store.load(PURSUIT_STREAM_TYPE, pursuit_id)
+    assert [row.event_type for row in stored].count("PursuitResumed") == 2
+
+
+async def _rounds(deps: Kernel, pursuit_id: UUID) -> tuple[Any, ...]:
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    return pursuit.rounds
+
+
+async def test_resuming_asks_the_authorization_port_first() -> None:
+    deps = _kernel(authz=_DenyAllAuthorize())
+
+    with pytest.raises(UnauthorizedError):
+        await bind_resume(deps)(
+            ResumePursuit(pursuit_id=uuid4()), principal_id=uuid4(), correlation_id=uuid4()
+        )

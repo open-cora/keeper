@@ -51,22 +51,36 @@ anyway and, not coincidentally, is not None.
 Opening a round goes without, and is already protected by something
 better. A pursuit refuses a second round about an execution it has already
 asked about, so a retry is a 409 from the domain rather than a duplicate
-the chassis had to catch.
+the chassis had to catch. Closing one is the same: a round that already
+closed refuses, which matters more there than anywhere else here, because
+the duplicate a retry would otherwise make is a second execution at a
+beamline.
 
-No slice takes more than the kernel. Nothing here reads a projection,
-because nothing here lists anything yet.
+One slice takes more than the kernel. `list_pursuits` reads a projection,
+which the kernel cannot hold because the kernel is declared in
+infrastructure and a pursuit summary is this context's own idea, so this
+module picks the implementation and passes it in.
 """
 
 from dataclasses import dataclass
 from uuid import UUID
 
-from keeper.infrastructure.kernel import Kernel
+from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
+from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
+from keeper.pursuit.adapters import (
+    InMemoryPursuitSummaryLookup,
+    PostgresPursuitSummaryLookup,
+)
+from keeper.pursuit.aggregates.pursuit.summary import PursuitSummaryLookup
 from keeper.pursuit.features import (
     charge_pursuit,
+    close_pursuit_round,
     get_pursuit,
+    list_pursuits,
     open_pursuit_round,
+    resume_pursuit,
     start_pursuit,
     withdraw_pursuit,
 )
@@ -80,9 +94,28 @@ class PursuitHandlers:
 
     start_pursuit: start_pursuit.IdempotentHandler
     open_pursuit_round: open_pursuit_round.Handler
+    close_pursuit_round: close_pursuit_round.Handler
     charge_pursuit: charge_pursuit.IdempotentHandler
+    resume_pursuit: resume_pursuit.Handler
     withdraw_pursuit: withdraw_pursuit.Handler
     get_pursuit: get_pursuit.Handler
+    list_pursuits: list_pursuits.Handler
+
+
+def _pursuit_summary_lookup(deps: Kernel) -> PursuitSummaryLookup:
+    """Pick the read adapter this deployment can actually use.
+
+    With a pool, the projection table, which a background worker keeps in
+    step. Without one, a fold over every pursuit stream, because the worker
+    does not run when there is nothing to project into and an empty table
+    would answer "nothing is authorized here" to somebody standing at a
+    beamline where a loop is running.
+    """
+    if deps.pool is not None:
+        return PostgresPursuitSummaryLookup(deps.pool)
+    if isinstance(deps.event_store, InMemoryEventStore):
+        return InMemoryPursuitSummaryLookup(deps.event_store)
+    raise UnreadableSummariesError(type(deps.event_store).__name__)
 
 
 def wire_pursuit(deps: Kernel) -> PursuitHandlers:
@@ -105,6 +138,16 @@ def wire_pursuit(deps: Kernel) -> PursuitHandlers:
             command_name="OpenPursuitRound",
             bc=_BC,
         ),
+        close_pursuit_round=with_tracing(
+            close_pursuit_round.bind(deps),
+            command_name="ClosePursuitRound",
+            bc=_BC,
+        ),
+        resume_pursuit=with_tracing(
+            resume_pursuit.bind(deps),
+            command_name="ResumePursuit",
+            bc=_BC,
+        ),
         charge_pursuit=with_tracing(
             with_idempotency(
                 charge_pursuit.bind(deps),
@@ -125,6 +168,11 @@ def wire_pursuit(deps: Kernel) -> PursuitHandlers:
         get_pursuit=with_tracing(
             get_pursuit.bind(deps),
             command_name="GetPursuit",
+            bc=_BC,
+        ),
+        list_pursuits=with_tracing(
+            list_pursuits.bind(deps, _pursuit_summary_lookup(deps)),
+            command_name="ListPursuits",
             bc=_BC,
         ),
     )

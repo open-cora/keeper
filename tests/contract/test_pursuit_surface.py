@@ -422,3 +422,114 @@ def test_replaying_a_charge_key_adds_it_once_rather_than_twice(client: TestClien
         second = client.post(f"/pursuits/{pursuit_id}/charges", json=body, headers=headers)
 
         assert (first.json()["total"], second.json()["total"]) == (250, 250)
+
+
+def _an_answered_round(client: TestClient, pursuit_id: str, **answer: Any) -> int:
+    """Open a round and put an answer on its inquiry, ready to be closed."""
+    opened = client.post(
+        f"/pursuits/{pursuit_id}/rounds", json={"execution_id": _an_execution(client)}
+    )
+    assert opened.status_code == 201, opened.text
+    body = {"conclusion": "Abstain", "observed_step_count": 0, "execution_ended": True}
+    body.update(answer)
+    answered = client.post(f"/inquiries/{opened.json()['inquiry_id']}/answer", json=body)
+    assert answered.status_code == 204, answered.text
+    return len(client.get(f"/pursuits/{pursuit_id}").json().get("rounds", [])) or 0
+
+
+def _a_proposal(client: TestClient) -> str:
+    plan = client.post(
+        "/plans",
+        json={
+            "name": "count",
+            "parameters_schema": {"$schema": "https://json-schema.org/draft/2020-12/schema"},
+        },
+    )
+    assert plan.status_code == 201, plan.text
+    proposed = client.post("/proposals", json={"plan_id": plan.json()["plan_id"], "parameters": {}})
+    assert proposed.status_code == 201, proposed.text
+    proposal_id: str = proposed.json()["proposal_id"]
+    return proposal_id
+
+
+def test_closing_on_a_proposal_dispatches_a_run_at_the_pursuits_beamline(
+    client: TestClient,
+) -> None:
+    """Only this tier can see it. Nothing in the closing request names a
+    beamline, so a route that lost the pursuit's would leave every other
+    tier green and dispatch work somewhere nobody authorized."""
+    with client:
+        pursuit_id = _a_pursuit(client, beamline="7-bm")
+        _an_answered_round(
+            client, pursuit_id, conclusion="Propose", proposal_id=_a_proposal(client)
+        )
+
+        closed = client.post(f"/pursuits/{pursuit_id}/rounds/0/close")
+
+        assert closed.status_code == 200, closed.text
+        assert closed.json()["outcome"] == "Advanced"
+        dispatched = closed.json()["dispatched_id"]
+        assert client.get(f"/executions/{dispatched}").json()["beamline"] == "7-bm"
+
+
+def test_closing_on_a_stop_ends_the_pursuit(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+        _an_answered_round(client, pursuit_id, conclusion="Stop")
+
+        closed = client.post(f"/pursuits/{pursuit_id}/rounds/0/close")
+
+        assert closed.json() == {
+            "pursuit_id": pursuit_id,
+            "round_index": 0,
+            "outcome": "Completed",
+            "dispatched_id": None,
+        }
+        assert client.get(f"/pursuits/{pursuit_id}").json()["status"] == "Stopped"
+
+
+def test_closing_on_an_abstention_holds_the_pursuit_and_it_can_be_resumed(
+    client: TestClient,
+) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+        _an_answered_round(client, pursuit_id, conclusion="Abstain")
+
+        closed = client.post(f"/pursuits/{pursuit_id}/rounds/0/close")
+        held = client.get(f"/pursuits/{pursuit_id}").json()["status"]
+        resumed = client.post(f"/pursuits/{pursuit_id}/resume")
+
+        assert (closed.json()["outcome"], held) == ("Stalled", "Held")
+        assert resumed.status_code == 204, resumed.text
+        assert client.get(f"/pursuits/{pursuit_id}").json()["status"] == "Running"
+
+
+def test_closing_a_round_whose_inquiry_has_no_answer_is_a_conflict(
+    client: TestClient,
+) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+        client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": _an_execution(client)})
+
+        closed = client.post(f"/pursuits/{pursuit_id}/rounds/0/close")
+
+        assert closed.status_code == 409, closed.text
+
+
+def test_closing_a_round_that_does_not_exist_is_a_conflict(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        assert client.post(f"/pursuits/{pursuit_id}/rounds/7/close").status_code == 409
+
+
+def test_resuming_a_running_pursuit_is_a_conflict(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        assert client.post(f"/pursuits/{pursuit_id}/resume").status_code == 409
+
+
+def test_resuming_a_pursuit_that_was_never_started_is_a_404(client: TestClient) -> None:
+    with client:
+        assert client.post(f"/pursuits/{uuid4()}/resume").status_code == 404
