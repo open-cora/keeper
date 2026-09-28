@@ -99,9 +99,9 @@ names from carrying it.
 ## Four outcomes, four classes, rather than one with a word on it
 
 A step's outcome could have ridden on a single step event as a string.
-It does not, for the reason the retired Run aggregate derived its status
-from the event type: a field can be set wrong and a class cannot, and
-this is an append-only row nobody can go back and fix.
+It does not, for the reason every status in this context is derived from
+the event type: a field can be set wrong and a class cannot, and this is
+an append-only row nobody can go back and fix.
 
 It also removes four nullable fields. Each class carries what its own
 outcome has and nothing else: a reference to the run that was opened, or

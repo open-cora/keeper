@@ -176,7 +176,6 @@ A proposal looks like a step nothing has driven yet, and modelling it as one wou
 
 **A proposal nothing came of would be a step nobody drove.** Every count of how far an execution got would carry steps nobody intended to run. That is the failure the [output-of-record test](../reference/modeling.md#choosing-where-an-act-is-recorded) exists to prevent: the same act landing in two places, or in this case a non-act landing among acts.
 
-The argument this replaced was aimed at the Run aggregate and was longer, because a run's required external reference and its five-valued status each gave a separate reason against folding a proposal into one. Neither bears on a step, and the two above are what remain.
 
 ## Why the aggregate is not called Decision
 

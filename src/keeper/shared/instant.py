@@ -19,9 +19,8 @@ the whole of the work here.
 
 It lives in `keeper.shared` because it is pure, imports nothing from
 `keeper`, and has three consumers across three bounded contexts. It began
-beside the Run aggregate, where the first consumer was, and stayed there
-through the second because the rule of three in
-docs/reference/layout.md was not met. Commands that describe an act
+beside its first consumer and stayed there through the second, because
+the rule of three in docs/reference/layout.md was not met. Commands that describe an act
 performed elsewhere are what reach for it, so the set of consumers grows
 with contexts of that kind rather than with contexts in general.
 

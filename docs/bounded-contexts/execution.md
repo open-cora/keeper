@@ -253,7 +253,7 @@ One table, where there were two. The second existed because the execution refusa
 
 `InvalidIdentifierError` is the odd one. It belongs to a shared value object rather than to an aggregate, so it does not follow the naming shape the other three do and is not defined in a state module. Nothing else registers a status for it, and unregistered it would be a 500.
 
-`StepRunCannotBeReportedError` is one class covering a whole state machine, which is where this parts company with the Run aggregate it replaced. A run's five transitions were five slices and so five errors, each named for the verb its caller called, and R6 is about not collapsing several VERBS into one class. This is one slice taking a discriminator, so the verb is a value rather than a call site, and five classes would be five names for one refusal nobody could tell apart by type. The error carries the state it holds and the report it got.
+`StepRunCannotBeReportedError` is one class covering a whole state machine. R6 is about not collapsing several VERBS into one class, and this is one slice taking a discriminator, so the verb is a value rather than a call site, and five classes would be five names for one refusal nobody could tell apart by type. The error carries the state it holds and the report it got.
 
 `ExecutionCannotBeClaimedError` carries the status for the same reason: being told an execution cannot be claimed is much less useful than being told something already claimed it, which is a contest, or that it ended, which is merely late.
 
@@ -530,9 +530,9 @@ What a driving surface would still add is the asking side of a pause, which is a
      wire.py                    which handler gets idempotency, which gets tracing
 ```
 
-**Thirteen directories where there were twenty-one.** Eight left with the Run aggregate, and six of those were its transitions: five near-identical handlers plus a genesis. [Layout](../reference/layout.md#bc-root-extras) records a shared shell for them that was built and then reverted, and the decision it records is still the live one, because the same question came up again here and was answered the other way.
+**Thirteen directories where there were twenty-one.** Eight went with an aggregate this context no longer has, and six of those were its transitions: five near-identical handlers plus a genesis. [Layout](../reference/layout.md#bc-root-extras) records a shared shell for them that was built and then reverted, and the decision it records is still the live one, because the same question came up again here and was answered the other way.
 
-`report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what Run did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
+`report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what that aggregate did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
 
 `define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may hold several runs, so its handler loads each distinct operation once and hands the lot across keyed by id. Once, because a tomography procedure running the same operation at twenty sample positions would otherwise replay that stream twenty times for no new information.
 
@@ -564,7 +564,7 @@ Any way to hear from an engine that names its run only at the end. The engine re
 
 This is less damaging than it was. The reference is a correlation hint rather than a key, so an engine that cannot supply one still has its step reported: what is lost is the ability to join that step to whatever the engine wrote. Recording the whole thing in one call is still not a variation on this shape.
 
-A shared shell for near-identical update handlers. It was built for the Run aggregate's five, measured against the alternative and reverted; see [Layout](../reference/layout.md#bc-root-extras). There are fewer of them to share now, which is a reason the question has not come back rather than an answer to it.
+A shared shell for near-identical update handlers. It was built for the five transitions of a since-retired aggregate, measured against the alternative and reverted; see [Layout](../reference/layout.md#bc-root-extras). There are fewer of them to share now, which is a reason the question has not come back rather than an answer to it.
 
 Any way to say which operation named `count` is the one to use now. Deliberately unanswered here rather than deferred: a caller resolving a name knows which engine it is speaking to and this system does not, so the mapping belongs with the caller. What would change that is a second caller wanting the same answer for a different reason, at which point the question is an operation lifecycle and worth deciding on its own terms rather than as a lookup.
 
