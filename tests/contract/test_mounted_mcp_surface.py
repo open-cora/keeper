@@ -107,6 +107,7 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "resume_pursuit",
         "withdraw_pursuit",
         "get_pursuit",
+        "list_pursuits",
     }
 )
 """Spelled out rather than imported, so this side is independent.
@@ -753,6 +754,10 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         _call(client, live, "resume_pursuit", pursuit_id=pursuit_id)
         after_resuming = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
 
+        # The question somebody standing at a beamline asks: what is
+        # authorized to dispatch work here.
+        authorized_here = _call(client, live, "list_pursuits", beamline="2-bm", status="Running")
+
         # The half of the budget nothing here can measure. A thinker charges
         # what it spent, and the answer is where the budget now stands.
         charged = _call(
@@ -934,6 +939,10 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "because more data may land and the authorization is still good"
     )
     assert after_resuming["status"] == "Running"
+    assert [item["pursuit_id"] for item in authorized_here["items"]] == [pursuit_id], (
+        "narrowing by beamline and status is the question an operator asks, and "
+        "the answer has to be the loops that may run there rather than all of them"
+    )
     assert while_running["status"] == "Running"
     assert while_running["budget"] == {"Rounds": 8, "Tokens": 400000}, (
         "a budget comes back keyed by dimension and spelled as it went in, because "

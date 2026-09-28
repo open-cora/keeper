@@ -17,6 +17,10 @@ Four shapes:
              the amount was not positive, the dimension is one this
              system counts for itself, or the pursuit was never bounded
              in it
+         InvalidCursorError
+             a page cursor did not decode. Registered in
+             `keeper.infrastructure`, not here, because every listing in
+             the tree raises the same one
 
     403  UnauthorizedError
              the caller is known and refused, which is a different fact
@@ -80,6 +84,7 @@ from keeper.pursuit.features import (
     charge_pursuit,
     close_pursuit_round,
     get_pursuit,
+    list_pursuits,
     open_pursuit_round,
     resume_pursuit,
     start_pursuit,
@@ -114,6 +119,7 @@ def register_pursuit_routes(app: FastAPI) -> None:
     app.include_router(resume_pursuit.router)
     app.include_router(withdraw_pursuit.router)
     app.include_router(get_pursuit.router)
+    app.include_router(list_pursuits.router)
 
     for bad_request_cls in (
         InvalidPursuitGoalError,

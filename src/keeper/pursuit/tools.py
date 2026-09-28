@@ -4,7 +4,7 @@
 always reaches the bundle the lifespan wired rather than one captured
 before startup finished.
 
-All seven are here, including the one that hands out a standing
+All eight are here, including the one that hands out a standing
 permission and the one that puts a held loop back to work, and that is
 worth stating rather than leaving to be noticed.
 
@@ -24,6 +24,7 @@ from mcp.server.fastmcp import FastMCP
 from keeper.pursuit.features.charge_pursuit import tool as charge_pursuit_tool
 from keeper.pursuit.features.close_pursuit_round import tool as close_pursuit_round_tool
 from keeper.pursuit.features.get_pursuit import tool as get_pursuit_tool
+from keeper.pursuit.features.list_pursuits import tool as list_pursuits_tool
 from keeper.pursuit.features.open_pursuit_round import tool as open_pursuit_round_tool
 from keeper.pursuit.features.resume_pursuit import tool as resume_pursuit_tool
 from keeper.pursuit.features.start_pursuit import tool as start_pursuit_tool
@@ -64,6 +65,10 @@ def register_pursuit_tools(
     get_pursuit_tool.register(
         mcp,
         get_handler=lambda: get_handlers().get_pursuit,
+    )
+    list_pursuits_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().list_pursuits,
     )
 
 

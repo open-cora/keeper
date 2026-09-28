@@ -65,6 +65,17 @@ from keeper.execution.aggregates.procedure.state import (
 )
 from keeper.infrastructure.ports.event_store import EventStore
 from keeper.infrastructure.slices.envelope import to_new_event
+from keeper.pursuit.aggregates.pursuit import (
+    PURSUIT_STREAM_TYPE,
+    PursuitEvent,
+    PursuitResumed,
+    PursuitRoundClosed,
+    PursuitRoundOpened,
+    PursuitStarted,
+    PursuitWithdrawn,
+    RoundOutcome,
+)
+from keeper.pursuit.aggregates.pursuit import to_payload as pursuit_payload
 from keeper.shared.identifier import Identifier
 
 _EMPTY_SCHEMA: Final[dict[str, Any]] = {
@@ -481,6 +492,7 @@ __all__ = [
     "EventStorePlanWriter",
     "EventStoreProcedureWriter",
     "EventStoreProposalWriter",
+    "EventStorePursuitWriter",
 ]
 
 
@@ -577,3 +589,110 @@ class EventStoreExecutionWriter:
             ],
         )
         self._versions[execution_id] = version + 1
+
+
+class EventStorePursuitWriter:
+    """Writes real pursuit events, the way the handlers do.
+
+    Five verbs where the inquiry writer has three, and the reason is the
+    same one that made this contract worth its own suite: a pursuit's
+    status goes backwards, so a writer that could only build a forward
+    sequence would never reach the state the read side most easily gets
+    wrong.
+
+    Versions are counted rather than assumed, for the reason they are next
+    door. A pursuit may be held, resumed and held again any number of
+    times before it is withdrawn, so there is no fixed version any verb
+    lands at.
+
+    `start` takes the author, the goal and the beamline rather than
+    minting them, because a writer that chose them would leave a later
+    check unable to say which pursuits it expected back.
+
+    There is no verb for a charge. Nothing on the summary row moves when
+    one lands, and a writer offering one would invite a check on a column
+    that does not exist.
+    """
+
+    def __init__(self, event_store: EventStore) -> None:
+        self._event_store = event_store
+        self._principal_id = uuid4()
+        self._versions: dict[UUID, int] = {}
+
+    async def start(
+        self,
+        *,
+        pursuit_id: UUID,
+        actor_id: UUID,
+        goal: str,
+        beamline: str,
+        at: datetime,
+    ) -> None:
+        event = PursuitStarted(
+            pursuit_id=pursuit_id,
+            actor_id=actor_id,
+            goal=goal,
+            beamline=beamline,
+            scopes=("2bmb:det:",),
+            budget={"Rounds": 8},
+            occurred_at=at,
+        )
+        await self._append(pursuit_id, event, "StartPursuit", at)
+
+    async def open_round(self, *, pursuit_id: UUID, round_index: int, at: datetime) -> None:
+        event = PursuitRoundOpened(
+            pursuit_id=pursuit_id,
+            round_index=round_index,
+            execution_id=uuid4(),
+            inquiry_id=uuid4(),
+            occurred_at=at,
+        )
+        await self._append(pursuit_id, event, "OpenPursuitRound", at)
+
+    async def close_round(
+        self, *, pursuit_id: UUID, round_index: int, outcome: RoundOutcome, at: datetime
+    ) -> None:
+        advancing = outcome is RoundOutcome.ADVANCED
+        event = PursuitRoundClosed(
+            pursuit_id=pursuit_id,
+            round_index=round_index,
+            outcome=outcome.value,
+            proposal_id=uuid4() if advancing else None,
+            dispatched_id=uuid4() if advancing else None,
+            occurred_at=at,
+        )
+        await self._append(pursuit_id, event, "ClosePursuitRound", at)
+
+    async def resume(self, *, pursuit_id: UUID, at: datetime) -> None:
+        event = PursuitResumed(pursuit_id=pursuit_id, actor_id=uuid4(), occurred_at=at)
+        await self._append(pursuit_id, event, "ResumePursuit", at)
+
+    async def withdraw(self, *, pursuit_id: UUID, at: datetime) -> None:
+        event = PursuitWithdrawn(pursuit_id=pursuit_id, actor_id=uuid4(), occurred_at=at)
+        await self._append(pursuit_id, event, "WithdrawPursuit", at)
+
+    async def _append(
+        self,
+        pursuit_id: UUID,
+        event: PursuitEvent,
+        command_name: str,
+        at: datetime,
+    ) -> None:
+        expected_version = self._versions.get(pursuit_id, 0)
+        await self._event_store.append(
+            PURSUIT_STREAM_TYPE,
+            pursuit_id,
+            expected_version,
+            [
+                to_new_event(
+                    event_type=type(event).__name__,
+                    payload=pursuit_payload(event),
+                    occurred_at=at,
+                    event_id=uuid4(),
+                    command_name=command_name,
+                    correlation_id=uuid4(),
+                    principal_id=self._principal_id,
+                )
+            ],
+        )
+        self._versions[pursuit_id] = expected_version + 1
