@@ -216,17 +216,15 @@ def test_replaying_an_idempotency_key_returns_the_same_pursuit(client: TestClien
         assert second.json()["pursuit_id"] == first.json()["pursuit_id"]
 
 
-def test_replaying_a_withdrawal_is_refused_like_every_other_transition(
+def test_replaying_a_withdrawal_with_its_key_is_told_it_worked(
     client: TestClient,
 ) -> None:
-    """The wrapper was wired here first and backed out, so this pins the
-    behaviour that replaced it.
+    """The only transition in this tree that answers a retry from cache.
 
-    `with_idempotency` cannot carry a handler that returns None: a stored
-    result of None reads as no stored result, so the replay runs the
-    handler again and caches the refusal. `wire.py` holds the whole
-    argument. What a caller sees is a 409, which is what a replayed
-    transition is everywhere else in this tree.
+    A handler returning None could not be wrapped until the store learned
+    to record a completed row without a stored result, and this is the
+    slice that drove the change. What a caller with a timed-out request
+    sees now is the answer it missed rather than a refusal.
     """
     with client:
         pursuit_id = _a_pursuit(client)
@@ -234,6 +232,26 @@ def test_replaying_a_withdrawal_is_refused_like_every_other_transition(
 
         first = client.post(f"/pursuits/{pursuit_id}/withdraw", headers=headers)
         second = client.post(f"/pursuits/{pursuit_id}/withdraw", headers=headers)
+
+        assert (first.status_code, second.status_code) == (204, 204), second.text
+
+
+def test_withdrawing_again_under_a_different_key_still_meets_the_decider(
+    client: TestClient,
+) -> None:
+    """The key replays one caller's own retry and nothing else.
+
+    Sibling of the check above, and the pair is the point: a cache that
+    answered every repeat would hide a second person stopping a pursuit
+    that had already stopped, which is a real thing to be told about.
+    """
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        first = client.post(f"/pursuits/{pursuit_id}/withdraw", headers={"Idempotency-Key": "one"})
+        second = client.post(
+            f"/pursuits/{pursuit_id}/withdraw", headers={"Idempotency-Key": "another"}
+        )
 
         assert (first.status_code, second.status_code) == (204, 409), second.text
 

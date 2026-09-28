@@ -170,27 +170,29 @@ The five are speech acts, and a speech act happens where it is spoken: there is 
 
 `charge_pursuit` describes rather than makes, so it takes the caller's moment and falls back to the clock, beside `report_step` and away from the five around it.
 
-## Idempotency, and one place it could not be applied
+## Idempotency, and the one transition that takes a key
 
-Four of the six writing slices need no retry key, and two do.
+Three of the six writing slices take a retry key and three do not.
 
 ```
    start_pursuit         key     a retry without one is a second standing
                                  authorization nobody asked for
    charge_pursuit        key     charges add rather than replace, so a
                                  redelivered one spends the budget twice
+   withdraw_pursuit      key     the only transition in this tree with one
    open_pursuit_round    none    the pursuit refuses a second round about
                                  an execution it already asked about
    close_pursuit_round   none    a round that already closed refuses
    resume_pursuit        none    a running pursuit refuses
-   withdraw_pursuit      none    see below
 ```
 
-The two that go without a key are protected by something better than a cache: the domain refuses the duplicate, which matters most on closing, where the duplicate a retry would otherwise make is a second execution at a beamline.
+The three that go without are protected by something better than a cache: the domain refuses the duplicate. That matters most on closing, where the duplicate a retry would otherwise make is a second execution at a beamline.
 
-Withdrawing was wired with the wrapper first, and the wrapper could not carry it. `with_idempotency` cannot hold a handler that returns None, because a stored result of None is indistinguishable from no stored result, so the replay reads as a fresh claim, runs the handler again and caches the refusal it raises. Nothing else in this tree returns None through the wrapper, so the limitation had never been reached.
+**Withdrawing is the exception, and it is a deliberate one.** A 409 is the right answer to somebody stopping a pursuit that had already stopped, and the wrong answer to one person's own retry after a timeout. Those are different events and only a key tells them apart, so a replayed withdrawal carrying its key is a second 204 and a withdrawal arriving without one still meets the decider. The contract tier pins both halves, because a cache that answered every repeat would hide the fact worth being told.
 
-It was backed out rather than papered over. A replayed withdrawal is a 409, which is what a replayed transition is everywhere else here, and the contract tier pins that rather than leaving it to be discovered. Fixing it properly means changing both idempotency adapters and the constraint behind them, which is shared infrastructure and did not belong in the commit that adds a context. `charge_pursuit` can take the wrapper because it answers with the new total, which is a number a reporter wants anyway and, not coincidentally, is not None.
+Getting there meant fixing the chassis rather than this context. `with_idempotency` could not wrap a handler returning None: the store recorded a completed call by storing a non-null result, so a stored None read back as no row at all. Postgres refused the write after the handler had already appended its events, which is a 500 for a call that worked, and the in-memory adapter lost the row and ran the handler a second time.
+
+The store names the state in a column now instead of inferring it from which column is null, which is the same move this context's read model made and for the same reason. `withdraw_pursuit` was the slice that found it, and is the first caller of the codec pair that had been sitting in the chassis unused and unusable.
 
 ## Why the read model stores a status
 

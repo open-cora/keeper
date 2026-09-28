@@ -131,7 +131,7 @@ Detection is lenient: a slice counts as covered if either the 1:1 file `test_<sl
 
 ## Idempotency contract tests
 
-Create-style slices that accept `Idempotency-Key` get a dedicated `test_<slice>_idempotency.py` contract test. State-transition slices do not need them; the state machine rejects duplicate transitions naturally.
+Create-style slices that accept `Idempotency-Key` get a dedicated `test_<slice>_idempotency.py` contract test. State-transition slices usually do not need them, because the state machine rejects duplicate transitions naturally. A transition that takes a key anyway needs two tests rather than one: that a replay carrying the key returns the first answer, and that a repeat without it still reaches the decider. Withdrawing a pursuit is the one such slice, and the pair is what stops the cache hiding a real conflict.
 
 ## Event-sourcing aggregate conventions
 

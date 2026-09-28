@@ -11,9 +11,12 @@ No body at all. The only thing a caller could put in one is a reason, and
 this record declines to hold one: who withdrew it is on the envelope, and
 asking that person is better than reading free text they typed in a hurry.
 
-No `Idempotency-Key` either, beside every other transition in this tree. A
-replayed withdrawal is a 409 rather than a second 204, which is what a
-replayed transition is everywhere else here.
+An `Idempotency-Key`, which no other transition in this tree takes. A 409
+is the right answer to withdrawing a pursuit that somebody else already
+stopped, and the wrong answer to a caller's own retry after a timeout;
+only a key tells those two apart. Sent with one, a replayed withdrawal is
+a second 204. Sent without, it meets the decider and is refused like any
+other repeat.
 
 204 rather than the pursuit back. A caller that wants the stopped record
 can read it, and returning it here would make the common case pay for the
@@ -23,7 +26,7 @@ rare one.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
 
 from keeper.infrastructure.request import (
     ErrorResponse,
@@ -32,11 +35,11 @@ from keeper.infrastructure.request import (
     get_surface_id,
 )
 from keeper.pursuit.features.withdraw_pursuit.command import WithdrawPursuit
-from keeper.pursuit.features.withdraw_pursuit.handler import Handler
+from keeper.pursuit.features.withdraw_pursuit.handler import IdempotentHandler
 
 
-def _get_handler(request: Request) -> Handler:
-    handler: Handler = request.app.state.pursuit.withdraw_pursuit
+def _get_handler(request: Request) -> IdempotentHandler:
+    handler: IdempotentHandler = request.app.state.pursuit.withdraw_pursuit
     return handler
 
 
@@ -64,14 +67,25 @@ router = APIRouter(tags=["pursuit"])
 )
 async def post_pursuit_withdrawal(
     pursuit_id: UUID,
-    handler: Annotated[Handler, Depends(_get_handler)],
+    handler: Annotated[IdempotentHandler, Depends(_get_handler)],
     cid: Annotated[UUID, Depends(get_correlation_id)],
     principal_id: Annotated[UUID, Depends(get_principal_id)],
     surface_id: Annotated[UUID, Depends(get_surface_id)],
+    idempotency_key: Annotated[
+        str | None,
+        Header(
+            alias="Idempotency-Key",
+            description=(
+                "Replay the same key to be told the withdrawal worked, "
+                "rather than that it had already happened."
+            ),
+        ),
+    ] = None,
 ) -> None:
     await handler(
         WithdrawPursuit(pursuit_id=pursuit_id),
         principal_id=principal_id,
         correlation_id=cid,
         surface_id=surface_id,
+        idempotency_key=idempotency_key,
     )

@@ -70,6 +70,49 @@ async def check_a_finished_call_replays_the_result_it_returned(
     assert outcome.command_name == "DoThing"
 
 
+async def check_a_finished_call_that_returned_nothing_replays_as_a_success(
+    store: IdempotencyStore,
+) -> None:
+    """A handler with nothing to return still gets replay protection.
+
+    The one an adapter is most likely to get wrong, because a stored
+    None looks like nothing stored unless something else records that
+    the call finished. Both adapters once got it wrong in different
+    directions: one refused the write and one lost the row.
+    """
+    principal, surface = uuid4(), uuid4()
+    await store.claim(principal, "k", surface, "hash", "DoThing", lock_stale_seconds=_HOLD)
+    await store.finalize_success(principal, "k", surface, None)
+
+    outcome = await store.claim(
+        principal, "k", surface, "hash", "DoThing", lock_stale_seconds=_HOLD
+    )
+    assert isinstance(outcome, CachedSuccess), "a success with no payload was not replayed"
+    assert outcome.result is None
+    assert outcome.command_name == "DoThing"
+
+
+async def check_a_call_that_returned_nothing_is_not_read_back_as_a_failure(
+    store: IdempotencyStore,
+) -> None:
+    """The empty success must not drift into the other two states.
+
+    Asserted separately from the check above because they fail on
+    different mistakes. That one catches an adapter that loses the row;
+    this one catches an adapter that keeps it and files it under the
+    wrong outcome, which would replay a 4xx for a call that worked.
+    """
+    principal, surface = uuid4(), uuid4()
+    await store.claim(principal, "k", surface, "hash", "DoThing", lock_stale_seconds=_HOLD)
+    await store.finalize_success(principal, "k", surface, None)
+
+    outcome = await store.claim(
+        principal, "k", surface, "hash", "DoThing", lock_stale_seconds=_HOLD
+    )
+    assert not isinstance(outcome, CachedError), "an empty success replayed as an error"
+    assert not isinstance(outcome, Claimed), "an empty success replayed as a fresh claim"
+
+
 async def check_a_finished_failure_replays_the_error_it_raised(
     store: IdempotencyStore,
 ) -> None:
@@ -172,6 +215,8 @@ CHECKS: tuple[Check, ...] = (
     check_a_fresh_key_is_claimed,
     check_a_second_claim_while_the_first_is_in_flight_is_told_to_wait,
     check_a_finished_call_replays_the_result_it_returned,
+    check_a_finished_call_that_returned_nothing_replays_as_a_success,
+    check_a_call_that_returned_nothing_is_not_read_back_as_a_failure,
     check_a_finished_failure_replays_the_error_it_raised,
     check_a_finished_key_reused_with_a_different_command_is_refused,
     check_the_same_key_under_a_different_principal_is_a_separate_claim,
