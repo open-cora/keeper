@@ -48,6 +48,8 @@ EXPECTED_OPENAPI_PATHS = frozenset(
         "/pursuits",
         "/pursuits/{pursuit_id}",
         "/pursuits/{pursuit_id}/withdraw",
+        "/pursuits/{pursuit_id}/rounds",
+        "/pursuits/{pursuit_id}/charges",
         "/plans",
         "/plans/{plan_id}",
         "/procedures",

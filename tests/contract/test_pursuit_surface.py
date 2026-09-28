@@ -236,3 +236,189 @@ def test_replaying_a_withdrawal_is_refused_like_every_other_transition(
         second = client.post(f"/pursuits/{pursuit_id}/withdraw", headers=headers)
 
         assert (first.status_code, second.status_code) == (204, 409), second.text
+
+
+def _an_execution(client: TestClient) -> str:
+    """Dispatch something real for a round to observe."""
+    defined = client.post(
+        "/procedures",
+        json={
+            "name": "park",
+            "beamline": "2-bm",
+            "steps": [{"kind": "move", "record": "2bmb:m1", "to": 0.0}],
+        },
+    )
+    assert defined.status_code == 201, defined.text
+    dispatched = client.post("/executions", json={"procedure_id": defined.json()["procedure_id"]})
+    assert dispatched.status_code == 201, dispatched.text
+    execution_id: str = dispatched.json()["execution_id"]
+    return execution_id
+
+
+def test_opening_a_round_returns_the_inquiry_a_thinker_should_answer(
+    client: TestClient,
+) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+        execution_id = _an_execution(client)
+
+        opened = client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": execution_id})
+
+        assert opened.status_code == 201, opened.text
+        assert opened.json()["inquiry_id"]
+
+
+def test_the_inquiry_a_round_opens_carries_the_pursuits_goal(client: TestClient) -> None:
+    """Only this tier can see it. The objective is not a request field on
+    the round, so a route that dropped it would leave every other tier
+    green."""
+    with client:
+        pursuit_id = _a_pursuit(client)
+        execution_id = _an_execution(client)
+
+        opened = client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": execution_id})
+        inquiry = client.get(f"/inquiries/{opened.json()['inquiry_id']}").json()
+
+        assert inquiry["objective"] == _BODY["goal"]
+        assert inquiry["execution_id"] == execution_id
+
+
+def test_a_second_round_about_one_execution_is_a_conflict(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+        execution_id = _an_execution(client)
+        client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": execution_id})
+
+        again = client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": execution_id})
+
+        assert again.status_code == 409, again.text
+
+
+def test_a_round_on_a_withdrawn_pursuit_is_a_conflict(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+        execution_id = _an_execution(client)
+        client.post(f"/pursuits/{pursuit_id}/withdraw")
+
+        opened = client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": execution_id})
+
+        assert opened.status_code == 409, opened.text
+
+
+def test_a_round_past_the_budget_is_a_conflict_naming_the_dimension(
+    client: TestClient,
+) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client, budget={"Rounds": 1})
+        client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": _an_execution(client)})
+
+        past = client.post(
+            f"/pursuits/{pursuit_id}/rounds", json={"execution_id": _an_execution(client)}
+        )
+
+        assert past.status_code == 409, past.text
+        assert "Rounds" in past.json()["detail"]
+
+
+def test_a_round_naming_an_execution_that_does_not_exist_is_a_404(client: TestClient) -> None:
+    """`ExecutionNotFoundError` is Execution's and reaches a Pursuit route.
+    Nothing in this context registers it, and only this tier can say
+    whether the reliance holds."""
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        opened = client.post(f"/pursuits/{pursuit_id}/rounds", json={"execution_id": str(uuid4())})
+
+        assert opened.status_code == 404, opened.text
+
+
+def test_charging_answers_with_where_the_budget_now_stands(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        first = client.post(
+            f"/pursuits/{pursuit_id}/charges", json={"dimension": "Tokens", "amount": 12500}
+        )
+        second = client.post(
+            f"/pursuits/{pursuit_id}/charges", json={"dimension": "Tokens", "amount": 500}
+        )
+
+        assert first.status_code == 201, first.text
+        assert (first.json()["total"], second.json()["total"]) == (12500, 13000)
+
+
+def test_charging_a_dimension_this_system_counts_for_itself_is_a_400(
+    client: TestClient,
+) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        charged = client.post(
+            f"/pursuits/{pursuit_id}/charges", json={"dimension": "Rounds", "amount": 3}
+        )
+
+        assert charged.status_code == 400, charged.text
+        assert "Rounds" in charged.json()["detail"]
+
+
+def test_charging_a_dimension_the_pursuit_was_not_bounded_in_is_a_400(
+    client: TestClient,
+) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        charged = client.post(
+            f"/pursuits/{pursuit_id}/charges", json={"dimension": "BeamSeconds", "amount": 90}
+        )
+
+        assert charged.status_code == 400, charged.text
+
+
+def test_an_amount_that_is_not_positive_is_refused_by_the_model(client: TestClient) -> None:
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        charged = client.post(
+            f"/pursuits/{pursuit_id}/charges", json={"dimension": "Tokens", "amount": 0}
+        )
+
+        assert charged.status_code == 422, charged.text
+
+
+def test_a_charge_carrying_a_naive_timestamp_is_a_400(client: TestClient) -> None:
+    """`InvalidOccurredAtError` is the shared helper's, registered by
+    Execution for the whole application. This context relies on it and
+    cannot say so in its own source."""
+    with client:
+        pursuit_id = _a_pursuit(client)
+
+        charged = client.post(
+            f"/pursuits/{pursuit_id}/charges",
+            json={"dimension": "Tokens", "amount": 10, "occurred_at": "2026-09-27T09:00:00"},
+        )
+
+        assert charged.status_code == 400, charged.text
+
+
+def test_charging_a_pursuit_that_was_never_started_is_a_404(client: TestClient) -> None:
+    with client:
+        charged = client.post(
+            f"/pursuits/{uuid4()}/charges", json={"dimension": "Tokens", "amount": 10}
+        )
+
+        assert charged.status_code == 404, charged.text
+
+
+def test_replaying_a_charge_key_adds_it_once_rather_than_twice(client: TestClient) -> None:
+    """The one retry key in this context that does something. Charges add
+    rather than replace, so a redelivered one is beam time spent twice on a
+    record that cannot be edited."""
+    with client:
+        pursuit_id = _a_pursuit(client)
+        headers = {"Idempotency-Key": "a-retried-charge"}
+        body = {"dimension": "Tokens", "amount": 250}
+
+        first = client.post(f"/pursuits/{pursuit_id}/charges", json=body, headers=headers)
+        second = client.post(f"/pursuits/{pursuit_id}/charges", json=body, headers=headers)
+
+        assert (first.json()["total"], second.json()["total"]) == (250, 250)

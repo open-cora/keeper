@@ -4,7 +4,7 @@
 always reaches the bundle the lifespan wired rather than one captured
 before startup finished.
 
-All three are here, including the one that hands out a standing
+All five are here, including the one that hands out a standing
 permission, and that is worth stating rather than leaving to be noticed.
 
 An agent can start a pursuit. The alternative would be an HTTP-only
@@ -20,7 +20,9 @@ from collections.abc import Callable
 
 from mcp.server.fastmcp import FastMCP
 
+from keeper.pursuit.features.charge_pursuit import tool as charge_pursuit_tool
 from keeper.pursuit.features.get_pursuit import tool as get_pursuit_tool
+from keeper.pursuit.features.open_pursuit_round import tool as open_pursuit_round_tool
 from keeper.pursuit.features.start_pursuit import tool as start_pursuit_tool
 from keeper.pursuit.features.withdraw_pursuit import tool as withdraw_pursuit_tool
 from keeper.pursuit.wire import PursuitHandlers
@@ -35,6 +37,14 @@ def register_pursuit_tools(
     start_pursuit_tool.register(
         mcp,
         get_handler=lambda: get_handlers().start_pursuit,
+    )
+    open_pursuit_round_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().open_pursuit_round,
+    )
+    charge_pursuit_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().charge_pursuit,
     )
     withdraw_pursuit_tool.register(
         mcp,

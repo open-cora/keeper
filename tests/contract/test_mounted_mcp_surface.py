@@ -101,6 +101,8 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "get_device",
         "list_devices",
         "start_pursuit",
+        "open_pursuit_round",
+        "charge_pursuit",
         "withdraw_pursuit",
         "get_pursuit",
     }
@@ -607,29 +609,6 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         _call(client, live, "retire_device", device_id=device_id)
         after_retirement = _call(client, live, "get_device", device_id=device_id)["status"]
 
-        # The pursuit leg, which borrows nothing and is borrowed from by
-        # nothing yet. A pursuit authorizes what a machine may go on to do,
-        # and the verbs that spend that authorization are not on this
-        # surface, so what an execution of it can reach today is the
-        # authorization itself: state it, read it back, revoke it.
-        #
-        # The budget names two dimensions on purpose. One would run
-        # whatever the mapping does with a single key, and the whole reason
-        # a budget is a mapping is that a deployment picks more than one.
-        authorized = _call(
-            client,
-            live,
-            "start_pursuit",
-            goal="find the edge of the useful exposure range",
-            beamline="2-bm",
-            scopes=["2bmb:m1", "2bmb:det"],
-            budget={"Rounds": 8, "Tokens": 400000},
-        )
-        pursuit_id = authorized["pursuit_id"]
-        while_running = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
-        _call(client, live, "withdraw_pursuit", pursuit_id=pursuit_id)
-        after_withdrawal = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
-
         # The execution leg. An execution now cites a procedure, so this borrows the
         # one composed earlier on this same execution of the surface rather
         # than standing alone.
@@ -693,6 +672,60 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         # The read that needs no execution id: someone asking how a routine
         # went, every time it was run.
         recovered = _call(client, live, "list_executions", procedure_id=walk_procedure)
+
+        # The pursuit leg, last because it is the only one that borrows from
+        # every leg before it. A pursuit authorizes work toward a goal and
+        # then asks what should run next given an execution, so it needs one
+        # that has already been through the walk above.
+        #
+        # The budget names two dimensions on purpose. One would run whatever
+        # the mapping does with a single key, and the whole reason a budget
+        # is a mapping is that a deployment picks more than one.
+        authorized = _call(
+            client,
+            live,
+            "start_pursuit",
+            goal="find the edge of the useful exposure range",
+            beamline="2-bm",
+            scopes=["2bmb:m1", "2bmb:det"],
+            budget={"Rounds": 8, "Tokens": 400000},
+        )
+        pursuit_id = authorized["pursuit_id"]
+        while_running = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
+
+        # One turn of the loop. The question is the pursuit's own goal, so
+        # nothing is phrased here, and what comes back is an inquiry a
+        # thinker would claim.
+        turned = _call(
+            client,
+            live,
+            "open_pursuit_round",
+            pursuit_id=pursuit_id,
+            execution_id=execution_id,
+        )
+        asked_about = _call(client, live, "get_inquiry", inquiry_id=turned["inquiry_id"])
+
+        # The half of the budget nothing here can measure. A thinker charges
+        # what it spent, and the answer is where the budget now stands.
+        charged = _call(
+            client,
+            live,
+            "charge_pursuit",
+            pursuit_id=pursuit_id,
+            dimension="Tokens",
+            amount=12500,
+        )
+        charged_again = _call(
+            client,
+            live,
+            "charge_pursuit",
+            pursuit_id=pursuit_id,
+            dimension="Tokens",
+            amount=500,
+        )
+
+        _call(client, live, "withdraw_pursuit", pursuit_id=pursuit_id)
+        after_withdrawal = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
 
     assert stepped == [
         {"execution_id": execution_id, "index": 0},
@@ -834,6 +867,15 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "each transition tool must reach its own status; two matching means "
         "two bundle fields are wired to one handler, and recovery returning "
         "to Available is the one edge on this machine that points backwards"
+    )
+    assert asked_about["objective"] == "find the edge of the useful exposure range", (
+        "the question a round puts is the pursuit's own goal, so a caller cannot "
+        "ask something the person who authorized the pursuit did not"
+    )
+    assert asked_about["execution_id"] == execution_id
+    assert (charged["total"], charged_again["total"]) == (12500, 13000), (
+        "charges add to what a pursuit has spent rather than replacing it, so a "
+        "reporter can send what one turn cost without reading the record first"
     )
     assert while_running["status"] == "Running"
     assert while_running["budget"] == {"Rounds": 8, "Tokens": 400000}, (

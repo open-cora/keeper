@@ -229,15 +229,13 @@ depends_on = [
     "keeper.equipment.aggregates",
 ]
 
-# Pursuit reaches no sibling either, and unlike Equipment it will. What a
-# pursuit authorizes is acted on in Counsel and in Execution, so the doors
-# are coming; what is here now is a standing authorization and the act of
-# revoking one, and neither needs to look anywhere else.
+# Pursuit's aggregate reaches no sibling and should not. What a pursuit
+# holds is the authorization, which is decided against itself; the acting
+# is in the feature layer below, and that is where the edges are.
 #
-# The direction is fixed even though no edge exists yet. This context may
-# read the two it acts on, and neither may read it: a pursuit is why
-# something ran, and a context asking that would be asking about its own
-# cause.
+# The direction is one-way and stays that way. This context may read the
+# two it acts on, and neither may read it: a pursuit is why something ran,
+# and a context asking that would be asking about its own cause.
 [[modules]]
 path = "keeper.pursuit.aggregates"
 depends_on = ["keeper.shared", "keeper.infrastructure"]
@@ -248,6 +246,9 @@ depends_on = [
     "keeper.shared",
     "keeper.infrastructure",
     "keeper.pursuit.aggregates",
+    "keeper.counsel.aggregates",
+    "keeper.counsel",
+    "keeper.execution.aggregates",
 ]
 
 # The cross-BC doors, and how wide each one is.
@@ -372,6 +373,63 @@ expose = [
     "procedure.runs_plan",
 ]
 visibility = ["keeper.counsel"]
+
+# Pursuit reads Execution once, to refuse a round naming a run that is not
+# there. Two names, both about that one check, which is the door Custody
+# has minus the step: a pursuit observes a whole execution where a dataset
+# cites one acquisition inside it.
+#
+# `Execution` itself is not on the list, although the value is loaded and
+# used. It is handed straight to Counsel's own decider, which declares the
+# type in its context module, so nothing here writes it down. That is the
+# same sizing rule that kept the type off this door for Counsel until an
+# inquiry started naming it.
+[[interfaces]]
+from = ["keeper.execution.aggregates"]
+expose = [
+    "execution.load_execution",
+    "execution.ExecutionNotFoundError",
+]
+visibility = ["keeper.pursuit"]
+
+# Pursuit reads Counsel twice and writes it once, and both halves are the
+# same act: opening a round puts a question, and the question is an
+# inquiry. Two names off the aggregate, the stream to write on and the
+# renderer for what goes on it.
+#
+# Neither the event classes nor the fold are here. This context never reads
+# an inquiry back, because what it would want from one is the conclusion,
+# and nothing here acts on a conclusion yet.
+[[interfaces]]
+from = ["keeper.counsel.aggregates"]
+expose = [
+    "inquiry.INQUIRY_STREAM_TYPE",
+    "inquiry.to_payload",
+]
+visibility = ["keeper.pursuit"]
+
+# The feature-layer half, gated from the first import rather than after
+# the fact. Counsel's own reach into Execution's slices went ungated for
+# four commits, because a module edge grants the whole package and only an
+# interface sizes it, and the comment arguing that the aggregate door was
+# honest was describing the half something counted.
+#
+# Three names, and they are the composition: the command, the context it
+# is decided against, and the decider. Opening a round calls the pure half
+# of that slice rather than its handler, because a handler appends on its
+# own and two appends are not the single one this slice exists to make.
+#
+# Three stays three rather than collapsing behind a helper in Counsel,
+# because there is one consumer and the rule of three in
+# docs/reference/patterns.md is what holds a shape where it is.
+[[interfaces]]
+from = ["keeper.counsel"]
+expose = [
+    "features.make_inquiry.MakeInquiry",
+    "features.make_inquiry.MakeInquiryContext",
+    "features.make_inquiry.decide",
+]
+visibility = ["keeper.pursuit"]
 
 # The same consumer, and the other half of the same edge. Counsel reaches
 # Execution's feature layer once, in the slice that adopts a proposal.

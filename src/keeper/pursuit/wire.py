@@ -41,6 +41,18 @@ So a replayed withdrawal is a 409, which is what a replayed transition is
 everywhere else here, and the contract tier says so out loud rather than
 leaving it to be discovered.
 
+Charging takes the wrapper, and it is the one transition in this tree that
+needs it rather than merely reading better with it. Charges add to what a
+pursuit has spent rather than replacing it, so a redelivered one is beam
+time spent twice on a record nobody can edit. It can take the wrapper
+because it answers with the new total, which is a number a reporter wants
+anyway and, not coincidentally, is not None.
+
+Opening a round goes without, and is already protected by something
+better. A pursuit refuses a second round about an execution it has already
+asked about, so a retry is a 409 from the domain rather than a duplicate
+the chassis had to catch.
+
 No slice takes more than the kernel. Nothing here reads a projection,
 because nothing here lists anything yet.
 """
@@ -51,7 +63,13 @@ from uuid import UUID
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
-from keeper.pursuit.features import get_pursuit, start_pursuit, withdraw_pursuit
+from keeper.pursuit.features import (
+    charge_pursuit,
+    get_pursuit,
+    open_pursuit_round,
+    start_pursuit,
+    withdraw_pursuit,
+)
 
 _BC = "pursuit"
 
@@ -61,6 +79,8 @@ class PursuitHandlers:
     """The bundle, one field per slice."""
 
     start_pursuit: start_pursuit.IdempotentHandler
+    open_pursuit_round: open_pursuit_round.Handler
+    charge_pursuit: charge_pursuit.IdempotentHandler
     withdraw_pursuit: withdraw_pursuit.Handler
     get_pursuit: get_pursuit.Handler
 
@@ -78,6 +98,23 @@ def wire_pursuit(deps: Kernel) -> PursuitHandlers:
                 lock_stale_seconds=deps.settings.idempotency_lock_stale_seconds,
             ),
             command_name="StartPursuit",
+            bc=_BC,
+        ),
+        open_pursuit_round=with_tracing(
+            open_pursuit_round.bind(deps),
+            command_name="OpenPursuitRound",
+            bc=_BC,
+        ),
+        charge_pursuit=with_tracing(
+            with_idempotency(
+                charge_pursuit.bind(deps),
+                deps.idempotency_store,
+                command_name="ChargePursuit",
+                serialize_result=int,
+                deserialize_result=lambda raw: int(str(raw)),
+                lock_stale_seconds=deps.settings.idempotency_lock_stale_seconds,
+            ),
+            command_name="ChargePursuit",
             bc=_BC,
         ),
         withdraw_pursuit=with_tracing(

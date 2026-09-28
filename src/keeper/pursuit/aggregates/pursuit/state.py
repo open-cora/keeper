@@ -51,7 +51,7 @@ stops them colliding is the same thing that stops two operators colliding.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
@@ -187,6 +187,22 @@ class BudgetDimension(StrEnum):
     BEAM_SECONDS = "BeamSeconds"
     TOKENS = "Tokens"
 
+    @property
+    def is_reported(self) -> bool:
+        """Whether this dimension can only be learned from outside.
+
+        The two that can are the two a charge may name. The other three
+        are computed from the pursuit's own events and the clock, so a
+        charge against one of them would be counted twice: once by the
+        record and once by whoever sent it.
+
+        Written as a positive list of the reported pair rather than as
+        the complement of the computed three, because a dimension added
+        later is far more likely to be reported than computed, and the
+        complement would let it through by default.
+        """
+        return self in (BudgetDimension.BEAM_SECONDS, BudgetDimension.TOKENS)
+
 
 class InvalidPursuitBudgetError(ValueError):
     """A budget named no dimension, or gave one a limit that is not positive."""
@@ -228,6 +244,68 @@ class Budget:
         for dimension, limit in self.limits.items():
             if limit <= 0:
                 raise InvalidPursuitBudgetError(f"{dimension} has a limit of {limit}")
+
+
+class PursuitRoundCannotBeOpenedError(Exception):
+    """A round was asked for on a pursuit that cannot open one.
+
+    Per verb rather than collapsed onto a shared transition error, which is
+    R6 in docs/reference/naming.md. Named for the round rather than for the
+    pursuit because the round is what was refused, the way
+    `ExecutionStepNotFoundError` is named for the step.
+
+    `reason` says which of the three refusals it was, because they call for
+    opposite responses. A stopped pursuit is finished. An exhausted one
+    needs a person to decide whether to authorize more. One already asking
+    about that execution has the answer coming, and the caller should wait
+    rather than do anything.
+    """
+
+    def __init__(self, pursuit_id: UUID, reason: str) -> None:
+        super().__init__(f"Pursuit {pursuit_id} cannot open a round: {reason}")
+        self.pursuit_id = pursuit_id
+        self.reason = reason
+
+
+class InvalidPursuitChargeError(ValueError):
+    """A charge named an amount, or a dimension, this record will not take.
+
+    A `ValueError` rather than a conflict, because none of the three causes
+    is about the state the pursuit is in. An amount that is not positive, a
+    dimension this system computes for itself, and a dimension the pursuit
+    was never bounded in are all malformed rather than untimely.
+    """
+
+    def __init__(self, pursuit_id: UUID, reason: str) -> None:
+        super().__init__(f"Pursuit {pursuit_id} cannot be charged: {reason}")
+        self.pursuit_id = pursuit_id
+        self.reason = reason
+
+
+@dataclass(frozen=True, slots=True)
+class PursuitRound:
+    """One turn of the loop: what was observed, and what was asked about it.
+
+    Numbered from zero, in the order the pursuit opened them, the way an
+    execution's steps are. The index is what a caller names to close one,
+    because a round has no id of its own: it is an element of a list one
+    pursuit accumulates rather than a record anything else points at.
+
+    `execution_id` is what this round observed. It is also the retry guard:
+    a caller that crashed and came back cannot open a second round about
+    the same execution, which is what lets the thing driving a pursuit be
+    duplicated without coordinating.
+
+    `dispatched_id` is the execution this round caused, and is None until
+    the round closes with one. Nothing sets it yet, because the verb that
+    closes a round is not here. It is read all the same, by the count of
+    executions the budget can be bounded in.
+    """
+
+    index: int
+    execution_id: UUID
+    inquiry_id: UUID
+    dispatched_id: UUID | None = None
 
 
 class PursuitStatus(StrEnum):
@@ -314,6 +392,15 @@ class Pursuit:
     state because one budget dimension is measured against it. It is the
     only timestamp this aggregate keeps.
 
+    `rounds` does three jobs, which is why one tuple carries them all. It
+    is the retry guard, the counter behind two budget dimensions, and the
+    audit trail of what this one authorization actually caused.
+
+    `charged` holds only the two dimensions nothing here can measure. The
+    other three are computed in `spent`, so a number appearing here for one
+    of them would be counted twice, and the charge that would have written
+    it is refused.
+
     `stopped_by` is whoever withdrew it, and is None on a running pursuit
     and on any other way of stopping. There is one other way at present and
     it is not modelled here yet.
@@ -327,6 +414,8 @@ class Pursuit:
     budget: Budget
     started_at: datetime
     status: PursuitStatus
+    rounds: tuple[PursuitRound, ...] = ()
+    charged: Mapping[BudgetDimension, int] = field(default_factory=dict[BudgetDimension, int])
     stopped_by: UUID | None = None
 
     @property
@@ -338,6 +427,72 @@ class Pursuit:
         and this one cannot disagree with the status it reads.
         """
         return self.status is PursuitStatus.RUNNING
+
+    def spent(self, *, now: datetime) -> dict[BudgetDimension, int]:
+        """Consumption so far, in every dimension, however it is learned.
+
+        The three groups the dimensions split into arrive here by three
+        different routes and the method is the only place they meet.
+        Rounds and executions are counted off this pursuit's own history,
+        wall seconds come from the clock the caller passed, and the two
+        reported ones are read out of what somebody charged.
+
+        A dimension the budget does not bound still gets a number. It costs
+        nothing, and a caller reading this to show somebody where a pursuit
+        has got to wants all five rather than only the bounded ones.
+        """
+        return {
+            BudgetDimension.ROUNDS: len(self.rounds),
+            BudgetDimension.EXECUTIONS: sum(
+                1 for turn in self.rounds if turn.dispatched_id is not None
+            ),
+            BudgetDimension.WALL_SECONDS: max(0, int((now - self.started_at).total_seconds())),
+            BudgetDimension.BEAM_SECONDS: self.charged.get(BudgetDimension.BEAM_SECONDS, 0),
+            BudgetDimension.TOKENS: self.charged.get(BudgetDimension.TOKENS, 0),
+        }
+
+    def exhausted_by(self, *, now: datetime) -> BudgetDimension | None:
+        """The first bounded dimension that has run out, or None.
+
+        Whichever comes first, which is what a budget across several
+        dimensions means. The enum's declaration order decides which is
+        reported when two run out together, so the answer is the same on
+        every machine and does not depend on how a mapping happened to
+        iterate.
+
+        Derived rather than recorded, which is the same choice the status
+        makes and for a stronger reason. One dimension is the clock, so a
+        pursuit runs out of wall time at a moment nobody is present for. An
+        event would have to be written by whoever next called in, which
+        would date the exhaustion to the discovery rather than to when it
+        happened, and a pursuit nobody called about again would never get
+        one at all.
+
+        So there is no exhaustion event, and no status for it. What a
+        reader sees is a pursuit still authorized and a dimension with
+        nothing left, which are two true facts rather than one invented
+        one.
+        """
+        spent = self.spent(now=now)
+        return next(
+            (
+                dimension
+                for dimension in BudgetDimension
+                if dimension in self.budget.limits
+                and spent[dimension] >= self.budget.limits[dimension]
+            ),
+            None,
+        )
+
+    def has_observed(self, execution_id: UUID) -> bool:
+        """Whether a round of this pursuit already asked about that execution.
+
+        The retry guard, and the reason nothing has to claim a pursuit. A
+        driver that crashed between opening a round and hearing about it
+        comes back, tries the same execution, and is refused rather than
+        opening a second round and spending the budget twice.
+        """
+        return any(turn.execution_id == execution_id for turn in self.rounds)
 
 
 def validate_scopes(scopes: tuple[str, ...]) -> tuple[str, ...]:
@@ -381,6 +536,7 @@ __all__ = [
     "BudgetDimension",
     "InvalidPursuitBeamlineError",
     "InvalidPursuitBudgetError",
+    "InvalidPursuitChargeError",
     "InvalidPursuitGoalError",
     "InvalidPursuitScopesError",
     "Pursuit",
@@ -389,6 +545,8 @@ __all__ = [
     "PursuitCannotBeWithdrawnError",
     "PursuitGoal",
     "PursuitNotFoundError",
+    "PursuitRound",
+    "PursuitRoundCannotBeOpenedError",
     "PursuitStatus",
     "validate_scopes",
 ]

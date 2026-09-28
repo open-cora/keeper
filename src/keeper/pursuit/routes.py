@@ -13,6 +13,10 @@ Four shapes:
              there were none, one was empty, or there were too many
          InvalidPursuitBudgetError
              it bounded nothing, or a limit was not positive
+         InvalidPursuitChargeError
+             the amount was not positive, the dimension is one this
+             system counts for itself, or the pursuit was never bounded
+             in it
 
     403  UnauthorizedError
              the caller is known and refused, which is a different fact
@@ -27,6 +31,20 @@ Four shapes:
              a genesis event was asked for on a live stream
          PursuitCannotBeWithdrawnError
              the pursuit had already stopped
+         PursuitRoundCannotBeOpenedError
+             the pursuit has stopped, has spent a budget dimension, or
+             has already asked about that execution
+
+Two more this context relies on and does not register.
+`ExecutionNotFoundError` reaches a Pursuit route when a round names an
+execution that is not there, and `InvalidOccurredAtError` reaches one when
+a charge carries a naive timestamp. Both are Execution's, which is the
+context that first needed each. FastAPI's exception handlers are
+app-scoped, so the context that owns one maps it for the whole application
+and a second registration here would be the duplicate
+docs/reference/patterns.md warns against. That this context relies on
+registrations it does not make is not something the source can state, so
+the contract tier walks both.
 
 Four classes on the 400 line where the sibling contexts have one or two,
 and the count is what a standing authorization costs. Every one of them
@@ -40,13 +58,21 @@ from fastapi.responses import JSONResponse
 from keeper.pursuit.aggregates.pursuit import (
     InvalidPursuitBeamlineError,
     InvalidPursuitBudgetError,
+    InvalidPursuitChargeError,
     InvalidPursuitGoalError,
     InvalidPursuitScopesError,
     PursuitAlreadyExistsError,
     PursuitCannotBeWithdrawnError,
     PursuitNotFoundError,
+    PursuitRoundCannotBeOpenedError,
 )
-from keeper.pursuit.features import get_pursuit, start_pursuit, withdraw_pursuit
+from keeper.pursuit.features import (
+    charge_pursuit,
+    get_pursuit,
+    open_pursuit_round,
+    start_pursuit,
+    withdraw_pursuit,
+)
 
 
 async def _handle_bad_request(request: Request, exc: Exception) -> JSONResponse:
@@ -70,6 +96,8 @@ async def _handle_conflict(request: Request, exc: Exception) -> JSONResponse:
 def register_pursuit_routes(app: FastAPI) -> None:
     """Include every Pursuit router and register its exception handlers."""
     app.include_router(start_pursuit.router)
+    app.include_router(open_pursuit_round.router)
+    app.include_router(charge_pursuit.router)
     app.include_router(withdraw_pursuit.router)
     app.include_router(get_pursuit.router)
 
@@ -78,10 +106,15 @@ def register_pursuit_routes(app: FastAPI) -> None:
         InvalidPursuitBeamlineError,
         InvalidPursuitScopesError,
         InvalidPursuitBudgetError,
+        InvalidPursuitChargeError,
     ):
         app.add_exception_handler(bad_request_cls, _handle_bad_request)
     app.add_exception_handler(PursuitNotFoundError, _handle_not_found)
-    for conflict_cls in (PursuitAlreadyExistsError, PursuitCannotBeWithdrawnError):
+    for conflict_cls in (
+        PursuitAlreadyExistsError,
+        PursuitCannotBeWithdrawnError,
+        PursuitRoundCannotBeOpenedError,
+    ):
         app.add_exception_handler(conflict_cls, _handle_conflict)
 
 

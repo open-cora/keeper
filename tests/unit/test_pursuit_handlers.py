@@ -19,6 +19,13 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from keeper.counsel.aggregates.inquiry import INQUIRY_STREAM_TYPE, load_inquiry
+from keeper.execution.aggregates.execution import ExecutionNotFoundError
+from keeper.execution.aggregates.procedure import MoveStep
+from keeper.execution.features.define_procedure import DefineProcedure
+from keeper.execution.features.define_procedure import bind as bind_define_procedure
+from keeper.execution.features.dispatch_execution import DispatchExecution
+from keeper.execution.features.dispatch_execution import bind as bind_dispatch_execution
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.deps import make_inmemory_kernel
 from keeper.infrastructure.kernel import Kernel
@@ -29,17 +36,23 @@ from keeper.pursuit.aggregates.pursuit import (
     PURSUIT_STREAM_TYPE,
     Budget,
     BudgetDimension,
+    InvalidPursuitChargeError,
     Pursuit,
     PursuitAlreadyExistsError,
     PursuitBeamline,
     PursuitCannotBeWithdrawnError,
     PursuitGoal,
     PursuitNotFoundError,
+    PursuitRoundCannotBeOpenedError,
     PursuitStatus,
     load_pursuit,
 )
+from keeper.pursuit.features.charge_pursuit import ChargePursuit
+from keeper.pursuit.features.charge_pursuit import bind as bind_charge
 from keeper.pursuit.features.get_pursuit import GetPursuit
 from keeper.pursuit.features.get_pursuit import bind as bind_get
+from keeper.pursuit.features.open_pursuit_round import OpenPursuitRound
+from keeper.pursuit.features.open_pursuit_round import bind as bind_open_round
 from keeper.pursuit.features.start_pursuit import StartPursuit
 from keeper.pursuit.features.start_pursuit import bind as bind_start
 from keeper.pursuit.features.start_pursuit import decide as decide_start
@@ -286,3 +299,286 @@ async def test_reading_asks_the_authorization_port_first() -> None:
         await bind_get(deps)(
             GetPursuit(pursuit_id=uuid4()), principal_id=uuid4(), correlation_id=uuid4()
         )
+
+
+async def _an_execution(deps: Kernel) -> UUID:
+    """Dispatch something real for a round to observe.
+
+    The whole chain runs, because opening a round loads the execution and
+    counts the steps it was dispatched with: that number is the denominator
+    of the observation boundary the answer will be read against, and there
+    is nothing to fake short of dispatching something.
+    """
+    procedure_id = await bind_define_procedure(deps)(
+        DefineProcedure(
+            name="align_then_scan",
+            beamline="2-bm",
+            steps=(MoveStep(record="2bmb:m1", to=0.0), MoveStep(record="2bmb:m2", to=5.0)),
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    return await bind_dispatch_execution(deps)(
+        DispatchExecution(procedure_id=procedure_id),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def _a_round(deps: Kernel, pursuit_id: UUID, execution_id: UUID, **kw: UUID) -> UUID:
+    return await bind_open_round(deps)(
+        OpenPursuitRound(pursuit_id=pursuit_id, execution_id=execution_id),
+        principal_id=kw.get("principal_id", uuid4()),
+        correlation_id=uuid4(),
+    )
+
+
+async def test_opening_a_round_writes_both_streams_and_returns_the_inquiry() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    execution_id = await _an_execution(deps)
+
+    inquiry_id = await _a_round(deps, pursuit_id, execution_id)
+
+    on_the_pursuit, _v = await deps.event_store.load(PURSUIT_STREAM_TYPE, pursuit_id)
+    on_the_inquiry, _w = await deps.event_store.load(INQUIRY_STREAM_TYPE, inquiry_id)
+    assert [row.event_type for row in on_the_pursuit] == ["PursuitStarted", "PursuitRoundOpened"]
+    assert [row.event_type for row in on_the_inquiry] == ["InquiryMade"]
+
+
+async def test_the_question_a_round_puts_is_the_pursuits_own_goal() -> None:
+    """A caller that could word the question would be able to ask something
+    the person who authorized the pursuit did not."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    execution_id = await _an_execution(deps)
+
+    inquiry_id = await _a_round(deps, pursuit_id, execution_id)
+
+    inquiry = await load_inquiry(deps.event_store, inquiry_id)
+    assert inquiry is not None
+    assert inquiry.objective.value == _GOAL.value
+    assert inquiry.execution_id == execution_id
+
+
+async def test_a_round_captures_the_step_count_the_boundary_is_read_against() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    execution_id = await _an_execution(deps)
+
+    inquiry = await load_inquiry(deps.event_store, await _a_round(deps, pursuit_id, execution_id))
+
+    assert inquiry is not None
+    assert inquiry.execution_step_count == 2
+
+
+async def test_the_round_and_the_inquiry_cite_each_other() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    execution_id = await _an_execution(deps)
+
+    inquiry_id = await _a_round(deps, pursuit_id, execution_id)
+
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    assert pursuit.rounds[0].inquiry_id == inquiry_id
+    assert pursuit.rounds[0].execution_id == execution_id
+
+
+async def test_a_second_round_about_one_execution_is_refused() -> None:
+    """The retry guard. A driver that crashed and came back cannot spend
+    the budget twice on the same question, which is what lets it be run
+    more than once with no coordination."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    execution_id = await _an_execution(deps)
+    await _a_round(deps, pursuit_id, execution_id)
+
+    with pytest.raises(PursuitRoundCannotBeOpenedError, match="already asked"):
+        await _a_round(deps, pursuit_id, execution_id)
+
+
+async def test_a_round_on_a_withdrawn_pursuit_is_refused() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    execution_id = await _an_execution(deps)
+    await bind_withdraw(deps)(
+        WithdrawPursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+    )
+
+    with pytest.raises(PursuitRoundCannotBeOpenedError, match="stopped"):
+        await _a_round(deps, pursuit_id, execution_id)
+
+
+async def test_a_round_past_the_budget_is_refused_and_names_the_dimension() -> None:
+    """The refusal a person has to act on, so it says which limit was
+    reached rather than that some limit was."""
+    deps = _kernel()
+    pursuit_id = await bind_start(deps)(
+        StartPursuit(
+            goal=_GOAL,
+            beamline=_BEAMLINE,
+            scopes=_SCOPES,
+            budget=Budget({BudgetDimension.ROUNDS: 1}),
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    await _a_round(deps, pursuit_id, await _an_execution(deps))
+
+    with pytest.raises(PursuitRoundCannotBeOpenedError, match="Rounds"):
+        await _a_round(deps, pursuit_id, await _an_execution(deps))
+
+
+async def test_a_round_naming_an_execution_that_does_not_exist_writes_nothing() -> None:
+    """Both halves must fail together, and the inquiry is the one that
+    would otherwise land: it is a genesis on a fresh stream, so nothing
+    refuses it but the missing execution."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    with pytest.raises(ExecutionNotFoundError):
+        await _a_round(deps, pursuit_id, uuid4())
+
+    assert isinstance(deps.event_store, InMemoryEventStore)
+    assert not deps.event_store.stream_ids(INQUIRY_STREAM_TYPE)
+    pursuit = await load_pursuit(deps.event_store, pursuit_id)
+    assert pursuit is not None
+    assert pursuit.rounds == ()
+
+
+async def test_a_round_on_a_pursuit_that_was_never_started_is_not_found() -> None:
+    deps = _kernel()
+
+    with pytest.raises(PursuitNotFoundError):
+        await _a_round(deps, uuid4(), await _an_execution(deps))
+
+
+async def test_opening_a_round_asks_the_authorization_port_first() -> None:
+    allowed = _kernel()
+    pursuit_id = await _a_pursuit(allowed)
+    execution_id = await _an_execution(allowed)
+    refused = _kernel(authz=_DenyAllAuthorize())
+
+    with pytest.raises(UnauthorizedError):
+        await bind_open_round(refused)(
+            OpenPursuitRound(pursuit_id=pursuit_id, execution_id=execution_id),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+
+async def _charge(deps: Kernel, pursuit_id: UUID, dimension: BudgetDimension, amount: int) -> int:
+    return await bind_charge(deps)(
+        ChargePursuit(pursuit_id=pursuit_id, dimension=dimension, amount=amount),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def test_charging_adds_and_answers_with_the_new_total() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    first = await _charge(deps, pursuit_id, BudgetDimension.TOKENS, 12500)
+    second = await _charge(deps, pursuit_id, BudgetDimension.TOKENS, 500)
+
+    assert (first, second) == (12500, 13000)
+
+
+async def test_charging_stamps_the_clock_when_the_caller_names_no_moment() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    await _charge(deps, pursuit_id, BudgetDimension.TOKENS, 10)
+
+    stored, _version = await deps.event_store.load(PURSUIT_STREAM_TYPE, pursuit_id)
+    assert stored[-1].occurred_at == _CLOCK_NOW
+
+
+async def test_charging_stamps_the_moment_the_caller_gave() -> None:
+    """The one describing command here. Beam seconds were consumed out in
+    the world, and the caller was there while this system was not."""
+    deps = _kernel()
+    pursuit_id = await bind_start(deps)(
+        StartPursuit(
+            goal=_GOAL,
+            beamline=_BEAMLINE,
+            scopes=_SCOPES,
+            budget=Budget({BudgetDimension.BEAM_SECONDS: 3600}),
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    measured = datetime(2026, 9, 26, 22, 30, tzinfo=UTC)
+
+    await bind_charge(deps)(
+        ChargePursuit(
+            pursuit_id=pursuit_id,
+            dimension=BudgetDimension.BEAM_SECONDS,
+            amount=90,
+            occurred_at=measured,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    stored, _version = await deps.event_store.load(PURSUIT_STREAM_TYPE, pursuit_id)
+    assert stored[-1].occurred_at == measured
+    assert measured != _CLOCK_NOW
+
+
+async def test_a_stopped_pursuit_is_charged_like_any_other() -> None:
+    """What this records happened out in the world. Beam seconds from the
+    run that was in flight when somebody withdrew the pursuit are real
+    seconds, and refusing them would make the record disagree."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+    await bind_withdraw(deps)(
+        WithdrawPursuit(pursuit_id=pursuit_id), principal_id=uuid4(), correlation_id=uuid4()
+    )
+
+    assert await _charge(deps, pursuit_id, BudgetDimension.TOKENS, 40) == 40
+
+
+@pytest.mark.parametrize("amount", [0, -1])
+async def test_charging_an_amount_that_is_not_positive_is_refused(amount: int) -> None:
+    """A correction that silently reduces what a loop has spent is a way to
+    extend a budget without anybody authorizing more."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    with pytest.raises(InvalidPursuitChargeError, match="positive"):
+        await _charge(deps, pursuit_id, BudgetDimension.TOKENS, amount)
+
+
+async def test_charging_a_dimension_this_system_counts_for_itself_is_refused() -> None:
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    with pytest.raises(InvalidPursuitChargeError, match="Rounds"):
+        await _charge(deps, pursuit_id, BudgetDimension.ROUNDS, 3)
+
+
+async def test_charging_a_dimension_the_pursuit_was_not_bounded_in_is_refused() -> None:
+    """Almost certainly a caller naming the wrong pursuit, and a number
+    nothing will ever read accumulating on a record nobody can edit."""
+    deps = _kernel()
+    pursuit_id = await _a_pursuit(deps)
+
+    with pytest.raises(InvalidPursuitChargeError, match="BeamSeconds"):
+        await _charge(deps, pursuit_id, BudgetDimension.BEAM_SECONDS, 90)
+
+
+async def test_charging_a_pursuit_that_was_never_started_is_not_found() -> None:
+    deps = _kernel()
+
+    with pytest.raises(PursuitNotFoundError):
+        await _charge(deps, uuid4(), BudgetDimension.TOKENS, 10)
+
+
+async def test_charging_asks_the_authorization_port_first() -> None:
+    deps = _kernel(authz=_DenyAllAuthorize())
+
+    with pytest.raises(UnauthorizedError):
+        await _charge(deps, uuid4(), BudgetDimension.TOKENS, 10)

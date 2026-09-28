@@ -4,12 +4,16 @@ Events live with the aggregate rather than with the slice that emits them,
 because they are facts about the aggregate's history. A slice decides when
 one happens; the history is not the slice's to own.
 
-Both members are on the makes side of R8, so neither of their commands
-accepts an `occurred_at`. Authorizing a loop and revoking one are both
-speech acts, and a speech act happens where it is spoken: there is no
-earlier moment out in the world for either record to be late to. That is
-the same reading that keeps a timestamp off `make_inquiry` and puts one on
-`answer_inquiry`.
+R8 runs between these, and the split is three to one. Authorizing a loop,
+revoking one and opening a round are all acts performed here, so none of
+their commands accepts an `occurred_at`: a speech act happens where it is
+spoken and there is no earlier moment out in the world to be late to.
+
+`PursuitCharged` is the exception and the only one that could be. What it
+records is consumption measured somewhere else, by a beamline or by a
+thinker counting its own tokens, and the caller was there while this
+system was not. So its command takes the moment from the caller, beside
+`report_step` and away from the three around it.
 
 The budget rides as a mapping of plain strings to integers rather than as
 `Budget`. That is the ordinary rule in docs/reference/modeling.md rather
@@ -91,7 +95,74 @@ class PursuitWithdrawn:
     occurred_at: datetime
 
 
-PursuitEvent = PursuitStarted | PursuitWithdrawn
+@dataclass(frozen=True)
+class PursuitRoundOpened:
+    """The pursuit asked what should run next, about one execution.
+
+    Opened rather than asked, and the difference is what the record needs
+    to be able to say. Naming this one for the asking would give a class
+    that reads as the pursuit having been asked something, because every
+    event in this tree is the aggregate followed by what was done to it.
+    What happened is the opposite: the pursuit did the asking. So the round
+    is the subject, and opening one is what the pursuit did.
+
+    A round is the unit because the asking and the answer are separated by
+    however long a thinker takes, and the thing that closes one is a
+    different call than the thing that opened it. Numbering them from zero
+    is what lets the second call name the first without a round needing an
+    id of its own.
+
+    `execution_id` is what this round is about. `inquiry_id` is the
+    question that went with it, written on the same append, so a round
+    citing a question that does not exist is not a state this can reach.
+
+    Nothing here carries the objective. It is the pursuit's goal, unchanged
+    every round, and a copy on each one would be the same sentence written
+    as many times as the loop turned.
+    """
+
+    pursuit_id: UUID
+    round_index: int
+    execution_id: UUID
+    inquiry_id: UUID
+    occurred_at: datetime
+
+
+@dataclass(frozen=True)
+class PursuitCharged:
+    """Something outside reported what this pursuit consumed.
+
+    The one event here that describes rather than makes. Beam seconds are
+    measured by whatever measures beam and tokens are counted by a thinker,
+    so both arrive from a caller that was there while this system was not,
+    and the command behind this one takes their moment rather than the
+    clock's.
+
+    That also means this number is only as honest as its reporter. A
+    thinker that crashed before charging what it spent got it free, and
+    nothing here can tell. A pursuit is a governor rather than an
+    accounting system, and the two dimensions that arrive this way are why
+    that sentence is worth repeating wherever they appear.
+
+    `dimension` rides as a plain string for the reason the budget's keys
+    do, and is narrowed back to the enum at the fold. Only a reported
+    dimension may appear: the other three are computed from this
+    aggregate's own history, so a charge against one would be counted
+    twice, and the decider refuses it.
+
+    Charges accumulate rather than replace. A reporter sending what one
+    round spent does not have to know what every round before it spent,
+    which is what lets a thinker charge its own tokens without reading the
+    pursuit first.
+    """
+
+    pursuit_id: UUID
+    dimension: str
+    amount: int
+    occurred_at: datetime
+
+
+PursuitEvent = PursuitStarted | PursuitRoundOpened | PursuitCharged | PursuitWithdrawn
 """Every event that can appear on a Pursuit stream.
 
 A new member is a new class added here and to this alias, never a field
@@ -112,6 +183,21 @@ def to_payload(event: PursuitEvent) -> dict[str, Any]:
                 "beamline": event.beamline,
                 "scopes": list(event.scopes),
                 "budget": dict(event.budget),
+                "occurred_at": event.occurred_at.isoformat(),
+            }
+        case PursuitRoundOpened():
+            return {
+                "pursuit_id": str(event.pursuit_id),
+                "round_index": event.round_index,
+                "execution_id": str(event.execution_id),
+                "inquiry_id": str(event.inquiry_id),
+                "occurred_at": event.occurred_at.isoformat(),
+            }
+        case PursuitCharged():
+            return {
+                "pursuit_id": str(event.pursuit_id),
+                "dimension": event.dimension,
+                "amount": event.amount,
                 "occurred_at": event.occurred_at.isoformat(),
             }
         case PursuitWithdrawn():
@@ -155,6 +241,29 @@ def from_stored(stored: StoredEvent) -> PursuitEvent:
                 ),
                 extra=(ValueError,),
             )
+        case "PursuitRoundOpened":
+            return deserialize_or_raise(
+                "PursuitRoundOpened",
+                lambda: PursuitRoundOpened(
+                    pursuit_id=UUID(payload["pursuit_id"]),
+                    round_index=int(payload["round_index"]),
+                    execution_id=UUID(payload["execution_id"]),
+                    inquiry_id=UUID(payload["inquiry_id"]),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
+        case "PursuitCharged":
+            return deserialize_or_raise(
+                "PursuitCharged",
+                lambda: PursuitCharged(
+                    pursuit_id=UUID(payload["pursuit_id"]),
+                    dimension=str(payload["dimension"]),
+                    amount=int(payload["amount"]),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
         case "PursuitWithdrawn":
             return deserialize_or_raise(
                 "PursuitWithdrawn",
@@ -171,7 +280,9 @@ def from_stored(stored: StoredEvent) -> PursuitEvent:
 
 
 __all__ = [
+    "PursuitCharged",
     "PursuitEvent",
+    "PursuitRoundOpened",
     "PursuitStarted",
     "PursuitWithdrawn",
     "from_stored",

@@ -14,7 +14,7 @@ round-trip tests below go through `to_payload` and `from_stored` rather
 than constructing events directly.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -29,10 +29,14 @@ from keeper.pursuit.aggregates.pursuit import (
     BudgetDimension,
     InvalidPursuitBeamlineError,
     InvalidPursuitBudgetError,
+    InvalidPursuitChargeError,
     InvalidPursuitGoalError,
     InvalidPursuitScopesError,
     PursuitBeamline,
+    PursuitCharged,
+    PursuitEvent,
     PursuitGoal,
+    PursuitRoundOpened,
     PursuitStarted,
     PursuitStatus,
     PursuitWithdrawn,
@@ -62,7 +66,7 @@ def _started(**overrides: Any) -> PursuitStarted:
     return PursuitStarted(**fields)
 
 
-def _as_stored(event: PursuitStarted | PursuitWithdrawn) -> StoredEvent:
+def _as_stored(event: PursuitEvent) -> StoredEvent:
     """Put an event through the payload the store would actually hold.
 
     Constructing the event again by hand would test the constructor twice
@@ -266,3 +270,210 @@ def test_a_payload_missing_a_field_names_the_event_rather_than_the_field() -> No
 
     with pytest.raises(ValueError, match="PursuitStarted"):
         from_stored(broken)
+
+
+def _opened(pursuit_id: Any, index: int, execution_id: Any, inquiry_id: Any) -> PursuitRoundOpened:
+    return PursuitRoundOpened(
+        pursuit_id=pursuit_id,
+        round_index=index,
+        execution_id=execution_id,
+        inquiry_id=inquiry_id,
+        occurred_at=_WHEN,
+    )
+
+
+def _charged(pursuit_id: Any, dimension: str, amount: int) -> PursuitCharged:
+    return PursuitCharged(
+        pursuit_id=pursuit_id, dimension=dimension, amount=amount, occurred_at=_WHEN
+    )
+
+
+def _folded(*events: Any) -> Any:
+    """Fold a stream through the payload the store would actually hold."""
+    return fold([from_stored(_as_stored(event)) for event in events])
+
+
+def test_opening_rounds_accumulates_them_in_order() -> None:
+    started = _started()
+    first, second = uuid4(), uuid4()
+
+    pursuit = _folded(
+        started,
+        _opened(started.pursuit_id, 0, first, uuid4()),
+        _opened(started.pursuit_id, 1, second, uuid4()),
+    )
+
+    assert pursuit is not None
+    assert [turn.index for turn in pursuit.rounds] == [0, 1]
+    assert [turn.execution_id for turn in pursuit.rounds] == [first, second]
+
+
+def test_the_round_index_comes_off_the_event_rather_than_the_fold() -> None:
+    """A fold that numbered rounds itself would renumber them, and the
+    number is what a later call uses to name the round it is closing."""
+    started = _started()
+
+    pursuit = _folded(started, _opened(started.pursuit_id, 7, uuid4(), uuid4()))
+
+    assert pursuit is not None
+    assert pursuit.rounds[0].index == 7
+
+
+def test_a_pursuit_knows_which_executions_it_has_already_asked_about() -> None:
+    """The retry guard, and the reason nothing has to claim a pursuit."""
+    started = _started()
+    observed, never = uuid4(), uuid4()
+
+    pursuit = _folded(started, _opened(started.pursuit_id, 0, observed, uuid4()))
+
+    assert pursuit is not None
+    assert pursuit.has_observed(observed)
+    assert not pursuit.has_observed(never)
+
+
+def test_a_round_starts_with_nothing_dispatched() -> None:
+    started = _started()
+
+    pursuit = _folded(started, _opened(started.pursuit_id, 0, uuid4(), uuid4()))
+
+    assert pursuit is not None
+    assert pursuit.rounds[0].dispatched_id is None
+
+
+def test_charges_accumulate_rather_than_replace() -> None:
+    """A reporter sends what one turn cost without reading the record first,
+    which only works if the arm adds to what is there."""
+    started = _started()
+
+    pursuit = _folded(
+        started,
+        _charged(started.pursuit_id, "Tokens", 12500),
+        _charged(started.pursuit_id, "Tokens", 500),
+    )
+
+    assert pursuit is not None
+    assert pursuit.charged[BudgetDimension.TOKENS] == 13000
+
+
+def test_charges_in_different_dimensions_do_not_mix() -> None:
+    started = _started(budget={"Rounds": 8, "Tokens": 400000, "BeamSeconds": 3600})
+
+    pursuit = _folded(
+        started,
+        _charged(started.pursuit_id, "Tokens", 400),
+        _charged(started.pursuit_id, "BeamSeconds", 90),
+    )
+
+    assert pursuit is not None
+    assert pursuit.charged == {
+        BudgetDimension.TOKENS: 400,
+        BudgetDimension.BEAM_SECONDS: 90,
+    }
+
+
+def test_a_charge_against_a_computed_dimension_fails_at_the_fold() -> None:
+    """The direction that matters. A stored charge against rounds would be
+    counted once by the record and once by itself, quietly giving a loop
+    more room than anybody authorized."""
+    started = _started()
+
+    with pytest.raises(InvalidPursuitChargeError, match="Rounds"):
+        _folded(started, _charged(started.pursuit_id, "Rounds", 3))
+
+
+def test_spending_counts_rounds_executions_and_the_clock() -> None:
+    started = _started()
+    pursuit = _folded(
+        started,
+        _opened(started.pursuit_id, 0, uuid4(), uuid4()),
+        _charged(started.pursuit_id, "Tokens", 700),
+    )
+
+    assert pursuit is not None
+    spent = pursuit.spent(now=_WHEN + timedelta(minutes=5))
+
+    assert spent[BudgetDimension.ROUNDS] == 1
+    assert spent[BudgetDimension.EXECUTIONS] == 0, "nothing sets a round's dispatch yet"
+    assert spent[BudgetDimension.WALL_SECONDS] == 300
+    assert spent[BudgetDimension.TOKENS] == 700
+    assert spent[BudgetDimension.BEAM_SECONDS] == 0
+
+
+def test_a_clock_that_went_backwards_spends_no_negative_time() -> None:
+    """Wall seconds are the one dimension read off a caller's clock rather
+    than off this record, so the floor is here rather than assumed."""
+    pursuit = _folded(_started())
+
+    assert pursuit is not None
+    assert pursuit.spent(now=_WHEN - timedelta(hours=1))[BudgetDimension.WALL_SECONDS] == 0
+
+
+def test_a_fresh_pursuit_has_exhausted_nothing() -> None:
+    pursuit = _folded(_started())
+
+    assert pursuit is not None
+    assert pursuit.exhausted_by(now=_WHEN) is None
+
+
+def test_a_dimension_reaching_its_limit_exhausts_the_pursuit() -> None:
+    """At the limit rather than past it: a budget of eight rounds allows
+    eight, and the ninth is what is refused."""
+    started = _started(budget={"Rounds": 2})
+    pursuit = _folded(
+        started,
+        _opened(started.pursuit_id, 0, uuid4(), uuid4()),
+        _opened(started.pursuit_id, 1, uuid4(), uuid4()),
+    )
+
+    assert pursuit is not None
+    assert pursuit.exhausted_by(now=_WHEN) is BudgetDimension.ROUNDS
+
+
+def test_wall_seconds_exhaust_a_pursuit_with_nobody_present() -> None:
+    """The reason exhaustion is derived rather than an event. This one
+    becomes true at a moment no call was made."""
+    pursuit = _folded(_started(budget={"WallSeconds": 3600}))
+
+    assert pursuit is not None
+    assert pursuit.exhausted_by(now=_WHEN + timedelta(minutes=30)) is None
+    assert pursuit.exhausted_by(now=_WHEN + timedelta(hours=2)) is BudgetDimension.WALL_SECONDS
+
+
+def test_an_unbounded_dimension_never_exhausts_however_much_is_spent() -> None:
+    """Spending is reported for all five, and only the bounded ones stop
+    anything, so a pursuit bounded in rounds is not stopped by tokens."""
+    started = _started(budget={"Rounds": 8})
+    pursuit = _folded(started, _charged(started.pursuit_id, "Tokens", 10**9))
+
+    assert pursuit is not None
+    assert pursuit.exhausted_by(now=_WHEN) is None
+
+
+def test_the_first_exhausted_dimension_is_reported_in_a_fixed_order() -> None:
+    """Two running out together must answer the same way on every machine,
+    rather than depending on how a mapping happened to iterate."""
+    started = _started(budget={"Rounds": 1, "Tokens": 100})
+    pursuit = _folded(
+        started,
+        _opened(started.pursuit_id, 0, uuid4(), uuid4()),
+        _charged(started.pursuit_id, "Tokens", 100),
+    )
+
+    assert pursuit is not None
+    assert pursuit.exhausted_by(now=_WHEN) is BudgetDimension.ROUNDS
+
+
+def test_only_the_two_dimensions_nothing_here_measures_may_be_reported() -> None:
+    reported = {d for d in BudgetDimension if d.is_reported}
+
+    assert reported == {BudgetDimension.BEAM_SECONDS, BudgetDimension.TOKENS}
+
+
+def test_a_round_opened_on_a_pursuit_that_was_never_started_refuses_to_fold() -> None:
+    with pytest.raises(ValueError, match="PursuitRoundOpened"):
+        evolve(None, from_stored(_as_stored(_opened(uuid4(), 0, uuid4(), uuid4()))))
+
+
+def test_a_charge_on_a_pursuit_that_was_never_started_refuses_to_fold() -> None:
+    with pytest.raises(ValueError, match="PursuitCharged"):
+        evolve(None, from_stored(_as_stored(_charged(uuid4(), "Tokens", 10))))
