@@ -4,8 +4,9 @@
 always reaches the bundle the lifespan wired rather than one captured
 before startup finished.
 
-All five are here, including the one that hands out a standing
-permission, and that is worth stating rather than leaving to be noticed.
+All seven are here, including the one that hands out a standing
+permission and the one that puts a held loop back to work, and that is
+worth stating rather than leaving to be noticed.
 
 An agent can start a pursuit. The alternative would be an HTTP-only
 genesis, and it was rejected: a surface a person can reach and an agent
@@ -21,8 +22,10 @@ from collections.abc import Callable
 from mcp.server.fastmcp import FastMCP
 
 from keeper.pursuit.features.charge_pursuit import tool as charge_pursuit_tool
+from keeper.pursuit.features.close_pursuit_round import tool as close_pursuit_round_tool
 from keeper.pursuit.features.get_pursuit import tool as get_pursuit_tool
 from keeper.pursuit.features.open_pursuit_round import tool as open_pursuit_round_tool
+from keeper.pursuit.features.resume_pursuit import tool as resume_pursuit_tool
 from keeper.pursuit.features.start_pursuit import tool as start_pursuit_tool
 from keeper.pursuit.features.withdraw_pursuit import tool as withdraw_pursuit_tool
 from keeper.pursuit.wire import PursuitHandlers
@@ -42,9 +45,17 @@ def register_pursuit_tools(
         mcp,
         get_handler=lambda: get_handlers().open_pursuit_round,
     )
+    close_pursuit_round_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().close_pursuit_round,
+    )
     charge_pursuit_tool.register(
         mcp,
         get_handler=lambda: get_handlers().charge_pursuit,
+    )
+    resume_pursuit_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().resume_pursuit,
     )
     withdraw_pursuit_tool.register(
         mcp,

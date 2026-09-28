@@ -249,6 +249,7 @@ depends_on = [
     "keeper.counsel.aggregates",
     "keeper.counsel",
     "keeper.execution.aggregates",
+    "keeper.execution",
 ]
 
 # The cross-BC doors, and how wide each one is.
@@ -371,37 +372,70 @@ expose = [
 ]
 visibility = ["keeper.counsel"]
 
-# Pursuit reads Execution once, to refuse a round naming a run that is not
-# there. Two names, both about that one check, which is the door Custody
-# has minus the step: a pursuit observes a whole execution where a dataset
-# cites one acquisition inside it.
+# Pursuit reads Execution's aggregates twice, for two existence checks and
+# nothing else. A round naming a run that is not there is refused, and so
+# is one closing on a proposal whose plan has gone.
 #
-# `Execution` itself is not on the list, although the value is loaded and
-# used. It is handed straight to Counsel's own decider, which declares the
-# type in its context module, so nothing here writes it down. That is the
-# same sizing rule that kept the type off this door for Counsel until an
-# inquiry started naming it.
+# `Execution` and `Plan` are both absent, although both values are loaded
+# and used. The execution is handed straight to Counsel's decider, which
+# declares the type in its own context module, and the plan goes to the
+# composer, which declares it in its signature. Neither is written down
+# here. That is the same sizing rule that kept `Execution` off Counsel's
+# door until an inquiry started naming it.
 [[interfaces]]
 from = ["keeper.execution.aggregates"]
 expose = [
     "execution.load_execution",
     "execution.ExecutionNotFoundError",
+    "plan.load_plan",
+    "plan.PlanNotFoundError",
 ]
 visibility = ["keeper.pursuit"]
 
-# Pursuit reads Counsel twice and writes it once, and both halves are the
-# same act: opening a round puts a question, and the question is an
-# inquiry. Two names off the aggregate, the stream to write on and the
-# renderer for what goes on it.
+# One name onto Execution's feature layer, and it is the seam rather than
+# the parts. This is the second caller that made extracting it worth
+# doing: a pursuit closing a round on a proposal needs the same dispatch
+# adoption needs, alongside a write of its own.
 #
-# Neither the event classes nor the fold are here. This context never reads
-# an inquiry back, because what it would want from one is the conclusion,
-# and nothing here acts on a conclusion yet.
+# The two doors are identical because the need is identical, which is the
+# whole argument for the seam. Before it, this block would have listed the
+# same six names Counsel's did, and the two contexts would have held two
+# copies of one account of how Execution composes.
+[[interfaces]]
+from = ["keeper.execution"]
+expose = ["composing.compose_one_run"]
+visibility = ["keeper.pursuit"]
+
+# Pursuit reaches Counsel's aggregates for both halves of a round. Opening
+# one writes an inquiry; closing one reads that inquiry back for the
+# conclusion, and on the conclusion that proposes something, writes the
+# proposal being adopted.
+#
+# Seven names, and the shape of the list is the shape of the round. Two to
+# write an inquiry, three to read one and refuse a round whose question is
+# unanswered, and three more for the proposal on the arm that adopts.
+#
+# `InquiryConclusion` is the only closed type here and is the one name
+# this door exists for. Closing a round is a translation between two
+# vocabularies, and a translation needs both sides written down: a handler
+# that matched on strings would go quietly wrong the day a fifth
+# conclusion arrives, which is exactly the day it must not.
+#
+# `Proposal` and `Inquiry` themselves are absent. Both are loaded and read
+# from and neither is ever named, because the handler tests fields off
+# them and passes them to deciders that declare their own types.
 [[interfaces]]
 from = ["keeper.counsel.aggregates"]
 expose = [
     "inquiry.INQUIRY_STREAM_TYPE",
     "inquiry.to_payload",
+    "inquiry.load_inquiry",
+    "inquiry.InquiryConclusion",
+    "inquiry.InquiryNotFoundError",
+    "proposal.PROPOSAL_STREAM_TYPE",
+    "proposal.to_payload",
+    "proposal.load_proposal_with_version",
+    "proposal.ProposalNotFoundError",
 ]
 visibility = ["keeper.pursuit"]
 
@@ -411,20 +445,25 @@ visibility = ["keeper.pursuit"]
 # interface sizes it, and the comment arguing that the aggregate door was
 # honest was describing the half something counted.
 #
-# Three names, and they are the composition: the command, the context it
-# is decided against, and the decider. Opening a round calls the pure half
-# of that slice rather than its handler, because a handler appends on its
-# own and two appends are not the single one this slice exists to make.
+# Five names across two of Counsel's slices, and each is the pure half of
+# one. Opening a round decides an inquiry; closing one on a proposal
+# decides the adoption. Both call the decider rather than the handler,
+# because a handler appends on its own and separate appends are not the
+# single one each of these slices exists to make.
 #
-# Three stays three rather than collapsing behind a helper in Counsel,
-# because there is one consumer and the rule of three in
-# docs/reference/patterns.md is what holds a shape where it is.
+# Five stays five rather than collapsing behind a helper in Counsel. The
+# seam that was worth building sits in Execution, because two contexts
+# wanted the same composed run; nothing yet wants the same composed
+# adoption, and the rule of three in docs/reference/patterns.md is what
+# holds a shape where it is until something does.
 [[interfaces]]
 from = ["keeper.counsel"]
 expose = [
     "features.make_inquiry.MakeInquiry",
     "features.make_inquiry.MakeInquiryContext",
     "features.make_inquiry.decide",
+    "features.adopt_proposal.AdoptProposal",
+    "features.adopt_proposal.decide",
 ]
 visibility = ["keeper.pursuit"]
 

@@ -102,7 +102,9 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "list_devices",
         "start_pursuit",
         "open_pursuit_round",
+        "close_pursuit_round",
         "charge_pursuit",
+        "resume_pursuit",
         "withdraw_pursuit",
         "get_pursuit",
     }
@@ -705,6 +707,52 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         )
         asked_about = _call(client, live, "get_inquiry", inquiry_id=turned["inquiry_id"])
 
+        # A thinker answers, and the round is closed on what it said. This
+        # arm is the four-stream one: the proposal is adopted at the
+        # pursuit's own beamline and scopes, a procedure is composed, an
+        # execution is dispatched, and the round advances, all in one
+        # append. Nothing in the closing call names a beamline, which is
+        # the whole point of the pursuit having been authorized.
+        _call(client, live, "claim_inquiry", inquiry_id=turned["inquiry_id"])
+        next_run = _call(client, live, "make_proposal", plan_id=plan_id, parameters={})
+        _call(
+            client,
+            live,
+            "answer_inquiry",
+            inquiry_id=turned["inquiry_id"],
+            conclusion="Propose",
+            observed_step_count=2,
+            execution_ended=True,
+            proposal_id=next_run["proposal_id"],
+        )
+        advanced = _call(client, live, "close_pursuit_round", pursuit_id=pursuit_id, round_index=0)
+
+        # A second turn, about the execution the first one dispatched,
+        # which is the loop actually closing. This thinker has nothing to
+        # go on, so the round stalls and the pursuit holds until somebody
+        # puts it back to work.
+        again = _call(
+            client,
+            live,
+            "open_pursuit_round",
+            pursuit_id=pursuit_id,
+            execution_id=advanced["dispatched_id"],
+        )
+        _call(client, live, "claim_inquiry", inquiry_id=again["inquiry_id"])
+        _call(
+            client,
+            live,
+            "answer_inquiry",
+            inquiry_id=again["inquiry_id"],
+            conclusion="Abstain",
+            observed_step_count=0,
+            execution_ended=False,
+        )
+        stalled = _call(client, live, "close_pursuit_round", pursuit_id=pursuit_id, round_index=1)
+        while_held = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
+        _call(client, live, "resume_pursuit", pursuit_id=pursuit_id)
+        after_resuming = _call(client, live, "get_pursuit", pursuit_id=pursuit_id)
+
         # The half of the budget nothing here can measure. A thinker charges
         # what it spent, and the answer is where the budget now stands.
         charged = _call(
@@ -877,6 +925,15 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "charges add to what a pursuit has spent rather than replacing it, so a "
         "reporter can send what one turn cost without reading the record first"
     )
+    assert advanced["outcome"] == "Advanced"
+    assert advanced["dispatched_id"], (
+        "the advancing arm dispatches a run, and the id is what a driver watches next"
+    )
+    assert (stalled["outcome"], while_held["status"]) == ("Stalled", "Held"), (
+        "a thinker with nothing to go on holds the loop rather than ending it, "
+        "because more data may land and the authorization is still good"
+    )
+    assert after_resuming["status"] == "Running"
     assert while_running["status"] == "Running"
     assert while_running["budget"] == {"Rounds": 8, "Tokens": 400000}, (
         "a budget comes back keyed by dimension and spelled as it went in, because "

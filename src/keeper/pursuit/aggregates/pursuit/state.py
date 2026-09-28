@@ -246,6 +246,48 @@ class Budget:
                 raise InvalidPursuitBudgetError(f"{dimension} has a limit of {limit}")
 
 
+class RoundOutcome(StrEnum):
+    """How a round ended, as this record holds it.
+
+    Four values rather than four event classes, which is a departure from
+    how an execution's step outcomes are modelled and is the same
+    departure `InquiryConclusion` makes, for the same reason. Those four
+    arrive from different reporting paths and carry different fields, so
+    four classes make four wrong states unrepresentable. These four arrive
+    from one call and three of them carry nothing beyond the round they
+    closed, so the difference between them is one bit rather than four
+    shapes.
+
+    They are this context's words rather than the thinker's, although each
+    answers to one of its conclusions. A round that ends because a thinker
+    proposed something has advanced, which is a fact about the loop; that
+    the thinker said Propose is a fact about the inquiry, and the round
+    cites the inquiry rather than copying what it holds.
+
+    Only `ADVANCED` leaves the pursuit running. That asymmetry is the
+    whole control flow: a loop continues while there is something to run
+    and stops or waits otherwise.
+    """
+
+    ADVANCED = "Advanced"
+    COMPLETED = "Completed"
+    STALLED = "Stalled"
+    REFERRED = "Referred"
+
+    @property
+    def holds(self) -> bool:
+        """Whether this outcome pauses the pursuit rather than ending it.
+
+        Two of the four, and what they have in common is that a person
+        could reasonably want the loop to carry on afterwards. Nothing to
+        go on may stop being true when more data lands, and a referral is
+        answered by whoever was referred to. Neither is a reason to throw
+        the authorization away, so both are reversible and `COMPLETED` is
+        not.
+        """
+        return self in (RoundOutcome.STALLED, RoundOutcome.REFERRED)
+
+
 class PursuitRoundCannotBeOpenedError(Exception):
     """A round was asked for on a pursuit that cannot open one.
 
@@ -282,6 +324,27 @@ class InvalidPursuitChargeError(ValueError):
         self.reason = reason
 
 
+class PursuitRoundCannotBeClosedError(Exception):
+    """A round was closed that cannot be, or by something that cannot close it.
+
+    Per verb rather than collapsed onto a shared transition error, which is
+    R6 in docs/reference/naming.md, and named for the round beside the
+    error that refuses opening one.
+
+    `reason` says which refusal it was, because they mean different things
+    to whoever is driving. A round that does not exist is a caller with the
+    wrong number. One already closed is a retry, and the answer is already
+    on the record. An inquiry with no answer yet is nobody's fault and the
+    caller should wait.
+    """
+
+    def __init__(self, pursuit_id: UUID, round_index: int, reason: str) -> None:
+        super().__init__(f"Round {round_index} of pursuit {pursuit_id} cannot be closed: {reason}")
+        self.pursuit_id = pursuit_id
+        self.round_index = round_index
+        self.reason = reason
+
+
 @dataclass(frozen=True, slots=True)
 class PursuitRound:
     """One turn of the loop: what was observed, and what was asked about it.
@@ -296,16 +359,27 @@ class PursuitRound:
     the same execution, which is what lets the thing driving a pursuit be
     duplicated without coordinating.
 
-    `dispatched_id` is the execution this round caused, and is None until
-    the round closes with one. Nothing sets it yet, because the verb that
-    closes a round is not here. It is read all the same, by the count of
-    executions the budget can be bounded in.
+    `outcome` is None while the round is open and set once it closes. It
+    is this context's word for what the thinker concluded rather than a
+    copy of the conclusion, which stays on the inquiry one hop away.
+
+    `proposal_id` and `dispatched_id` are set together and only on an
+    advance, because they are the two halves of one fact: the advice that
+    was taken up, and the work it became. Neither can be present without
+    the other, and the decider is what keeps that true.
     """
 
     index: int
     execution_id: UUID
     inquiry_id: UUID
+    outcome: RoundOutcome | None = None
+    proposal_id: UUID | None = None
     dispatched_id: UUID | None = None
+
+    @property
+    def is_open(self) -> bool:
+        """Whether this round is still waiting on an answer."""
+        return self.outcome is None
 
 
 class PursuitStatus(StrEnum):
@@ -321,6 +395,7 @@ class PursuitStatus(StrEnum):
     """
 
     RUNNING = "Running"
+    HELD = "Held"
     STOPPED = "Stopped"
 
     @property
@@ -353,6 +428,22 @@ class PursuitAlreadyExistsError(Exception):
     def __init__(self, pursuit_id: UUID) -> None:
         super().__init__(f"Pursuit {pursuit_id} already exists")
         self.pursuit_id = pursuit_id
+
+
+class PursuitCannotBeResumedError(Exception):
+    """A resume arrived on a pursuit that was not being held.
+
+    A running pursuit needs no resuming and a stopped one cannot be, so
+    both are refused rather than treated as a no-op. The second is the one
+    worth refusing loudly: resuming a completed pursuit would be restarting
+    a loop somebody decided was finished, and doing that quietly is how an
+    authorization outlives the intention behind it.
+    """
+
+    def __init__(self, pursuit_id: UUID, status: PursuitStatus) -> None:
+        super().__init__(f"Pursuit {pursuit_id} cannot be resumed while {status}")
+        self.pursuit_id = pursuit_id
+        self.status = status
 
 
 class PursuitCannotBeWithdrawnError(Exception):
@@ -427,6 +518,33 @@ class Pursuit:
         and this one cannot disagree with the status it reads.
         """
         return self.status is PursuitStatus.RUNNING
+
+    @property
+    def held_for(self) -> RoundOutcome | None:
+        """Why the pursuit is waiting, or None if it is not.
+
+        Derived from the round that put it there rather than stored, for
+        the reason the status is: a field a writer can set is a field a
+        writer can set wrong, and this one cannot disagree with the round
+        it reads.
+
+        The two it can be are the two a person triaging a list of held
+        pursuits needs to tell apart. One is waiting for them. The other
+        ran out of ideas and may be worth more data rather than more
+        attention.
+        """
+        if self.status is not PursuitStatus.HELD or not self.rounds:
+            return None
+        return self.rounds[-1].outcome
+
+    def round_at(self, index: int) -> PursuitRound | None:
+        """The round with this number, or None if the pursuit has no such round.
+
+        By search rather than by position, because the number is a fact the
+        event carries rather than a place in a list, and the two would only
+        agree for as long as nothing is ever removed.
+        """
+        return next((turn for turn in self.rounds if turn.index == index), None)
 
     def spent(self, *, now: datetime) -> dict[BudgetDimension, int]:
         """Consumption so far, in every dimension, however it is learned.
@@ -542,11 +660,14 @@ __all__ = [
     "Pursuit",
     "PursuitAlreadyExistsError",
     "PursuitBeamline",
+    "PursuitCannotBeResumedError",
     "PursuitCannotBeWithdrawnError",
     "PursuitGoal",
     "PursuitNotFoundError",
     "PursuitRound",
+    "PursuitRoundCannotBeClosedError",
     "PursuitRoundCannotBeOpenedError",
     "PursuitStatus",
+    "RoundOutcome",
     "validate_scopes",
 ]

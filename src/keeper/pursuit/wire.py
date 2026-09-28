@@ -51,7 +51,10 @@ anyway and, not coincidentally, is not None.
 Opening a round goes without, and is already protected by something
 better. A pursuit refuses a second round about an execution it has already
 asked about, so a retry is a 409 from the domain rather than a duplicate
-the chassis had to catch.
+the chassis had to catch. Closing one is the same: a round that already
+closed refuses, which matters more there than anywhere else here, because
+the duplicate a retry would otherwise make is a second execution at a
+beamline.
 
 No slice takes more than the kernel. Nothing here reads a projection,
 because nothing here lists anything yet.
@@ -65,8 +68,10 @@ from keeper.infrastructure.observability import with_tracing
 from keeper.infrastructure.slices.idempotency import with_idempotency
 from keeper.pursuit.features import (
     charge_pursuit,
+    close_pursuit_round,
     get_pursuit,
     open_pursuit_round,
+    resume_pursuit,
     start_pursuit,
     withdraw_pursuit,
 )
@@ -80,7 +85,9 @@ class PursuitHandlers:
 
     start_pursuit: start_pursuit.IdempotentHandler
     open_pursuit_round: open_pursuit_round.Handler
+    close_pursuit_round: close_pursuit_round.Handler
     charge_pursuit: charge_pursuit.IdempotentHandler
+    resume_pursuit: resume_pursuit.Handler
     withdraw_pursuit: withdraw_pursuit.Handler
     get_pursuit: get_pursuit.Handler
 
@@ -103,6 +110,16 @@ def wire_pursuit(deps: Kernel) -> PursuitHandlers:
         open_pursuit_round=with_tracing(
             open_pursuit_round.bind(deps),
             command_name="OpenPursuitRound",
+            bc=_BC,
+        ),
+        close_pursuit_round=with_tracing(
+            close_pursuit_round.bind(deps),
+            command_name="ClosePursuitRound",
+            bc=_BC,
+        ),
+        resume_pursuit=with_tracing(
+            resume_pursuit.bind(deps),
+            command_name="ResumePursuit",
             bc=_BC,
         ),
         charge_pursuit=with_tracing(

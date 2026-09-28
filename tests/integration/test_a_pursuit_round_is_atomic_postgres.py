@@ -40,9 +40,30 @@ from uuid import UUID, uuid4
 import asyncpg
 import pytest
 
-from keeper.counsel.aggregates.inquiry import INQUIRY_STREAM_TYPE, load_inquiry
-from keeper.execution.aggregates.execution import ExecutionNotFoundError
-from keeper.execution.aggregates.procedure import MoveStep
+from keeper.counsel.aggregates.inquiry import (
+    INQUIRY_STREAM_TYPE,
+    InquiryConclusion,
+    load_inquiry,
+)
+from keeper.counsel.aggregates.proposal import (
+    ProposalCannotBeAdoptedError,
+    ProposalStatus,
+    load_proposal,
+)
+from keeper.counsel.features.adopt_proposal import AdoptProposal
+from keeper.counsel.features.adopt_proposal import bind as bind_adopt
+from keeper.counsel.features.answer_inquiry import AnswerInquiry
+from keeper.counsel.features.answer_inquiry import bind as bind_answer
+from keeper.counsel.features.make_proposal import MakeProposal
+from keeper.counsel.features.make_proposal import bind as bind_make_proposal
+from keeper.execution.aggregates.execution import (
+    EXECUTION_STREAM_TYPE,
+    ExecutionNotFoundError,
+    load_execution,
+)
+from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, MoveStep, load_procedure
+from keeper.execution.features.define_plan import DefinePlan
+from keeper.execution.features.define_plan import bind as bind_define_plan
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.define_procedure import bind as bind_define_procedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -61,6 +82,8 @@ from keeper.pursuit.aggregates.pursuit import (
     PursuitGoal,
     load_pursuit,
 )
+from keeper.pursuit.features.close_pursuit_round import ClosePursuitRound
+from keeper.pursuit.features.close_pursuit_round import bind as bind_close
 from keeper.pursuit.features.open_pursuit_round import OpenPursuitRound
 from keeper.pursuit.features.open_pursuit_round import bind as bind_open_round
 from keeper.pursuit.features.start_pursuit import StartPursuit
@@ -70,6 +93,8 @@ if TYPE_CHECKING:
     from keeper.infrastructure.ports.event_store import EventStore
 
 pytestmark = [pytest.mark.integration]
+
+_SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/schema"}
 
 
 @pytest.fixture
@@ -263,3 +288,151 @@ async def test_a_round_past_the_budget_writes_neither_stream(
     pursuit = await load_pursuit(postgres_kernel.event_store, pursuit_id)
     assert pursuit is not None
     assert len(pursuit.rounds) == 1
+
+
+async def _a_proposal(deps: Kernel) -> UUID:
+    plan_id = await bind_define_plan(deps)(
+        DefinePlan(name="count", parameters_schema=_SCHEMA),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    return await bind_make_proposal(deps)(
+        MakeProposal(plan_id=plan_id, parameters={}),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def _answered_with_a_proposal(deps: Kernel, inquiry_id: UUID, proposal_id: UUID) -> None:
+    await bind_answer(deps)(
+        AnswerInquiry(
+            inquiry_id=inquiry_id,
+            conclusion=InquiryConclusion.PROPOSE,
+            observed_step_count=1,
+            execution_ended=True,
+            proposal_id=proposal_id,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+async def test_closing_on_a_proposal_commits_four_streams_across_three_contexts(
+    postgres_kernel: Kernel,
+) -> None:
+    """The widest write in this tree, and the only place it is real.
+
+    A procedure, an execution, the proposal being adopted and the round
+    advancing. Three bounded contexts, one transaction, and nothing in the
+    closing call names a beamline.
+    """
+    pursuit_id = await _a_pursuit(postgres_kernel)
+    inquiry_id = await bind_open_round(postgres_kernel)(
+        OpenPursuitRound(pursuit_id=pursuit_id, execution_id=await _an_execution(postgres_kernel)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    proposal_id = await _a_proposal(postgres_kernel)
+    await _answered_with_a_proposal(postgres_kernel, inquiry_id, proposal_id)
+
+    closed = await bind_close(postgres_kernel)(
+        ClosePursuitRound(pursuit_id=pursuit_id, round_index=0),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    assert closed.dispatched_id is not None
+    pursuit = await load_pursuit(postgres_kernel.event_store, pursuit_id)
+    proposal = await load_proposal(postgres_kernel.event_store, proposal_id)
+    dispatched = await load_execution(postgres_kernel.event_store, closed.dispatched_id)
+    assert pursuit is not None
+    assert proposal is not None
+    assert dispatched is not None
+    assert pursuit.rounds[0].dispatched_id == closed.dispatched_id
+    assert proposal.status is ProposalStatus.ADOPTED
+    assert dispatched.beamline.value == "2-bm"
+    procedure = await load_procedure(postgres_kernel.event_store, dispatched.procedure_id)
+    assert procedure is not None
+
+
+async def test_a_round_refused_at_the_close_dispatches_nothing(
+    postgres_kernel: Kernel, db_pool: asyncpg.Pool
+) -> None:
+    """The refusal that matters, because everything before it has already
+    been decided. The proposal was adopted once by somebody else, so the
+    adoption decider refuses, and the procedure and execution composed a
+    line earlier must not survive it."""
+    pursuit_id = await _a_pursuit(postgres_kernel)
+    inquiry_id = await bind_open_round(postgres_kernel)(
+        OpenPursuitRound(pursuit_id=pursuit_id, execution_id=await _an_execution(postgres_kernel)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    proposal_id = await _a_proposal(postgres_kernel)
+    await _answered_with_a_proposal(postgres_kernel, inquiry_id, proposal_id)
+    await bind_adopt(postgres_kernel)(
+        AdoptProposal(proposal_id=proposal_id, beamline="7-bm", scopes=("7bma:det:",)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    procedures = await _stream_count(db_pool, PROCEDURE_STREAM_TYPE)
+    executions = await _stream_count(db_pool, EXECUTION_STREAM_TYPE)
+
+    with pytest.raises(ProposalCannotBeAdoptedError):
+        await bind_close(postgres_kernel)(
+            ClosePursuitRound(pursuit_id=pursuit_id, round_index=0),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+    assert await _stream_count(db_pool, PROCEDURE_STREAM_TYPE) == procedures
+    assert await _stream_count(db_pool, EXECUTION_STREAM_TYPE) == executions
+    pursuit = await load_pursuit(postgres_kernel.event_store, pursuit_id)
+    assert pursuit is not None
+    assert pursuit.rounds[0].is_open, "a refused close leaves the round open to try again"
+
+
+async def test_two_callers_closing_one_round_at_once_dispatch_exactly_one_run(
+    postgres_kernel: Kernel, db_pool: asyncpg.Pool
+) -> None:
+    """The four-stream version of the race, held at the load the same way.
+
+    Both callers compose a procedure and an execution before either
+    appends. The loser must have written neither, because a beamline
+    walking a run that no round points at is the failure this whole slice
+    is one transaction to avoid.
+    """
+    pursuit_id = await _a_pursuit(postgres_kernel)
+    inquiry_id = await bind_open_round(postgres_kernel)(
+        OpenPursuitRound(pursuit_id=pursuit_id, execution_id=await _an_execution(postgres_kernel)),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    await _answered_with_a_proposal(postgres_kernel, inquiry_id, await _a_proposal(postgres_kernel))
+    procedures = await _stream_count(db_pool, PROCEDURE_STREAM_TYPE)
+    executions = await _stream_count(db_pool, EXECUTION_STREAM_TYPE)
+    racing = replace(
+        postgres_kernel,
+        event_store=cast(
+            "EventStore", _HeldAtTheLoad(postgres_kernel.event_store, asyncio.Barrier(2))
+        ),
+    )
+    close = bind_close(racing)
+
+    async def close_one() -> object:
+        return await close(
+            ClosePursuitRound(pursuit_id=pursuit_id, round_index=0),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+    outcomes = await asyncio.gather(close_one(), close_one(), return_exceptions=True)
+
+    won = [outcome for outcome in outcomes if not isinstance(outcome, BaseException)]
+    assert len(won) == 1, f"exactly one caller may close the round, got {outcomes}"
+    assert await _stream_count(db_pool, PROCEDURE_STREAM_TYPE) == procedures + 1, (
+        "the loser composed a procedure and must not have written it"
+    )
+    assert await _stream_count(db_pool, EXECUTION_STREAM_TYPE) == executions + 1, (
+        "the loser dispatched an execution and must not have written it"
+    )
