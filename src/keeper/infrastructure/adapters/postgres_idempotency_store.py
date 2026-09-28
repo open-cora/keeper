@@ -26,11 +26,16 @@ path (uncontended retry) is one SQL round-trip.
 
 ## CHECK constraint
 
-Migration 20260512330000 enforces a tri-state CHECK on the row:
-in-flight (locked_at, no result/error), completed-success (result,
-no locked_at/error), completed-error (error, no locked_at/result).
-Any adapter bug that would leave a row in an invalid state raises
-loudly at write time, not silently on next read.
+The table carries a tri-state CHECK, and `outcome` is what names the
+state: null while in flight, `OUTCOME_SUCCEEDED`, or `OUTCOME_FAILED`.
+Any adapter bug that would leave a row between those states raises
+loudly at write time rather than silently on the next read.
+
+The succeeded arm puts no condition on `result`, which is why this
+adapter reads that column without testing it. The state used to be
+inferred from the column being non-null, and that could not represent
+a handler which succeeded and returned nothing: the finalize violated
+the constraint after the events were already written.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
@@ -41,6 +46,8 @@ from uuid import UUID
 import asyncpg
 
 from keeper.infrastructure.ports.idempotency_store import (
+    OUTCOME_FAILED,
+    OUTCOME_SUCCEEDED,
     CachedError,
     CachedSuccess,
     Claimed,
@@ -56,27 +63,31 @@ VALUES ($1, $2, $3, $4, $5, now())
 ON CONFLICT (principal_id, key, surface_id) DO UPDATE
     SET locked_at    = now(),
         command_hash = EXCLUDED.command_hash,
-        command_name = EXCLUDED.command_name
+        command_name = EXCLUDED.command_name,
+        outcome      = NULL,
+        result       = NULL,
+        error_type   = NULL,
+        error_msg    = NULL
     WHERE idempotency_keys.locked_at IS NOT NULL
       AND idempotency_keys.locked_at < now() - make_interval(secs => $6::int)
 RETURNING locked_at
 """
 
 _INSPECT_SQL = """
-SELECT command_hash, command_name, locked_at, result, error_type, error_msg
+SELECT command_hash, command_name, locked_at, outcome, result, error_type, error_msg
 FROM idempotency_keys
 WHERE principal_id = $1 AND key = $2 AND surface_id = $3
 """
 
 _FINALIZE_SUCCESS_SQL = """
 UPDATE idempotency_keys
-SET locked_at = NULL, result = $4, error_type = NULL, error_msg = NULL
+SET locked_at = NULL, outcome = 'succeeded', result = $4, error_type = NULL, error_msg = NULL
 WHERE principal_id = $1 AND key = $2 AND surface_id = $3
 """
 
 _FINALIZE_ERROR_SQL = """
 UPDATE idempotency_keys
-SET locked_at = NULL, result = NULL, error_type = $4, error_msg = $5
+SET locked_at = NULL, outcome = 'failed', result = NULL, error_type = $4, error_msg = $5
 WHERE principal_id = $1 AND key = $2 AND surface_id = $3
 """
 
@@ -134,22 +145,26 @@ class PostgresIdempotencyStore:
                 expected_hash=existing_hash,
                 actual_hash=command_hash,
             )
-        if row["result"] is not None:
+        if row["outcome"] == OUTCOME_SUCCEEDED:
+            # `result` is read without testing it, which is the point of the
+            # column: a handler that returned nothing stored a null here and
+            # still succeeded.
             return CachedSuccess(
                 command_hash=existing_hash,
                 command_name=str(row["command_name"]),
                 result=row["result"],
             )
-        if row["error_type"] is not None:
+        if row["outcome"] == OUTCOME_FAILED:
             return CachedError(
                 command_hash=existing_hash,
                 command_name=str(row["command_name"]),
                 error_type=str(row["error_type"]),
                 error_msg=str(row["error_msg"]),
             )
-        # Unreachable per the CHECK constraint; treat as Claimed
-        # defensively (handler retry produces a new outcome; the
-        # optimistic-lock backstop protects state).
+        # Unreachable per the CHECK constraint, which allows no completed row
+        # without one of the two words. Treat as Claimed defensively: the
+        # handler retry produces a new outcome and the optimistic-lock
+        # backstop protects state.
         return Claimed()
 
     async def finalize_success(

@@ -37,11 +37,12 @@ single-phase `get + put`):
         `IdempotencyClaimLostError` -> 409 + Retry-After: 1.
       - `HashConflict`: same key reused with a DIFFERENT command
         body; raise `IdempotencyConflictError` -> 422.
-  - `finalize_success(principal_id, key, result)` clears `locked_at`
-    and stores the JSON-serializable result.
+  - `finalize_success(principal_id, key, result)` clears `locked_at`,
+    marks the row `OUTCOME_SUCCEEDED` and stores the
+    JSON-serializable result, which may be `None`.
   - `finalize_error(principal_id, key, error_type, error_msg)` clears
-    `locked_at` and stores the cached error so future retries
-    replay it.
+    `locked_at`, marks the row `OUTCOME_FAILED` and stores the cached
+    error so future retries replay it.
   - `prune(ttl_hours)` deletes completed rows older than the TTL.
     Called periodically by the pruner background task.
 
@@ -65,12 +66,38 @@ protects state integrity for any retry that does sneak through.
 Cached results are JSON-serializable forms of the handler's return
 value (UUIDs become str, None stays null). Callers of the decorator
 provide per-handler serialize/deserialize callables.
+
+## Which state a row is in, and why a column says so
+
+The three states are named by `outcome` rather than worked out from
+which of `result` and `error_type` is null. They were once worked out,
+and one state could not survive it: a stored result of `None` is
+indistinguishable from no result at all, so a handler that returns
+nothing had no legal row to land in. What that cost was a check
+violation on Postgres after the handler had already written its events,
+and a silently re-run handler in memory.
+
+So `result` carries the payload and says nothing about the state, which
+is what lets it be null for a handler that succeeded with nothing to
+return. `NOOP_SERIALIZE` and `NOOP_DESERIALIZE` in the decorator module
+are the codec pair for exactly that case.
 """
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Final, Protocol
 from uuid import UUID
+
+OUTCOME_SUCCEEDED: Final = "succeeded"
+"""The stored word for a row whose handler returned.
+
+Declared here rather than in either adapter because both of them write
+it and a contract suite asserts they agree. Two spellings of one stored
+word is the kind of disagreement that reads as a cache miss.
+"""
+
+OUTCOME_FAILED: Final = "failed"
+"""The stored word for a row whose handler raised a cacheable 4xx."""
 
 
 @dataclass(frozen=True)
@@ -212,17 +239,15 @@ class IdempotencyStore(Protocol):
         surface_id: UUID,
         result: Any,
     ) -> None:
-        """Clear `locked_at` and store the success result. The row
-        was previously claimed by `claim()` returning `Claimed`.
+        """Mark the row `OUTCOME_SUCCEEDED` and store the result.
+        The row was previously claimed by `claim()` returning
+        `Claimed`.
 
-        Caller contract: `result` MUST be JSON-serializable AND
-        MUST NOT be `None`. The PG adapter's CHECK constraint
-        requires `(locked_at IS NULL AND result IS NOT NULL)` for
-        the completed-success row state; passing `result=None`
-        would either violate the constraint (PG) or leave the row
-        in an unreachable tri-state (memory). Handlers that
-        legitimately return `None` should serialize to a sentinel
-        (for example `serialize_result=lambda _: "ok"`) at wire time.
+        Caller contract: `result` MUST be JSON-serializable. `None`
+        is allowed and round-trips as a cached success, which is
+        what a handler that returns nothing needs. The state is
+        carried by `outcome` rather than by the result being
+        present, so a null result is a result.
         """
         ...
 
@@ -234,16 +259,15 @@ class IdempotencyStore(Protocol):
         error_type: str,
         error_msg: str,
     ) -> None:
-        """Clear `locked_at` and store the cached error so future
-        retries replay it. The row was previously claimed by
-        `claim()` returning `Claimed`.
+        """Mark the row `OUTCOME_FAILED` and store the cached error
+        so future retries replay it. The row was previously claimed
+        by `claim()` returning `Claimed`.
 
         Caller contract: both `error_type` and `error_msg` MUST be
         non-empty strings. The PG adapter's CHECK constraint
-        requires `(locked_at IS NULL AND error_type IS NOT NULL
-        AND error_msg IS NOT NULL)` for the completed-error row
-        state. The decorator always passes `_full_class_name(exc)`
-        and `str(exc)` which are non-empty by construction.
+        requires both on the failed row state. The decorator always
+        passes `_full_class_name(exc)` and `str(exc)`, which are
+        non-empty by construction.
         """
         ...
 

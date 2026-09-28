@@ -66,10 +66,13 @@ Wall-clock timestamps on aggregates (`created_at`, `versioned_at`, `deprecated_a
 
 ## Idempotency
 
-Create-style commands accept an idempotency key so client-side retries do not duplicate. The standard is the IETF [`Idempotency-Key`](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07) header. The decorator lives at `keeper/infrastructure/idempotency.py`; the wrap is applied in each BC's `wire.py`.
+Create-style commands accept an idempotency key so client-side retries do not duplicate. The standard is the IETF [`Idempotency-Key`](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07) header. The decorator lives at `keeper/infrastructure/slices/idempotency.py`; the wrap is applied in each BC's `wire.py`.
 
 - **Apply** to create-style commands, where the server generates an id and a retry would otherwise duplicate.
 - **Skip** for queries, and for updates that do not need cached-success-on-retry.
+- **Consider** for a transition where refusing a caller's own retry and refusing somebody else's repeat are different answers. Withdrawing a pursuit is the one that qualifies so far.
+
+A handler that returns nothing can be wrapped: pass `NOOP_SERIALIZE` and `NOOP_DESERIALIZE`. The store records which state a row is in with an `outcome` column rather than by whether a result is stored, so a null result is a cached success rather than a cache miss.
 
 ```python
 register_thing=with_idempotency(

@@ -1,16 +1,18 @@
 """Charge the pursuit: authorize, load, decide, append at the version folded.
 
 Returns the pursuit's total in the charged dimension afterwards, which is
-two things at once. It is what a reporter wants back, since the number it
-sent was a delta and the number it cares about is where the budget now
-stands. And it is what lets this handler be wrapped for retries at all:
-`with_idempotency` cannot carry a result of None, because a stored None is
-indistinguishable from nothing stored, so a handler that answered with
-nothing would silently get no replay protection.
+what a reporter wants back: the number it sent was a delta and the number
+it cares about is where the budget now stands.
 
-That matters here more than anywhere else in this context. Charges add
-rather than replace, so a redelivered one is not a repeat that changes
-nothing: it is beam time spent twice on a record that cannot be edited.
+That was once load-bearing for a second reason, and is not any more. The
+wrapper could not carry a result of None, so answering with a number was
+what made this slice wrappable at all; the store names a completed row in
+a column now and a handler returning nothing can be wrapped too. The
+return value stayed because a reporter wants it.
+
+Retry protection matters here more than anywhere else in this context.
+Charges add rather than replace, so a redelivered one is not a repeat that
+changes nothing: it is beam time spent twice on a record nobody can edit.
 """
 
 from typing import Protocol

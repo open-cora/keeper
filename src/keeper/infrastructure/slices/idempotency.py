@@ -98,15 +98,18 @@ _log = get_logger(__name__)
 
 
 def _noop_serialize(_value: None) -> None:
-    """Serialize codec for None-returning handlers idempotency-wrapped.
+    """Serialize codec for a handler that returns nothing.
 
     `with_idempotency` requires a serialize_result / deserialize_result
-    pair; for handlers that return None there is no payload to round-
-    trip. The pair stays symmetric (serializes None to None, deserializes
-    None to None) so the cache hit replays "success with None".
+    pair, and a handler that returns None has no payload to round-trip.
+    The pair stays symmetric, serializing None to None and back, so the
+    cache hit replays the success rather than the absence of one.
 
-    Candidates: any command slice whose handler returns nothing and
-    whose route answers 204.
+    This pair was written before anything could use it, and for a while
+    nothing could: the store recorded a completed row by storing a
+    non-null result, so a stored None read back as no row at all. The
+    state is named by a column now, and `withdraw_pursuit` is the first
+    slice wired with this pair.
     """
     return None
 

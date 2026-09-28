@@ -22,24 +22,25 @@ leave a second standing authorization nobody asked for, running its own
 budget against the same beamline. A duplicated device record makes a
 reporter choose; a duplicated pursuit doubles what a machine may do.
 
-Withdrawing goes without, beside every other transition in this tree, and
-it was wired with the wrapper first. The argument for it was that a person
-whose stop request timed out will send it again and would rather be told
-it worked than told the pursuit had already stopped. That argument is real
-and it is not worth what answering it currently costs.
+Withdrawing takes the wrapper too, and it is the only transition in this
+tree that does. The argument is that a person whose stop request timed out
+will send it again, and would rather be told it worked than told the
+pursuit had already stopped. A 409 is the right answer to withdrawing a
+pursuit that somebody else stopped; it is the wrong answer to a caller's
+own retry, and only a key can tell those apart.
 
-`with_idempotency` cannot carry a handler that returns None. A stored
-result of None is indistinguishable from no stored result, so the replay
-reads as a fresh claim, runs the handler again and caches the refusal it
-raises. Nothing else in this tree returns None through the wrapper, so the
-limitation had never been reached; withdrawing reached it. Making it work
-means changing the store on both adapters and the constraint behind them,
-which is a change to shared infrastructure and does not belong in the
-commit that adds a context.
+This slice is why the chassis can carry it. `with_idempotency` could not
+wrap a handler returning None, because the store recorded a completed row
+by storing a non-null result, so a stored None read back as no row: the
+Postgres adapter refused the write after the events were already appended,
+and the in-memory one lost the row and ran the handler again. The store
+names the state in a column now, and `NOOP_SERIALIZE` and
+`NOOP_DESERIALIZE` are the codec pair for a handler with nothing to
+return.
 
-So a replayed withdrawal is a 409, which is what a replayed transition is
-everywhere else here, and the contract tier says so out loud rather than
-leaving it to be discovered.
+So a replayed withdrawal is a second 204 rather than a 409. Withdrawing
+with a different key, or none, still meets the decider and is refused,
+which is the distinction the key buys.
 
 Charging takes the wrapper, and it is the one transition in this tree that
 needs it rather than merely reading better with it. Charges add to what a
@@ -68,7 +69,11 @@ from uuid import UUID
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
-from keeper.infrastructure.slices.idempotency import with_idempotency
+from keeper.infrastructure.slices.idempotency import (
+    NOOP_DESERIALIZE,
+    NOOP_SERIALIZE,
+    with_idempotency,
+)
 from keeper.pursuit.adapters import (
     InMemoryPursuitSummaryLookup,
     PostgresPursuitSummaryLookup,
@@ -97,7 +102,7 @@ class PursuitHandlers:
     close_pursuit_round: close_pursuit_round.Handler
     charge_pursuit: charge_pursuit.IdempotentHandler
     resume_pursuit: resume_pursuit.Handler
-    withdraw_pursuit: withdraw_pursuit.Handler
+    withdraw_pursuit: withdraw_pursuit.IdempotentHandler
     get_pursuit: get_pursuit.Handler
     list_pursuits: list_pursuits.Handler
 
@@ -161,7 +166,14 @@ def wire_pursuit(deps: Kernel) -> PursuitHandlers:
             bc=_BC,
         ),
         withdraw_pursuit=with_tracing(
-            withdraw_pursuit.bind(deps),
+            with_idempotency(
+                withdraw_pursuit.bind(deps),
+                deps.idempotency_store,
+                command_name="WithdrawPursuit",
+                serialize_result=NOOP_SERIALIZE,
+                deserialize_result=NOOP_DESERIALIZE,
+                lock_stale_seconds=deps.settings.idempotency_lock_stale_seconds,
+            ),
             command_name="WithdrawPursuit",
             bc=_BC,
         ),

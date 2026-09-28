@@ -26,7 +26,7 @@ from keeper.infrastructure.observability import current_correlation_id
 from keeper.infrastructure.request import get_mcp_surface_id
 from keeper.infrastructure.slices.principal import get_mcp_principal_id
 from keeper.pursuit.features.withdraw_pursuit.command import WithdrawPursuit
-from keeper.pursuit.features.withdraw_pursuit.handler import Handler
+from keeper.pursuit.features.withdraw_pursuit.handler import IdempotentHandler
 
 
 class WithdrawPursuitOutput(BaseModel):
@@ -40,7 +40,7 @@ class WithdrawPursuitOutput(BaseModel):
     pursuit_id: UUID
 
 
-def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
+def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> None:
     """Register the tool on the given MCP server."""
 
     @mcp.tool(

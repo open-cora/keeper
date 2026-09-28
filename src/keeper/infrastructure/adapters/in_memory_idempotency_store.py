@@ -15,6 +15,8 @@ from typing import Any
 from uuid import UUID
 
 from keeper.infrastructure.ports.idempotency_store import (
+    OUTCOME_FAILED,
+    OUTCOME_SUCCEEDED,
     CachedError,
     CachedSuccess,
     Claimed,
@@ -26,15 +28,20 @@ from keeper.infrastructure.ports.idempotency_store import (
 
 @dataclass
 class _Row:
-    """Tri-state row, matching the PG CHECK constraint:
-    in-flight (locked_at, no result/error),
-    completed-success (result, no locked_at/error),
-    completed-error (error, no locked_at/result)."""
+    """Tri-state row, matching the PG CHECK constraint.
+
+    `outcome` names the state: None while in flight, then one of the
+    two stored words. It is a field rather than something worked out
+    from the others for the reason the column exists next door: a
+    result of None is a legitimate success, so the presence of a
+    result cannot be what says the row succeeded.
+    """
 
     command_hash: str
     command_name: str
     created_at: datetime
     locked_at: datetime | None = None
+    outcome: str | None = None
     result: Any = None
     error_type: str | None = None
     error_msg: str | None = None
@@ -76,6 +83,7 @@ class InMemoryIdempotencyStore:
                 existing.locked_at = now
                 # Stale takeover wipes any prior partial state (defensive
                 # against CHECK violations that shouldn't happen).
+                existing.outcome = None
                 existing.result = None
                 existing.error_type = None
                 existing.error_msg = None
@@ -89,14 +97,18 @@ class InMemoryIdempotencyStore:
                     expected_hash=existing.command_hash,
                     actual_hash=command_hash,
                 )
-            if existing.result is not None:
+            if existing.outcome == OUTCOME_SUCCEEDED:
+                # `result` is handed back without being tested, which is the
+                # point of the field: a handler that returned nothing left a
+                # None here and still succeeded.
                 return CachedSuccess(
                     command_hash=existing.command_hash,
                     command_name=existing.command_name,
                     result=existing.result,
                 )
-            if existing.error_type is not None:
+            if existing.outcome == OUTCOME_FAILED:
                 # Both error_type and error_msg present per CHECK constraint.
+                assert existing.error_type is not None
                 assert existing.error_msg is not None
                 return CachedError(
                     command_hash=existing.command_hash,
@@ -120,6 +132,7 @@ class InMemoryIdempotencyStore:
             if row is None:
                 return
             row.locked_at = None
+            row.outcome = OUTCOME_SUCCEEDED
             row.result = result
             row.error_type = None
             row.error_msg = None
@@ -137,6 +150,7 @@ class InMemoryIdempotencyStore:
             if row is None:
                 return
             row.locked_at = None
+            row.outcome = OUTCOME_FAILED
             row.result = None
             row.error_type = error_type
             row.error_msg = error_msg
