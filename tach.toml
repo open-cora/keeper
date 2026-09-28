@@ -323,19 +323,22 @@ visibility = ["keeper.custody"]
 # That last hop is what the extra names buy: the decision asks which plan
 # the step runs, and the answer lives on the definition.
 #
-# Adopting a proposal is the fifth and the only one that writes. It
-# needs the two stream types and the two payload renderers, because the
-# events it appends belong to Execution's aggregates, and it needs
-# `AcquireStep` to compose one and `fold` to turn the procedure it just
-# decided into the value the dispatch decider takes as context.
+# Adopting a proposal is the fifth and the only one that writes, and it
+# is the one that shrank. It once needed six more names here: the two
+# stream types, the two payload renderers, `AcquireStep` to compose a
+# procedure and `fold` to turn the one it had just decided into the value
+# the dispatch decider takes as context. All six were an account of how
+# Execution composes, held in Counsel.
 #
-# That is six names for one slice, and they are here rather than behind
-# some narrower helper because a door is sized by what the consumer
-# imports and pretending otherwise would only move the width somewhere
-# a test cannot see it.
+# The comment they used to carry argued that the width was honest because
+# a door is sized by what the consumer imports. That is true and it was
+# the wrong question. What made those six worth removing is not the
+# count: it is that Counsel knew the sequence, and would have broken when
+# Execution changed it. A second context wanting the same thing is what
+# made two copies of that knowledge worth collapsing into one.
 #
-# Eighteen names where Custody needs three, and the difference is exactly
-# that Custody checks existence and reads nothing off what it loaded. A door
+# Twelve names where Custody needs three, and the difference is that
+# Custody checks existence and reads nothing off what it loaded. A door
 # is sized by what the consumer imports, which is the only honest way to
 # size one, and `test_tach_edges_are_used.py` is what keeps that true.
 #
@@ -360,13 +363,7 @@ expose = [
     "execution.Execution",
     "execution.ExecutionNotFoundError",
     "execution.ExecutionStepNotFoundError",
-    "execution.EXECUTION_STREAM_TYPE",
-    "execution.to_payload",
     "procedure.load_procedure",
-    "procedure.PROCEDURE_STREAM_TYPE",
-    "procedure.AcquireStep",
-    "procedure.fold",
-    "procedure.to_payload",
     "procedure.ComposedStep",
     "procedure.ProcedureNotFoundError",
     "procedure.ProcedureStepNotFoundError",
@@ -441,28 +438,19 @@ visibility = ["keeper.pursuit"]
 # is honest because a door is sized by what the consumer imports, and that
 # argument was only ever true of the half of the edge something counted.
 #
-# Six names, and they are the composition. Two commands, the two contexts
-# they are decided against, and the two deciders. Adopting calls the pure
-# half of each slice rather than its handler, because a handler appends on
-# its own and three appends are not the single one that slice exists to
-# make.
+# One name now, and it was six. The six were two commands, the two
+# contexts they are decided against and the two deciders, called by
+# adoption to compose a run because a handler appends on its own and
+# three appends are not the single one that slice needs.
 #
-# Six stays six rather than collapsing behind a helper in Execution,
-# because there is one consumer, and the rule of three in
-# docs/reference/patterns.md is what holds a shape where it is until a
-# second one arrives. What would move it is something else needing to
-# dispatch one run of one plan alongside a write of its own, and that
-# caller is the one that could say what the helper wants to look like.
-# Until then the reach is real, written down, and counted by
-# `test_tach_edges_are_used.py` like every other.
+# What collapsed them was the second caller the old comment here named as
+# the trigger. `composing.compose_one_run` hands back the appends for
+# dispatching one run of one plan, and two contexts now ask for it rather
+# than each assembling it. That the door is narrower is the smaller half
+# of the gain: the larger half is that neither caller any longer knows
+# that a procedure is defined and then dispatched, or that the dispatch
+# needs the procedure folded first.
 [[interfaces]]
 from = ["keeper.execution"]
-expose = [
-    "features.define_procedure.DefineProcedure",
-    "features.define_procedure.DefineProcedureContext",
-    "features.define_procedure.decide",
-    "features.dispatch_execution.DispatchExecution",
-    "features.dispatch_execution.DispatchExecutionContext",
-    "features.dispatch_execution.decide",
-]
+expose = ["composing.compose_one_run"]
 visibility = ["keeper.counsel"]

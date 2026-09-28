@@ -12,25 +12,19 @@ a slice in Execution that loaded a proposal would be a cycle rather than
 an edge. What lands here instead is the composition, and the price is
 that this context's door onto Execution now reaches its feature layer.
 
-## Why the deciders are Execution's and only the write is ours
+## Why the composing is Execution's and only the write is ours
 
 Composing a procedure and dispatching an execution are decisions about
-Execution's aggregates, so Execution's own deciders make them. They are
-pure functions over values, which is what lets this handler call them
-without going through their handlers, and going through their handlers
-is exactly what would break the property this slice exists for: each
-would append on its own and the three writes would stop being one.
+Execution's aggregates, so Execution makes them, behind one function that
+hands back the appends. This handler once assembled that itself out of
+six of that context's names plus two stream types and two payload
+renderers, which meant it knew not only what it wanted but how Execution
+gets there. `keeper.execution.composing` holds that now, and the door it
+left behind is six names narrower.
 
-So the decisions stay where they are modelled and only the append moves.
-
-## Why the procedure is folded before it is stored
-
-`dispatch_execution.decide` takes a `Procedure` as context, and the one
-this dispatches was decided a few lines earlier and is not in any store
-yet. Folding the event it produced is how a procedure that does not
-exist becomes a value that does. The evolver is pure and total, so the
-state this builds is byte for byte the state a later reader will fold
-out of the same event.
+What does not move is the transaction. The appends come back undone, this
+handler adds its own and commits all three, because the proposal being
+adopted is this context's fact and Execution knows nothing of it.
 
 ## What one transaction buys
 
@@ -58,27 +52,8 @@ from keeper.counsel.aggregates.proposal import (
 )
 from keeper.counsel.features.adopt_proposal.command import AdoptProposal
 from keeper.counsel.features.adopt_proposal.decider import decide
-from keeper.execution.aggregates.execution import EXECUTION_STREAM_TYPE
-from keeper.execution.aggregates.execution import to_payload as execution_payload
 from keeper.execution.aggregates.plan import PlanNotFoundError, load_plan
-from keeper.execution.aggregates.procedure import (
-    PROCEDURE_STREAM_TYPE,
-    AcquireStep,
-)
-from keeper.execution.aggregates.procedure import (
-    fold as fold_procedure,
-)
-from keeper.execution.aggregates.procedure import to_payload as procedure_payload
-from keeper.execution.features.define_procedure import (
-    DefineProcedure,
-    DefineProcedureContext,
-)
-from keeper.execution.features.define_procedure import decide as decide_procedure
-from keeper.execution.features.dispatch_execution import (
-    DispatchExecution,
-    DispatchExecutionContext,
-)
-from keeper.execution.features.dispatch_execution import decide as decide_execution
+from keeper.execution.composing import compose_one_run
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.ports import Deny
@@ -160,49 +135,6 @@ def bind(deps: Kernel) -> Handler:
             raise PlanNotFoundError(proposal.plan_id)
 
         now = deps.clock.now()
-        procedure_id = deps.id_generator.new_id()
-        composed_step_id = deps.id_generator.new_id()
-        execution_id = deps.id_generator.new_id()
-        dispatched_step_id = deps.id_generator.new_id()
-
-        procedure_events = decide_procedure(
-            None,
-            DefineProcedure(
-                name=plan.name.value,
-                beamline=command.beamline,
-                steps=(
-                    AcquireStep(
-                        plan_id=proposal.plan_id,
-                        parameters=dict(proposal.parameters),
-                        scopes=tuple(command.scopes),
-                    ),
-                ),
-            ),
-            context=DefineProcedureContext(plans={proposal.plan_id: plan}),
-            now=now,
-            new_id=procedure_id,
-            step_ids=[composed_step_id],
-        )
-        composed = fold_procedure(procedure_events)
-        if composed is None:
-            msg = "defining a procedure produced no events, which its decider cannot do"
-            raise RuntimeError(msg)
-
-        execution_events = decide_execution(
-            None,
-            DispatchExecution(procedure_id=procedure_id),
-            context=DispatchExecutionContext(procedure=composed),
-            now=now,
-            new_id=execution_id,
-            step_ids=[dispatched_step_id],
-        )
-        adoption_events = decide(
-            proposal,
-            command,
-            execution_id=execution_id,
-            step_id=dispatched_step_id,
-            now=now,
-        )
 
         def envelope(event_type: str, payload: dict[str, Any], occurred_at: datetime) -> NewEvent:
             return to_new_event(
@@ -216,34 +148,26 @@ def bind(deps: Kernel) -> Handler:
                 principal_id=principal_id,
             )
 
+        run = compose_one_run(
+            plan=plan,
+            parameters=proposal.parameters,
+            beamline=command.beamline,
+            scopes=command.scopes,
+            now=now,
+            new_id=deps.id_generator.new_id,
+            envelope=envelope,
+        )
+        adoption_events = decide(
+            proposal,
+            command,
+            execution_id=run.execution_id,
+            step_id=run.step_id,
+            now=now,
+        )
+
         await deps.event_store.append_streams(
             [
-                StreamAppend(
-                    stream_type=PROCEDURE_STREAM_TYPE,
-                    stream_id=procedure_id,
-                    expected_version=0,
-                    events=[
-                        envelope(
-                            type(event).__name__,
-                            procedure_payload(event),
-                            event.occurred_at,
-                        )
-                        for event in procedure_events
-                    ],
-                ),
-                StreamAppend(
-                    stream_type=EXECUTION_STREAM_TYPE,
-                    stream_id=execution_id,
-                    expected_version=0,
-                    events=[
-                        envelope(
-                            type(event).__name__,
-                            execution_payload(event),
-                            event.occurred_at,
-                        )
-                        for event in execution_events
-                    ],
-                ),
+                *run.appends,
                 StreamAppend(
                     stream_type=PROPOSAL_STREAM_TYPE,
                     stream_id=command.proposal_id,
@@ -264,13 +188,12 @@ def bind(deps: Kernel) -> Handler:
             "adopt_proposal.success",
             command_name=_COMMAND_NAME,
             proposal_id=str(command.proposal_id),
-            procedure_id=str(procedure_id),
-            execution_id=str(execution_id),
+            execution_id=str(run.execution_id),
             beamline=command.beamline,
             principal_id=str(principal_id),
             correlation_id=str(correlation_id),
         )
-        return execution_id
+        return run.execution_id
 
     return handler
 
