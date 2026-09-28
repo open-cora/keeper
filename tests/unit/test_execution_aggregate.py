@@ -56,7 +56,7 @@ same across every execution of one procedure, where the step ids in
 """
 """Which step runs an operation, matched to `_STEPS` by position.
 
-The middle one is the acquisition, so the round trip below carries both
+The middle one is the run, so the round trip below carries both
 a set operation and two unset ones. A fixture where every step was a move
 would exercise only the null.
 """
@@ -115,7 +115,7 @@ def test_the_genesis_builds_a_step_for_every_step_it_names() -> None:
 
 
 def test_the_fold_keeps_the_composed_step_each_one_was_dispatched_from() -> None:
-    """Every step cites one, a move as much as an acquisition.
+    """Every step cites one, a move as much as a run.
 
     The fold rebuilds steps from the genesis payload, so a field dropped
     on the way through would leave a record that reads correctly and has

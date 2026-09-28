@@ -16,7 +16,7 @@ Four shapes, grouped by the answer they produce:
          InvalidProcedureStepsError
          InvalidProcedureParametersError
              a procedure was composed with a name, a beamline, a step
-             list or a set of acquisition parameters this system will
+             list or a set of run parameters this system will
              not store
          InvalidIdentifierError
              an external reference had an empty or over-long half

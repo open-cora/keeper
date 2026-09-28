@@ -1,7 +1,7 @@
 """HTTP door for reading a proposal.
 
 `GET /proposals/{proposal_id}`. Returns who advised, what they put
-forward, and the acquisition that took it if one has.
+forward, and the run that took it if one has.
 
 `execution_id` and `step_id` are null while the proposal is open, and
 that null is the status. There is no status field, because a two-valued

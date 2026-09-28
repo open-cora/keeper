@@ -15,8 +15,8 @@ import pytest
 from keeper.execution.aggregates.operation import OperationNotFoundError
 from keeper.execution.aggregates.procedure import (
     PROCEDURE_STREAM_TYPE,
-    AcquireStep,
     ProcedureName,
+    RunStep,
     SetStep,
     load_procedure,
 )
@@ -104,7 +104,7 @@ async def test_composing_returns_the_id_the_procedure_can_be_loaded_by() -> None
     operation_id = await _an_operation(deps)
     steps = (
         SetStep(record="2bmb:m1", to=12.5),
-        AcquireStep(
+        RunStep(
             operation_id=operation_id,
             parameters={"exposure_seconds": 0.2},
             scopes=("2bmb:m1", "2bmb:det:"),
@@ -135,7 +135,7 @@ async def test_a_procedure_citing_a_plan_that_does_not_exist_is_refused() -> Non
             DefineProcedure(
                 name="tomography",
                 beamline="2-bm",
-                steps=(AcquireStep(operation_id=absent, parameters={}, scopes=("2bmb:m1",)),),
+                steps=(RunStep(operation_id=absent, parameters={}, scopes=("2bmb:m1",)),),
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),
@@ -156,7 +156,7 @@ async def test_the_same_operation_acquired_many_times_is_read_once() -> None:
             name="tomography",
             beamline="2-bm",
             steps=tuple(
-                AcquireStep(
+                RunStep(
                     operation_id=operation_id,
                     parameters={"exposure_seconds": 0.2},
                     scopes=(f"2bmb:m{i}",),
@@ -214,7 +214,7 @@ async def test_a_denied_caller_is_refused_before_any_plan_is_read() -> None:
             DefineProcedure(
                 name="tomography",
                 beamline="2-bm",
-                steps=(AcquireStep(operation_id=uuid4(), parameters={}, scopes=("2bmb:m1",)),),
+                steps=(RunStep(operation_id=uuid4(), parameters={}, scopes=("2bmb:m1",)),),
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),

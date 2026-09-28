@@ -1,4 +1,4 @@
-"""The intent: tell this system where an acquisition's output ended up."""
+"""The intent: tell this system where a run's output ended up."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,7 +10,7 @@ from keeper.shared.instant import normalize_occurred_at
 
 @dataclass(frozen=True)
 class RegisterDataset:
-    """Register that one acquisition produced this data, held over there.
+    """Register that one run produced this data, held over there.
 
     Register, not deposit and not write. This system did not put the data
     anywhere and could not; something else did, and this command enrols
@@ -20,8 +20,8 @@ class RegisterDataset:
 
     The data is attached to one step of one execution, not to the
     execution as a whole. An execution may acquire several times and each
-    acquisition writes its own data, so a reference to the traversal
-    alone would lose which acquisition made which, and at a tomography
+    run writes its own data, so a reference to the traversal
+    alone would lose which run made which, and at a tomography
     beamline that is the sample position.
 
     Both ids, because `step_id` is enough to look a step up and not

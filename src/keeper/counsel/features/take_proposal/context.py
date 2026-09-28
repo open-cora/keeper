@@ -2,7 +2,7 @@
 
 The handler has already refused an execution with no stream behind it, a
 step that execution does not hold, and a procedure that holds no such
-composed step. What crosses here is the definition of the acquisition,
+composed step. What crosses here is the definition of the run,
 because the decision asks it one question: which operation it runs.
 
 That is the difference from `register_dataset` next door, which makes
@@ -31,7 +31,7 @@ from keeper.execution.aggregates.procedure import ComposedStep
 
 @dataclass(frozen=True)
 class TakeProposalContext:
-    """The composed step the recorded acquisition was dispatched from.
+    """The composed step the recorded run was dispatched from.
 
     Read at handler time, so it can be stale by the time the append
     lands. What this check is for is catching a caller that resolved the

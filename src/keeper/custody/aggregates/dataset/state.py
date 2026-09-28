@@ -71,12 +71,12 @@ class DatasetAlreadyExistsError(Exception):
 
 @dataclass(frozen=True)
 class Dataset:
-    """A body of data one acquisition produced, as the fold leaves it.
+    """A body of data one run produced, as the fold leaves it.
 
     ## Why this points at a step and not at a whole execution
 
     An execution may hold a thousand steps and acquire several times, and
-    each acquisition produces its own data. A reference to the execution
+    each run produces its own data. A reference to the execution
     alone would say that these five datasets came out of this traversal
     and nothing about which came from where, which at a tomography
     beamline is the sample position: the one thing that makes the data

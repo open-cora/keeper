@@ -157,7 +157,7 @@ def _a_procedure(client: TestClient, name: str = "align_then_scan", beamline: st
             "steps": [
                 {"kind": "set", "record": "2bmb:m1", "to": 0.0},
                 {
-                    "kind": "acquire",
+                    "kind": "run",
                     "operation_id": operation_id,
                     "parameters": {"exposure_seconds": 0.1},
                     "scopes": ["2bmb:det:"],
@@ -618,7 +618,7 @@ def test_a_page_of_plans_hands_back_a_cursor_that_reaches_the_rest(
 
 
 def _an_acquisition(client: TestClient) -> tuple[str, str]:
-    """A dispatched execution and the id of its one acquisition step."""
+    """A dispatched execution and the id of its one run step."""
     operation_id = _an_operation(client, name="tomo_scan")
     defined = client.post(
         "/procedures",
@@ -627,7 +627,7 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
             "beamline": "2-bm",
             "steps": [
                 {
-                    "kind": "acquire",
+                    "kind": "run",
                     "operation_id": operation_id,
                     "parameters": {"exposure_seconds": 0.1},
                     "scopes": ["2bmb:det:"],

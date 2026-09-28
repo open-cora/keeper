@@ -439,7 +439,7 @@ class EventStoreProcedureWriter:
     One verb, like the operation writer, because a procedure has one event.
 
     The steps are moves and nothing else. A summary records how many
-    there are and not what they do, so an acquisition would add an operation
+    there are and not what they do, so a run would add an operation
     stream this writer would then have to create for the parameters check
     it is not exercising.
     """

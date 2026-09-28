@@ -5,7 +5,7 @@ bundle the lifespan wired rather than whatever existed at registration.
 
 `execution_id` and `step_id` come back null while the proposal is open,
 which is how an agent checking on its own advice tells whether anything
-came of it. Set, they name the acquisition, and the execution is what
+came of it. Set, they name the run, and the execution is what
 the agent reads to find it.
 """
 

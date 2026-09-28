@@ -65,7 +65,7 @@ from uuid import UUID
 from keeper.execution.aggregates.execution import EXECUTION_STREAM_TYPE
 from keeper.execution.aggregates.execution import to_payload as execution_payload
 from keeper.execution.aggregates.operation import Operation
-from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, AcquireStep
+from keeper.execution.aggregates.procedure import PROCEDURE_STREAM_TYPE, RunStep
 from keeper.execution.aggregates.procedure import fold as fold_procedure
 from keeper.execution.aggregates.procedure import to_payload as procedure_payload
 from keeper.execution.features.define_procedure import DefineProcedure, DefineProcedureContext
@@ -87,8 +87,8 @@ class ComposedRun:
     The caller adds its own and commits all of them together.
 
     `execution_id` is what the caller hands back to whoever asked. `step_id`
-    is the acquisition inside it, which is the thing a record citing this
-    run points at: a dataset is produced by one acquisition rather than by
+    is the run inside it, which is the thing a record citing this
+    run points at: a dataset is produced by one run rather than by
     a whole traversal, and so is a proposal being taken up.
     """
 
@@ -109,7 +109,7 @@ def compose_one_run(
 ) -> ComposedRun:
     """Decide a procedure around this operation and an execution that traverses it.
 
-    One acquisition, named for the operation, at the beamline and over the
+    One run, named for the operation, at the beamline and over the
     scopes the caller states. Both of those are safety-bearing and neither
     is inferred: a caller that could not state them has no business
     dispatching anything, which is the rule this signature exists to make
@@ -136,7 +136,7 @@ def compose_one_run(
             name=operation.name.value,
             beamline=beamline,
             steps=(
-                AcquireStep(
+                RunStep(
                     operation_id=operation.id, parameters=dict(parameters), scopes=tuple(scopes)
                 ),
             ),

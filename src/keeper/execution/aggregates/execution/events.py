@@ -40,7 +40,7 @@ engine reports, and an ending.
     ExecutionStepSkipped
 
     ExecutionStepEngineStarted    what an engine was reported to
-    ExecutionStepEnginePaused     have done with one acquisition
+    ExecutionStepEnginePaused     have done with one run
     ExecutionStepEngineResumed    step
     ExecutionStepEngineCompleted
     ExecutionStepEngineAborted
@@ -53,14 +53,14 @@ never a count of this module.
 
 ## Why the third group says Engine and not Run
 
-It said Run until it did not, and the word came from one acquisition
+It said Run until it did not, and the word came from one run
 engine's document format, where a routine that is running opens a run and
 gets an identifier for it. These six events relay what such an engine was
 reported to have done.
 
 Borrowing that word was wrong twice over. This system does not model a
 run: it had an aggregate by that name and deleted it, precisely because a
-run and an acquisition step were the same fact written twice, so a class
+run and a run step were the same fact written twice, so a class
 here named for one named something the model no longer contains. And the
 word is one engine's, which is the kind of vocabulary this context
 refuses everywhere else. `procedure` declines to parse a scope grammar
@@ -185,8 +185,8 @@ class ExecutionStepDone:
     the one into the other.
 
     `engine_reference` is what the engine calls the run this step opened,
-    for an acquisition step that opened one. None for a set, which opens
-    nothing, and None for an acquisition whose engine had no name to
+    for a run step that opened one. None for a set, which opens
+    nothing, and None for a run whose engine had no name to
     give.
     """
 
@@ -266,7 +266,7 @@ class ExecutionEnded:
 
 @dataclass(frozen=True)
 class ExecutionStepEngineStarted:
-    """The engine began carrying out an acquisition step.
+    """The engine began carrying out a run step.
 
     The genesis of the second account of one step. Six classes rather
     than one carrying a state, for the reason the four outcome classes

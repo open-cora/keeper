@@ -20,7 +20,7 @@ everything else.
 
 **The aggregate has a second event.** Every other summary in this tree
 is written once and never changes, or changes only a status word. This
-one gains three columns when an acquisition takes the proposal, and the two
+one gains three columns when a run takes the proposal, and the two
 adapters reach that state by completely different routes: the Postgres
 side runs an UPDATE the worker applied, the in-memory side folds the
 second event. That a proposal moves from one side of the filter to the
@@ -57,7 +57,7 @@ class ProposalWriter(Protocol):
     async def take(
         self, *, proposal_id: UUID, execution_id: UUID, step_id: UUID, at: datetime
     ) -> None:
-        """Record that one acquisition took it."""
+        """Record that one run took it."""
         ...
 
     async def adopt(

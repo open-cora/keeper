@@ -37,7 +37,7 @@ def client() -> TestClient:
 
 
 def _an_acquisition(client: TestClient) -> tuple[str, str]:
-    """An operation, a procedure acquiring it, and one dispatch, over HTTP.
+    """An operation, a procedure running it, and one dispatch, over HTTP.
 
     The whole chain, because a dataset names a step and a step exists
     only inside an execution, so the registering route has something real
@@ -52,7 +52,7 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
             "beamline": "2-bm",
             "steps": [
                 {
-                    "kind": "acquire",
+                    "kind": "run",
                     "operation_id": operation.json()["operation_id"],
                     "parameters": {},
                     "scopes": ["2bmb:det:"],
@@ -70,8 +70,8 @@ def _an_acquisition(client: TestClient) -> tuple[str, str]:
     return execution_id, step_id
 
 
-def _a_dataset(client: TestClient, acquisition: tuple[str, str]) -> str:
-    execution_id, step_id = acquisition
+def _a_dataset(client: TestClient, run: tuple[str, str]) -> str:
+    execution_id, step_id = run
     response = client.post(
         "/datasets",
         json={"execution_id": execution_id, "step_id": step_id, "external_ref": _REF},

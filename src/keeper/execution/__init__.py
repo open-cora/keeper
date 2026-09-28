@@ -7,13 +7,13 @@ and what happened when it was carried out.
                 knows it by, and the schema its parameters must satisfy.
 
     procedure   a routine this system composed: ordered steps, each of
-                them a set or an acquisition citing an operation.
+                them a set or a run citing an operation.
 
     execution   one traversal of a procedure: the steps it was asked to
                 perform, and how each of them ended.
 
 Three aggregates in one context because none of them can be checked
-without the others. An acquisition's parameters are checked against the
+without the others. A run's parameters are checked against the
 operation it cites, and a dispatch copies a procedure's steps onto the record
 it opens. Across a context boundary each of those would have to reach
 through a sibling's read-side surface for a relationship neither side
@@ -29,7 +29,7 @@ existence by reporting a run that had already happened.
 
 What still comes from outside is how the work went, on two channels that
 can disagree. A driver says what it observed of each step, and whatever
-watches an engine says what that engine did to the run one acquisition
+watches an engine says what that engine did to the run one run
 opened. Both are relayed claims rather than things this system saw, and
 neither is treated as the other's correction: `ExecutionStep` carries
 both.

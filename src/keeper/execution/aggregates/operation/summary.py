@@ -8,7 +8,7 @@ not. Which operation is called `count`, and what can be run at all.
 
 Two operations may deliberately share a name. The Operation state module says why:
 one routine constrained two ways is two operations, and which one an
-acquisition step cites is what says how it was constrained. So this
+run step cites is what says how it was constrained. So this
 returns a page, and a caller asking by name has to decide what more than
 one means.
 

@@ -27,7 +27,7 @@ from keeper.infrastructure.slices.payload import deserialize_or_raise
 
 @dataclass(frozen=True)
 class DatasetRegistered:
-    """A body of data one acquisition produced was enrolled in the record.
+    """A body of data one run produced was enrolled in the record.
 
     Registered rather than defined, and the glossary's read-aloud test is
     what settles it: "define a dataset" sounds like inventing data, which

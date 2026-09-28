@@ -14,7 +14,7 @@ one names nothing and there is no act to record. Functional identity,
 not decoration.
 
 Two operations may share a name, and nothing here stops that. One routine
-constrained two ways is two operations, and which one an acquisition step
+constrained two ways is two operations, and which one a run step
 cites is what says how it was constrained.
 
 ## Why the schema is required

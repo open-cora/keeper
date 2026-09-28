@@ -5,7 +5,7 @@ procedure's name and steps onto the execution's genesis, and the procedure is
 a different stream, so the handler does the reading and hands it across
 as plain data.
 
-The sibling of `define_procedure`'s, which loads an operation per acquisition
+The sibling of `define_procedure`'s, which loads an operation per run
 where this one loads the single procedure being handed out.
 """
 

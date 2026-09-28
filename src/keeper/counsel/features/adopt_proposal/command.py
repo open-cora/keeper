@@ -19,7 +19,7 @@ class AdoptProposal:
     can derive them.** A proposal cites an operation and carries values, which
     is not enough to compose a procedure out of: `define_procedure` says
     a beamline cannot be derived because the steps imply it in a prefix
-    this system deliberately does not parse, and an acquisition
+    this system deliberately does not parse, and a run
     declaring no devices is refused outright, because a step believed to
     touch nothing can run beside another over the same motor.
 

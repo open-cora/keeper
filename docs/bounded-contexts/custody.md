@@ -1,18 +1,18 @@
 # Custody
 
-Custody is the bounded context that answers one question: where is the data one acquisition produced, and who is keeping it?
+Custody is the bounded context that answers one question: where is the data one run produced, and who is keeping it?
 
 It holds one aggregate, the Dataset, and three things you can do to it. The record is deliberately small, and most of this page is about what is not on it.
 
 ## What a Dataset is
 
-A dataset is one body of data one acquisition produced, as this system came to know about it.
+A dataset is one body of data one run produced, as this system came to know about it.
 
 ```
    Dataset
      id            a UUID minted when the record is written
      execution_id  the traversal it came out of
-     step_id       the acquisition within it that produced it
+     step_id       the run within it that produced it
      external_ref  what the store holding it calls it
 ```
 
@@ -22,11 +22,11 @@ Three fields. Two of them are references to things this system does not hold, wh
 
 The store holds the data, its shape, its size and its metadata, and it is addressable. Anything copied here would be a second copy of a fact somebody else owns, and it would go stale the first time they changed it. That is the same argument [Access](access.md#why-it-has-no-name) makes about an actor's name, applied to a much larger surface.
 
-What no store holds is which acquisition produced what it is keeping. A store was handed an engine's own identifier, and this system is the only place that identifier has been resolved to something it composed. **The join is the whole of what this context adds**, and every field that is not the join was left out on purpose.
+What no store holds is which run produced what it is keeping. A store was handed an engine's own identifier, and this system is the only place that identifier has been resolved to something it composed. **The join is the whole of what this context adds**, and every field that is not the join was left out on purpose.
 
 ### Why a step and not a whole execution
 
-An execution may hold a thousand steps and acquire several times, and each acquisition writes its own data. A reference to the execution alone would say that these five datasets came out of this traversal and nothing about which came from where, which at a tomography beamline is the sample position: the one thing that makes the data interpretable.
+An execution may hold a thousand steps and acquire several times, and each run writes its own data. A reference to the execution alone would say that these five datasets came out of this traversal and nothing about which came from where, which at a tomography beamline is the sample position: the one thing that makes the data interpretable.
 
 ### Why both ids
 
@@ -46,7 +46,7 @@ Custody says what this one can back: where the thing is, and on whose word. It i
 | --- | --- | --- | --- |
 | Register a dataset | `POST /datasets` | `register_dataset` | `201` with the new id |
 | Read one back | `GET /datasets/{dataset_id}` | `get_dataset` | `200` with the dataset |
-| Find what one acquisition produced | `GET /datasets` | `list_datasets` | `200` with a page of datasets |
+| Find what one run produced | `GET /datasets` | `list_datasets` | `200` with a page of datasets |
 
 Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/custody/routes.py`.
 
@@ -58,7 +58,7 @@ The genesis is `register_dataset`, producing `DatasetRegistered`. The glossary's
 
 That makes it **the first `register_*` in this tree that describes a fact rather than making one**, and the consequence is visible in the signature. `register_actor` takes no `occurred_at`, because an actor's registration is an act this system performs and the moment it writes one is the moment it happened. A dataset was written somewhere else, at a moment this system was not present for, so the caller may say when. See [R8](../reference/naming.md#r8-ask-whether-the-record-makes-the-fact-or-describes-one), which draws that line on the makes-versus-describes axis rather than on the verb, and the Time section in [Conventions](../reference/conventions.md#time), which lists the commands on each side.
 
-Reported is also permanent here, unlike in Execution. Even a deployment where this system dispatched the acquisition would not have written the data: some writer did, and this context would still be hearing about it afterwards. So no prefixed sibling is coming to sit beside this command.
+Reported is also permanent here, unlike in Execution. Even a deployment where this system dispatched the run would not have written the data: some writer did, and this context would still be hearing about it afterwards. So no prefixed sibling is coming to sit beside this command.
 
 ## What the stream holds
 
@@ -100,9 +100,9 @@ Reading is gated like writing. A dataset record says that a particular run produ
 
 ## Why one dataset per run is a caller's policy, not a rule
 
-Nothing here says an acquisition has one dataset, or that two datasets may not name the same address. Both are true of the reporting side today and neither is enforced, and the distinction matters because one of them was nearly frozen into the schema.
+Nothing here says a run has one dataset, or that two datasets may not name the same address. Both are true of the reporting side today and neither is enforced, and the distinction matters because one of them was nearly frozen into the schema.
 
-The stream id is a fresh `IdGenerator` id and is **not** derived from the step id. Deriving it, which is Variant A in [Patterns](../reference/patterns.md#cross-stream-uniqueness), would have made one-per-acquisition a permanent property of the identity scheme from the first migration. It is not, so the two ids are ordinary fields and many-to-one is already the shape on disk. Changing the policy later costs a sentence in the reporter rather than a migration.
+The stream id is a fresh `IdGenerator` id and is **not** derived from the step id. Deriving it, which is Variant A in [Patterns](../reference/patterns.md#cross-stream-uniqueness), would have made one-per-run a permanent property of the identity scheme from the first migration. It is not, so the two ids are ordinary fields and many-to-one is already the shape on disk. Changing the policy later costs a sentence in the reporter rather than a migration.
 
 What stands between an at-least-once producer and two records of one body of data is the idempotency key, and only that. Nothing in this context refuses a duplicate on its own, because one stream cannot see another. A producer that derives its key from the store's own address recomputes it after any restart having persisted nothing, which is what makes redelivery safe. That is a heavier load than the same wrapper carries elsewhere, and it is why the integration tier pins it against a real key store rather than a dictionary.
 
@@ -116,7 +116,7 @@ Execution, in one direction, for two names. Nothing in Execution reaches back.
 
 This is the second cross-context door in the tree and the doors are declared in `apps/keeper/tach.toml`. The first, from Authority into Access, exposes one name.
 
-`load_execution` is an existence check and nothing more, made twice: that the execution is there, and that it holds the step named. `register_dataset` has no `context.py`, which is the difference from `define_procedure` next door: that slice loads an operation per acquisition because its decision reads their schemas, so sibling state is an input. This decision needs nothing from the execution. Existence is the handler's to check and state is the decider's, which is the split [Patterns](../reference/patterns.md#cross-aggregate-validation) draws between a 404 and a refusal, and a context holder carrying a value nothing reads would be a door held open for nobody.
+`load_execution` is an existence check and nothing more, made twice: that the execution is there, and that it holds the step named. `register_dataset` has no `context.py`, which is the difference from `define_procedure` next door: that slice loads an operation per run because its decision reads their schemas, so sibling state is an input. This decision needs nothing from the execution. Existence is the handler's to check and state is the decider's, which is the split [Patterns](../reference/patterns.md#cross-aggregate-validation) draws between a 404 and a refusal, and a context holder carrying a value nothing reads would be a door held open for nobody.
 
 The door was one name wider. `normalize_occurred_at`, which this context's registering command calls to turn a claimed moment into an instant, came through it until a third consumer arrived. It is pure and has no `keeper` imports, so by the table in [Layout](../reference/layout.md#where-shared-code-goes) its home was always `keeper/shared/`, and the rule of three is what held it next door until [Counsel](counsel.md) met it. It is `keeper.shared.instant` now, which every module may import without an edge, and this command imports it like any other shared helper.
 
@@ -124,7 +124,7 @@ The door was one name wider. `normalize_occurred_at`, which this context's regis
 
 Reading a dataset by id replays one stream and answers from it, which costs one query and stays correct forever because the stream is the record.
 
-The question this context exists for cannot be answered that way. "What did this acquisition produce" names a step, not a dataset, and a fold has to know which stream to fold. So there is a second read path, the same shape [Execution](execution.md#finding-one-without-its-id) built for the same reason:
+The question this context exists for cannot be answered that way. "What did this run produce" names a step, not a dataset, and a fold has to know which stream to fold. So there is a second read path, the same shape [Execution](execution.md#finding-one-without-its-id) built for the same reason:
 
 ```
    POST /datasets                    GET /datasets/{dataset_id}
@@ -177,6 +177,6 @@ Any notion of which store. The scheme half of the reference names a vocabulary, 
 
 Any way to find a dataset by its address. The list filters on the step and on nothing else, and the table carries no index on the reference, because nothing asks: a producer wanting to know whether it already registered an address uses its idempotency key, which answers without a query. It is a column and a filter when somebody needs it.
 
-Anything a projection could answer beyond finding a record: how much one acquisition produced, which acquisitions produced nothing, what landed last week. The table has the columns for none of those.
+Anything a projection could answer beyond finding a record: how much one run produced, which runs produced nothing, what landed last week. The table has the columns for none of those.
 
 Any check that a reference resolves. Nothing here can reach the store, so a record can point at data that was deleted an hour later and nothing will notice. Closing that needs something watching rather than another field.

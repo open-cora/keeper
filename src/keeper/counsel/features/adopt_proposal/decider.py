@@ -51,7 +51,7 @@ def decide(
 
     **Neither the beamline nor the scopes are checked here.** Both are
     Execution's to refuse and it does: a beamline outside its bound and
-    an acquisition declaring no devices are each already a refusal in
+    a run declaring no devices are each already a refusal in
     `define_procedure`, raised before this function is reached. Checking
     them again would be this context holding an opinion about a bound
     that another context enforces, and the two would drift.

@@ -1,13 +1,13 @@
 """The sibling state this slice's decision needs, loaded before deciding.
 
 A decider is pure: it takes values and returns events, and it never reads
-from a port. This slice has to check every acquisition's parameters
+from a port. This slice has to check every run's parameters
 against the schema its operation declares, and each operation is a different
 stream.
 
 So the handler does the reading and hands the result across as plain
 data. `dispatch_execution/context.py` next door is the same shape for
-one procedure; this one carries an operation per acquisition, because a
+one procedure; this one carries an operation per run, because a
 procedure may acquire more than once.
 """
 
@@ -20,13 +20,13 @@ from keeper.execution.aggregates.operation import Operation
 
 @dataclass(frozen=True)
 class DefineProcedureContext:
-    """The operations this procedure's acquisitions cite, as they stand now.
+    """The operations this procedure's runs cite, as they stand now.
 
     Keyed by id and holding each distinct operation once, because a procedure
     that acquires the same operation at five sample positions should not make
     this system read the same stream five times.
 
-    Every acquisition's operation is present. The handler refuses a procedure
+    Every run's operation is present. The handler refuses a procedure
     citing an operation that does not exist before building this, so the
     decider may look one up without handling a miss.
 

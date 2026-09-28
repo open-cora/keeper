@@ -2,11 +2,11 @@
 
 Execution is the bounded context that answers three questions: what can this system be asked to run, what did it compose out of that, and what happened when the composition was carried out.
 
-It holds three aggregates, with a handful of things you can do to each. An Operation names a routine an engine already has. A Procedure is a routine composed here, out of sets and acquisitions in an order. An Execution is one traversal of a procedure.
+It holds three aggregates, with a handful of things you can do to each. An Operation names a routine an engine already has. A Procedure is a routine composed here, out of sets and runs in an order. An Execution is one traversal of a procedure.
 
 The difference between an operation and a procedure is who composed the routine. An operation is a reference to a thing this system did not write. A procedure is authored here, and nothing anywhere holds that sequence until the record says so.
 
-**This system owns every genesis.** It writes the operation, composes the procedure and opens the execution. A client outside can only move what the keeper created, which is the posture the whole context is arranged around and the thing that changed most recently: there used to be a Run aggregate whose genesis an outside reporter issued, so a client could bring a record into existence. See [What became of the Run aggregate](#what-became-of-the-run-aggregate).
+**This system owns every genesis.** It writes the operation, composes the procedure and opens the execution. A client outside can only move what the keeper created, which is the posture the whole context is arranged around.
 
 The routine itself still runs outside, in whatever **engine** the deployment has. This context holds what that engine can be asked for, what it was asked for, and what it was reported to have done, never the running of it.
 
@@ -44,7 +44,7 @@ A procedure is a routine this system composed: an ordered list of steps, each na
      id        a UUID minted at definition, never reused
      name      what this system calls the routine
      beamline  where it runs, such as 2-bm
-     steps     sets and acquisitions, in order, each under an id
+     steps     sets and runs, in order, each under an id
                minted for it at definition
 ```
 
@@ -73,9 +73,9 @@ Two kinds of step, and only one of them declares what it touches.
    Acquire   operation_id, parameters, scopes
 ```
 
-A set sends one record to one value, so deriving what it touches is exact and a declared field would be a second chance to say the same thing differently. An acquisition hands a routine to an engine, and nothing here can see inside that routine to work out which devices it will drive. So an acquisition declares its scopes and a set does not have the option, which is not an inconsistency: one is derivable and the other is not.
+A set sends one record to one value, so deriving what it touches is exact and a declared field would be a second chance to say the same thing differently. A run hands a routine to an engine, and nothing here can see inside that routine to work out which devices it will drive. So a run declares its scopes and a set does not have the option, which is not an inconsistency: one is derivable and the other is not.
 
-An acquisition must declare at least one scope. A step that declared none would be one this system believes touches no hardware, and that belief is what lets two of them run at once over one motor.
+A run must declare at least one scope. A step that declared none would be one this system believes touches no hardware, and that belief is what lets two of them run at once over one motor.
 
 ### What a scope is, and what this system does with it
 
@@ -83,25 +83,9 @@ Nothing. A scope is stored as the string it arrived as, and is not parsed into a
 
 ### Where the parameters are checked
 
-An acquisition's parameters are validated against the schema its operation declares, and the check runs at definition rather than when the procedure is walked. That is earlier and cheaper: a procedure with a malformed acquisition is refused before anything is dispatched, instead of failing partway through a traversal that has already moved motors.
+A run's parameters are validated against the schema its operation declares, and the check runs at definition rather than when the procedure is walked. That is earlier and cheaper: a procedure with a malformed run is refused before anything is dispatched, instead of failing partway through a traversal that has already moved motors.
 
-Two gaps in that check are worth stating rather than discovering. An acquisition supplying no parameters at all is accepted whatever its operation requires, because the shared validator defers `required` to the point the values are finally acted on, which is the engine. And an operation retired or redefined after the fact does not invalidate a procedure citing it: the parameters were checked against the schema as it stood, and the record is a record of what was composed.
-
-## What became of the Run aggregate
-
-There was a fourth aggregate here: a Run, one carrying-out of one operation, opened by a reporter telling this system that an engine had run something. It is gone, and the collapse is worth reading before the rest of this page, because several sections below are shorter than they were because of it.
-
-**A run and one acquisition step were the same fact in two vocabularies.** A run cited an operation and carried the parameters it was given. An acquisition step cites an operation and carries the parameters it was dispatched with. The only thing a run held beyond that was the engine's own name for it, and that now sits on the step as `engine_reference`.
-
-The duplication only became visible when Procedure and Execution arrived. Before them, a run was the only record of anything having happened, and a step was a conductor's internal business this system never saw. Once the keeper composed the work and dispatched it, every step passed through here in the keeper's own vocabulary, and a run was a second record of the same act at a coarser scale.
-
-**The collapse went this direction because most steps are not acquisitions.** A set drives a motor and opens nothing in any engine, so recording an execution as a run would have lost every step that was not an acquisition, which is most of them. There is no corresponding loss in the other direction.
-
-**What did not collapse is the lifecycle.** A run had five statuses and a step has an outcome, and they are not the same observation: the outcome is what the driver saw when the call returned, and the lifecycle is what the engine said about itself. So a step carries both, and they are allowed to disagree. See [Two observers of one step, kept apart](#two-observers-of-one-step-kept-apart).
-
-**What was dropped is the hand-run scan.** A run reported with no keeper reference used to be recorded. There is nothing here to record it against now: no execution, no step, and no way to make one out of a report. That is a real loss, chosen because it is reversible. Nothing is destroyed, the engine keeps its own record, and a reported shape can be added later as a purely additive change.
-
-**Two things came free.** The standing hole where two runs could name one engine run closed by construction, because nothing outside opens a record any more. And a Walk's `reference`, which existed because a driver had no handle before starting, disappeared: this system creates the record first, so the execution's id is the handle.
+Two gaps in that check are worth stating rather than discovering. A run supplying no parameters at all is accepted whatever its operation requires, because the shared validator defers `required` to the point the values are finally acted on, which is the engine. And an operation retired or redefined after the fact does not invalidate a procedure citing it: the parameters were checked against the schema as it stood, and the record is a record of what was composed.
 
 ## The operations
 
@@ -157,7 +141,7 @@ A step outcome is addressed by index and an engine report by step id, which look
 
 One event on an operation and one on a procedure, because nothing changes either yet. Retiring one arrives as a new class when the command that does lands, never as a field edited onto the genesis.
 
-A procedure's whole step list rides its genesis, as a list of objects rather than flat fields, which makes it the only payload here holding a nested structure. Each step carries a `kind` discriminating a set from an acquisition. That key is on the wire and not on either class in the model, because there the class IS the kind and a field saying so again is a second thing to get wrong.
+A procedure's whole step list rides its genesis, as a list of objects rather than flat fields, which makes it the only payload here holding a nested structure. Each step carries a `kind` discriminating a set from a run. That key is on the wire and not on either class in the model, because there the class IS the kind and a field saying so again is a second thing to get wrong.
 
 Every event after the genesis carries the same two fields. What is running is already on the stream, so a later event adds when, and which thing happened, and nothing else.
 
@@ -169,7 +153,7 @@ A dispatched step travels as three fields: its id, the sentence rendered for a r
 
 ## The state machine
 
-An execution has one, and so does the run an engine opens for one of its acquisition steps. They are two machines on one stream, and keeping them apart is the whole of the section below on two observers.
+An execution has one, and so does the run an engine opens for one of its run steps. They are two machines on one stream, and keeping them apart is the whole of the section below on two observers.
 
 ```
         dispatch_execution
@@ -243,8 +227,8 @@ A report that does not follow is a 409 and not a 400, and that correction was ma
 | `InvalidOperationNameError` | 400 | Empty after trimming, or over the length bound. |
 | `InvalidPlanParametersSchemaError` | 400 | Not a Draft 2020-12 document, or outside the stored subset. |
 | `InvalidProcedureNameError` | 400 | Empty after trimming, or over the length bound. |
-| `InvalidProcedureStepsError` | 400 | No steps, too many, a set naming no record or sent to a value JSON cannot carry, or an acquisition declaring no devices. |
-| `InvalidProcedureParametersError` | 400 | An acquisition's parameters do not satisfy the operation it cites. Names which step. |
+| `InvalidProcedureStepsError` | 400 | No steps, too many, a set naming no record or sent to a value JSON cannot carry, or a run declaring no devices. |
+| `InvalidProcedureParametersError` | 400 | A run's parameters do not satisfy the operation it cites. Names which step. |
 | `InvalidExecutionProcedureNameError` | 400 | The procedure's name falls outside what an execution stores. |
 | `InvalidExecutionStepsError` | 400 | The rendered step list is empty, too long, or holds a blank step. |
 | `InvalidStepReportError` | 400 | A step report carried a detail belonging to a different outcome, or a break named no cause. |
@@ -351,13 +335,13 @@ An execution is one traversal of a procedure: the record this system opens when 
 `beamline` is the one field here that exists for a query rather than for
 a reader. A conductor asks for every dispatched execution at its own
 beamline, which is a filter over many rows, so the value has to be on the
-row rather than one reference away. That is what separates it from the
-operation id a step used to copy: that answered one reader's question about
-one row with the whole definition a hop away, and this selects the page.
+row rather than one reference away. That is what separates it from an id a
+step could carry instead: an id answers one reader's question about one row
+with the whole definition a hop away, and this selects the page.
 
 Each step carries an id of its own, minted at dispatch and written onto the genesis. It is on the payload rather than made during the fold because a fold has to produce the same steps on every replay, and a record other aggregates point at cannot move between them.
 
-A step has an id at all so that something outside can name one. A dataset is produced by one acquisition, not by a whole traversal, so `(execution_id, index)` would be a pointer into the interior of another aggregate rather than a handle: it cannot be fetched, and checking it exists means folding the whole execution and bounds-checking an integer. Both [Custody](custody.md) and [Counsel](counsel.md) now cite one.
+A step has an id at all so that something outside can name one. A dataset is produced by one run, not by a whole traversal, so `(execution_id, index)` would be a pointer into the interior of another aggregate rather than a handle: it cannot be fetched, and checking it exists means folding the whole execution and bounds-checking an integer. Both [Custody](custody.md) and [Counsel](counsel.md) now cite one.
 
 **A step also cites the composed step it came from**, and that arrived with the second consumer rather than the first. Custody only needed a step to exist, so an id was enough. Counsel needs to ask something about one, whether it ran the operation a proposal named, and nothing on the record could answer: the operation id was present only inside the rendered sentence, written for a person to read.
 
@@ -427,7 +411,7 @@ Each step ends exactly once, in one of four ways:
 
 ### Two observers of one step, kept apart
 
-An acquisition step gets talked about twice, by two clients that do not know about each other.
+A run step gets talked about twice, by two clients that do not know about each other.
 
 ```
    outcome        what the driver saw     Done, Refused, Broken, Skipped
@@ -482,23 +466,23 @@ The answer is a page and not a single execution, and nothing reserves a row for 
 
 A procedure's genesis checks that every operation it cites exists, and that check is real. The equivalent one scale down is unavailable, and the reason is worth stating rather than discovering.
 
-A driver reports an acquisition step the moment its engine returns, and carries the engine's own name for the run it opened. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against: the run record this context used to keep is exactly what was retired. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
+A driver reports a run step the moment its engine returns, and carries the engine's own name for the run it opened. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
 
 That is weaker than an operation reference and it is the honest shape. An engine's names are the engine's, and a system that claimed to have checked one would be claiming to have asked.
 
 ## Why the three share a context
 
-An acquisition step cannot be composed without the operation it cites, and checking one against the other is the whole of what a procedure's genesis does. A dispatch cannot open a record without copying the procedure it hands out. Across a context boundary each of those would have to reach through a sibling's read-side surface for a relationship neither side can be without, so the three stay together.
+A run step cannot be composed without the operation it cites, and checking one against the other is the whole of what a procedure's genesis does. A dispatch cannot open a record without copying the procedure it hands out. Across a context boundary each of those would have to reach through a sibling's read-side surface for a relationship neither side can be without, so the three stay together.
 
 ## This system owns every genesis
 
-The context used to be **reported**: an engine ran a routine, and afterwards someone or something told this system that it did. It is now **dispatched**: this system composes the work and hands it out, and what comes back is how it went.
+This context is **dispatched** rather than **reported**: it composes the work and hands it out, and what comes back is how it went. Nothing an outside caller sends brings a record into existence.
 
-That is one sentence and it changed more than any other decision recorded on this page. Under the reported posture a client could bring a record into existence, which is why two runs could name one engine run and why the context needed a whole section arguing about what to do with the duplicate. Under this one there is nothing for an outside caller to create.
+That is the decision the whole page is arranged around. It is what makes every id in play one this system minted, so there is nothing to resolve by external reference and no way for two records to answer to one engine run.
 
 What still comes from outside is how the work went, on two channels that can disagree, and neither is treated as the other's correction. That is the section above on two observers.
 
-**Reported is still the right word for those two channels**, and deliberately not witnessed, which was the first word here. To witness something is to have been present and able to vouch for it. This system is neither: it is told, and the whole of what it knows is that it was told. The caller could be wrong and nothing here can check. "Witnessed" would claim otherwise, and this tree refuses unbacked claims everywhere else.
+**Reported is the right word for those two channels**, and deliberately not witnessed. To witness something is to have been present and able to vouch for it. This system is neither: it is told, and the whole of what it knows is that it was told. The caller could be wrong and nothing here can check. "Witnessed" would claim otherwise, and this tree refuses unbacked claims everywhere else.
 
 ### Why the verbs are bare imperatives
 
@@ -508,7 +492,7 @@ Two of them name the act plainly, because it is an act: claiming an execution an
 
 The other two are reports, and say so. Read as instructions, they would be addressed to something this system cannot instruct. Nobody asks a step to break. What a caller is asking is for the record to say what already happened, and the request is refusable, which is what keeps it a command rather than an inbound event.
 
-**A reserved table of driving verbs used to sit here**, pairing each reporting verb with the one a future driving surface would use: `report_run` against `start_run`, `pause_run` against `request_pause`. It is gone, and not because the question went away. It was answered differently. This system dispatches a whole procedure and a conductor carries it out step by step, so there is no `start_run` for this context to reserve a name for: the driving verb is `dispatch_execution`, it already exists, and it is the only one.
+**There is one driving verb and it is `dispatch_execution`.** This system dispatches a whole procedure and a conductor carries it out step by step, so there is no per-step driving verb to pair against each reporting one.
 
 What a driving surface would still add is the asking side of a pause, which is a request to a conductor rather than a report about an engine. That belongs to the conductor's own intake, not here, and Conducting is where it is discussed.
 
@@ -531,7 +515,7 @@ What a driving surface would still add is the asking side of a pause, which is a
        get_operation/                a query slice, so no decider: reading decides nothing
        list_operations/              the queries a fold cannot serve, one per
        define_procedure/        with a context module too, for the operations its
-                                acquisitions cite, which is several
+                                runs cite, which is several
        get_procedure/           the only read that returns the typed steps
        list_procedures/         aggregate
        dispatch_execution/      with a context module, for the procedure it copies
@@ -550,9 +534,11 @@ What a driving surface would still add is the asking side of a pause, which is a
 
 `report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what Run did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
 
-`define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may acquire several times, so its handler loads each distinct operation once and hands the lot across keyed by id. Once, because a tomography procedure acquiring the same operation at twenty sample positions would otherwise replay that stream twenty times for no new information.
+`define_procedure/context.py` carries more than one sibling, and is the only context module here that does. A procedure may acquire several times, so its handler loads each distinct operation once and hands the lot across keyed by id. Once, because a tomography procedure running the same operation at twenty sample positions would otherwise replay that stream twenty times for no new information.
 
 ## What is not here yet
+
+**A scan run by hand.** An engine run carrying no keeper reference cannot be recorded: there is no execution to hang it on, no step, and no way to make either out of a report. The engine keeps its own record, and a reported shape would be a purely additive change if one is wanted.
 
 The conductor's work intake. Something has to claim a dispatched execution and drive it, and nothing does: `dispatch_execution` writes a record that waits. `apps/conductor` holds the library that carries out a procedure and has no loop that goes looking for one. That is the largest single missing piece and it is what `Dispatched` is waiting for.
 
@@ -560,7 +546,7 @@ The recording seam on that side is stale in three places at once and is being le
 
 Anything about a pause beyond the fact of it. How long an engine has held a step paused, how many times it has, and what it is waiting for are all answerable from the events and none of them is on the read model. The first caller that needs one is the right place to decide whether it belongs there or in a projection.
 
-Any way to say that an engine run ended without saying how. The three terminals assume the engine knows which one happened and says so, and the first engine modelled does. A second one, driven in a spike, does not: it writes the same completion string whether the routine finished, the detector timed out or an operator stopped it, so the outcome exists only in a log nothing can read. Against that engine every step would be recorded `Completed`, including the failed ones, and "how many acquisitions failed last week" would be answered confidently and wrongly.
+Any way to say that an engine run ended without saying how. The three terminals assume the engine knows which one happened and says so, and the first engine modelled does. A second one, driven in a spike, does not: it writes the same completion string whether the routine finished, the detector timed out or an operator stopped it, so the outcome exists only in a log nothing can read. Against that engine every step would be recorded `Completed`, including the failed ones, and "how many runs failed last week" would be answered confidently and wrongly.
 
 Not decided here, because there is no caller: nothing reports from such an engine today. What the decision would be is a fourth terminal meaning the run is over and the reporter cannot say more, which is the same refusal to overclaim that picked `report` over `witness` above. Worth settling before a second direction is built on this aggregate, because the conducted path doubles what a wrong terminal set costs.
 

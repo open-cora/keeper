@@ -62,7 +62,7 @@ class ProposalSummary:
     never a caller's claim: making one is an act this system performs, so
     the envelope's domain time is this system's own clock reading.
 
-    `taken_at` is when an acquisition took it, and None unless that is
+    `taken_at` is when a run took it, and None unless that is
     how it closed. This is the caller's claim, because the step was
     driven somewhere else. `adopted_at` is when this system chose it and
     dispatched work, and can only ever be this system's own clock
@@ -116,7 +116,7 @@ class ProposalSummaryLookup(Protocol):
     ) -> ProposalSummaryPage:
         """Return one page of proposals, newest first.
 
-        `is_open` narrows to proposals with no acquisition against them,
+        `is_open` narrows to proposals with no run against them,
         which is the question this context exists to answer. False
         narrows to the ones a step took, and None asks for every
         proposal.

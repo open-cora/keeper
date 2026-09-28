@@ -2,7 +2,7 @@
 
 The other read path, and here it is the important one. `read.py` rebuilds
 one dataset by replaying its stream, which answers a question that already
-names the dataset. The question this context exists for names an acquisition
+names the dataset. The question this context exists for names a run
 and asks what came out of it, and folding cannot answer that: a fold has to
 know which stream to fold, and that is exactly what is being asked.
 
@@ -93,14 +93,14 @@ class DatasetSummaryLookup(Protocol):
     ) -> DatasetSummaryPage:
         """Return one page of datasets, newest first.
 
-        `step_id` narrows to the datasets one acquisition produced,
+        `step_id` narrows to the datasets one run produced,
         which is the question this context exists to answer. Filtering on
         the step and not on the execution is the whole point: an
-        execution may acquire several times, and which acquisition made
+        execution may acquire several times, and which run made
         which data is the fact a reader needs.
 
         It is deliberately not guaranteed to match at most one: how many
-        datasets an acquisition produces is the reporting side's policy
+        datasets a run produces is the reporting side's policy
         and not a rule here, so this answers with however many there
         are.
 

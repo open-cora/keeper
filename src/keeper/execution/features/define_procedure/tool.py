@@ -27,8 +27,8 @@ from keeper.execution.aggregates.procedure import (
     PROCEDURE_MAX_SCOPES_PER_STEP,
     PROCEDURE_MAX_STEPS,
     PROCEDURE_SCOPE_MAX_LENGTH,
-    AcquireStep,
     ProcedureStep,
+    RunStep,
     SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
@@ -46,10 +46,10 @@ class SetStepInput(BaseModel):
     to: float
 
 
-class AcquireStepInput(BaseModel):
+class RunStepInput(BaseModel):
     """Ask an engine to run an operation, over the devices this step declares."""
 
-    kind: Literal["acquire"]
+    kind: Literal["run"]
     operation_id: UUID
     parameters: dict[str, Any] = Field(default_factory=dict[str, Any])
     scopes: list[Annotated[str, Field(max_length=PROCEDURE_SCOPE_MAX_LENGTH)]] = Field(
@@ -57,7 +57,7 @@ class AcquireStepInput(BaseModel):
     )
 
 
-StepInput = Annotated[SetStepInput | AcquireStepInput, Field(discriminator="kind")]
+StepInput = Annotated[SetStepInput | RunStepInput, Field(discriminator="kind")]
 
 
 class DefineProcedureOutput(BaseModel):
@@ -66,11 +66,11 @@ class DefineProcedureOutput(BaseModel):
     procedure_id: UUID
 
 
-def _to_step(step: SetStepInput | AcquireStepInput) -> ProcedureStep:
+def _to_step(step: SetStepInput | RunStepInput) -> ProcedureStep:
     """Turn one parsed tool step into the step the domain holds."""
     if isinstance(step, SetStepInput):
         return SetStep(record=step.record, to=step.to)
-    return AcquireStep(
+    return RunStep(
         operation_id=step.operation_id,
         parameters=step.parameters,
         scopes=tuple(step.scopes),
@@ -84,7 +84,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
         name="define_procedure",
         description=(
             "Compose a routine out of ordered steps and return its id. A set "
-            "sends one record to one value; an acquisition runs an operation and must "
+            "sends one record to one value; a run hands an operation out and must "
             "declare the devices it touches. The beamline says where the routine "
             "runs, which is what routes a dispatch of it to a conductor."
         ),

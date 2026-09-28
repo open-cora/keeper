@@ -66,7 +66,7 @@ class ProposalMade:
 
 @dataclass(frozen=True)
 class ProposalTaken:
-    """An acquisition was recorded against a proposal.
+    """A run was recorded against a proposal.
 
     Taken rather than accepted, and the word withheld is the point.
     Accepting says a party considered the proposal and said yes. Nobody
@@ -98,7 +98,7 @@ class ProposalTaken:
     something no reader can reach.
 
     No actor. On the genesis the principal is the substance of the fact;
-    here the caller is a messenger and the acquisition is the fact.
+    here the caller is a messenger and the run is the fact.
     """
 
     proposal_id: UUID

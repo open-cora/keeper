@@ -59,8 +59,8 @@ from keeper.execution.aggregates.execution import (
 )
 from keeper.execution.aggregates.operation import OperationNotFoundError
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
     InvalidProcedureStepsError,
+    RunStep,
     SetStep,
     load_procedure,
 )
@@ -135,8 +135,8 @@ async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UU
     aggregate rather than a stream of its own, so there is nothing to
     fake short of dispatching something.
 
-    A move goes in front of the acquisition so the step this returns is
-    never the first one. A procedure of one acquisition would let an
+    A move goes in front of the run so the step this returns is
+    never the first one. A procedure of one run would let an
     off-by-one in the search pass.
     """
     procedure_id = await bind_define_procedure(deps)(
@@ -145,7 +145,7 @@ async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UU
             beamline="2-bm",
             steps=(
                 SetStep(record="2bmb:m1", to=0.0),
-                AcquireStep(
+                RunStep(
                     operation_id=operation_id, parameters=dict(_PARAMETERS), scopes=("2bmb:det:",)
                 ),
             ),
@@ -183,7 +183,7 @@ async def _a_move_in(deps: Kernel) -> tuple[UUID, UUID]:
 async def _an_inquiry(deps: Kernel) -> UUID:
     """A question about a real two-step execution, ready to be answered.
 
-    The execution has to be real for the same reason the acquisition above
+    The execution has to be real for the same reason the run above
     does: the handler reads the step count off it, so there is nothing to
     fake short of dispatching something.
     """
@@ -403,7 +403,7 @@ async def test_taking_with_an_acquisition_of_another_plan_writes_nothing() -> No
 async def test_a_move_cannot_take_a_proposal_even_though_the_step_is_real() -> None:
     """The refusal that only exists because a step can be something else.
 
-    A run was always a run. A step is a move or an acquisition, so the
+    A run was always a run. A step is a move or a run, so the
     handler can resolve a step that exists, belongs to a real execution,
     and still cannot have run what was proposed.
     """
@@ -797,7 +797,7 @@ async def test_adopting_puts_the_declared_devices_on_the_composed_step() -> None
     procedure = await load_procedure(deps.event_store, execution.procedure_id)
     assert procedure is not None
     composed = procedure.steps[0].step
-    assert isinstance(composed, AcquireStep)
+    assert isinstance(composed, RunStep)
     assert composed.scopes == ("2bmb:det:", "2bmb:m1")
 
 

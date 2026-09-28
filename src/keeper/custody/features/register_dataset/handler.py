@@ -14,8 +14,8 @@ Two checks rather than one, and the second is what a step reference costs.
 A step is an entity inside the Execution aggregate rather than a stream of
 its own, so nothing can load one by itself: establishing that a step
 exists means loading the execution around it. That is the price of
-pointing at the acquisition instead of the traversal, and it is worth
-paying: data belongs to one acquisition, and a reference to the whole
+pointing at the run instead of the traversal, and it is worth
+paying: data belongs to one run, and a reference to the whole
 execution would lose which.
 
 `ExecutionNotFoundError` and `ExecutionStepNotFoundError` are Execution's

@@ -43,17 +43,17 @@ class SetStepResponse(BaseModel):
     to: float
 
 
-class AcquireStepResponse(BaseModel):
+class RunStepResponse(BaseModel):
     """A step that asks an engine to run an operation."""
 
-    kind: Literal["acquire"] = "acquire"
+    kind: Literal["run"] = "run"
     step_id: UUID
     operation_id: UUID
     parameters: dict[str, Any]
     scopes: list[str]
 
 
-StepResponse = Annotated[SetStepResponse | AcquireStepResponse, Field(discriminator="kind")]
+StepResponse = Annotated[SetStepResponse | RunStepResponse, Field(discriminator="kind")]
 
 
 class GetProcedureResponse(BaseModel):
@@ -65,7 +65,7 @@ class GetProcedureResponse(BaseModel):
     steps: list[StepResponse]
 
 
-def to_response_step(composed: ComposedStep) -> SetStepResponse | AcquireStepResponse:
+def to_response_step(composed: ComposedStep) -> SetStepResponse | RunStepResponse:
     """Render one stored step for a reader, under the id it was composed with.
 
     `step_id` is what an execution's step cites, so it is what a reader
@@ -74,7 +74,7 @@ def to_response_step(composed: ComposedStep) -> SetStepResponse | AcquireStepRes
     step = composed.step
     if isinstance(step, SetStep):
         return SetStepResponse(step_id=composed.id, record=step.record, to=step.to)
-    return AcquireStepResponse(
+    return RunStepResponse(
         step_id=composed.id,
         operation_id=step.operation_id,
         parameters=step.parameters,

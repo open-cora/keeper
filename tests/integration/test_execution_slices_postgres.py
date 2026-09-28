@@ -47,7 +47,7 @@ from keeper.execution.aggregates.operation import (
     load_operation,
 )
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
+    RunStep,
     SetStep,
     load_procedure,
     runs_operation,
@@ -106,9 +106,9 @@ def handlers(db_pool: asyncpg.Pool) -> ExecutionHandlers:
 
 
 async def _a_procedure(handlers: ExecutionHandlers) -> UUID:
-    """An operation and a procedure acquiring with it, through the wired handlers.
+    """An operation and a procedure running with it, through the wired handlers.
 
-    Two steps, a move then an acquisition, so a test naming a step by
+    Two steps, a move then a run, so a test naming a step by
     index or by position is naming one of two rather than the only one.
     """
     operation_id = await handlers.define_operation(
@@ -122,7 +122,7 @@ async def _a_procedure(handlers: ExecutionHandlers) -> UUID:
             beamline="2-bm",
             steps=(
                 SetStep(record="2bmb:m1", to=0.0),
-                AcquireStep(
+                RunStep(
                     operation_id=operation_id,
                     parameters={"exposure_seconds": 0.25, "detector": "eiger"},
                     scopes=("2bmb:det:",),
@@ -227,7 +227,7 @@ async def _the_acquisition(handlers: ExecutionHandlers, execution_id: UUID) -> U
     """The id of the one step of that execution that runs an operation.
 
     Two reads, because the execution does not say which of its steps is
-    an acquisition. It says which composed step each one came from, and
+    a run. It says which composed step each one came from, and
     the procedure is what says which of those runs an operation. That is the
     join every outside caller makes, so it is worth making here rather
     than reaching past it.
@@ -240,10 +240,10 @@ async def _the_acquisition(handlers: ExecutionHandlers, execution_id: UUID) -> U
         principal_id=uuid4(),
         correlation_id=uuid4(),
     )
-    acquisitions = {
+    runs = {
         composed.id for composed in procedure.steps if runs_operation(composed.step) is not None
     }
-    return next(step.id for step in execution.steps if step.procedure_step_id in acquisitions)
+    return next(step.id for step in execution.steps if step.procedure_step_id in runs)
 
 
 async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
@@ -254,11 +254,11 @@ async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
     An operation's schema is a document this system stores and never reads
     back into types. A procedure's steps are a discriminated union: they
     go out as dictionaries and have to come back as `SetStep` and
-    `AcquireStep` with their floats still floats and their ids still
+    `RunStep` with their floats still floats and their ids still
     ids. A fold from objects it never serialised proves none of that.
 
     The cross-aggregate read is the other part real SQL adds. The
-    decider checks each acquisition's parameters against a schema that
+    decider checks each run's parameters against a schema that
     came back out of JSONB.
     """
     procedure_id = await _a_procedure(handlers)
@@ -269,7 +269,7 @@ async def test_a_procedure_survives_a_round_trip_with_its_typed_steps(
     assert procedure is not None
     move, acquire = procedure.steps
     assert move.step == SetStep(record="2bmb:m1", to=0.0)
-    assert isinstance(acquire.step, AcquireStep)
+    assert isinstance(acquire.step, RunStep)
     assert acquire.step.parameters == {"exposure_seconds": 0.25, "detector": "eiger"}
     assert acquire.step.scopes == ("2bmb:det:",)
     assert move.id != acquire.id
@@ -332,7 +332,7 @@ async def test_composing_against_a_plan_that_does_not_exist_is_refused(
             DefineProcedure(
                 name="one_scan",
                 beamline="2-bm",
-                steps=(AcquireStep(operation_id=uuid4(), parameters={}, scopes=("2bmb:det:",)),),
+                steps=(RunStep(operation_id=uuid4(), parameters={}, scopes=("2bmb:det:",)),),
             ),
             principal_id=uuid4(),
             correlation_id=uuid4(),

@@ -11,7 +11,7 @@ records where taking one only joins two that existed.
 The body is required, and both of its fields are, because a proposal
 does not carry either and nothing here can derive them. That is not a
 gap in the proposal: a beamline is implied by a device prefix this
-system deliberately does not parse, and an acquisition that declared no
+system deliberately does not parse, and a run that declared no
 devices would be a step believed to touch nothing, which is a step that
 can run beside another over the same motor.
 """

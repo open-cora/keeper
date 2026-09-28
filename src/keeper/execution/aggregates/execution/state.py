@@ -6,12 +6,12 @@ it dispatches one, and how far the thing driving it got.
 ## What an execution is, and what became of the Run aggregate
 
 An execution is one traversal of a procedure, and a procedure is a
-routine composed here: sets and acquisitions in an order, each declaring
+routine composed here: sets and runs in an order, each declaring
 the devices it touches.
 
 There used to be a Run aggregate beside it, one carrying-out of one operation,
 recorded because an engine had run something and this system was told.
-It is gone, and the reason is that it and an acquisition step were the
+It is gone, and the reason is that it and a run step were the
 same fact written twice once this system started composing the work: a
 step cites an operation and carries the parameters it was dispatched with,
 which is all a run's genesis held beyond the engine's own reference for
@@ -19,7 +19,7 @@ it. That reference is on the step too, as `engine_reference`.
 
 Most steps cause no run in any engine at all. A set drives a motor and
 opens nothing, so recording an execution as a run would have lost every
-step that was not an acquisition, which is most of them. That asymmetry
+step that was not a run, which is most of them. That asymmetry
 is why the collapse went this direction rather than the other.
 
 ## What is copied onto the record, and what is cited
@@ -59,7 +59,7 @@ and the fastest way to be confused is to meet them one at a time.
                       Done, Refused, Broken, Skipped
 
     EngineState       what the engine said about the run one
-                      acquisition step opened
+                      run step opened
                       Running, Paused, Completed, Aborted, Failed
 
 The first is this system's own and is new with the dispatch. The second
@@ -85,7 +85,7 @@ winner.
 
 The four are not degrees of success. `DONE` means the seam returned
 without raising and says nothing about whether the science worked, which
-is the distinction the acquisition findings forced and the one word here
+is the distinction the run findings forced and the one word here
 most likely to be read as more than it is. `REFUSED` is the only good
 news in the set: a claim conflict stopped the step before it touched
 anything. `BROKEN` means the seam raised. `SKIPPED` means the execution had
@@ -223,7 +223,7 @@ class InvalidStepReportError(ValueError):
 
 
 class EngineState(StrEnum):
-    """Where the engine run an acquisition step opened has got to.
+    """Where the engine run a run step opened has got to.
 
     The second of two claims about one step, and the reason they are two
     rather than one. A step's `outcome` is what the driver observed: the
@@ -516,7 +516,7 @@ class DispatchedStep:
     every replay, and a record other aggregates point at cannot move.
 
     A step gets an id at all so that something outside can name one.
-    A dataset is produced by one acquisition, not by a whole traversal,
+    A dataset is produced by one run, not by a whole traversal,
     and `(execution_id, index)` would be a pointer into the interior of
     another aggregate rather than a handle: it cannot be fetched, and
     checking it exists means folding the whole execution and bounds-checking
@@ -537,7 +537,7 @@ class DispatchedStep:
     a form nothing should parse.
 
     Never None, where the copied operation id was. A set comes from a
-    composed step as surely as an acquisition does, so every step here
+    composed step as surely as a run does, so every step here
     has a definition to point at, and it is the definition that says
     which kind it was.
 
@@ -630,7 +630,7 @@ class ExecutionStep:
     `engine_state` is the other observer. Everything above it is what the
     driver saw; this is what the engine said about the run the step
     opened, relayed by whatever watches that engine. It is None on a set
-    and on an acquisition nothing has reported yet, and it can disagree
+    and on a run nothing has reported yet, and it can disagree
     with `outcome`, which is why they are two fields.
 
     `procedure_step_id` is the one field here that says what the step was

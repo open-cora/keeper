@@ -14,7 +14,7 @@ under pressure.
 The rule in docs/reference/modeling.md is primitives on events, and its
 narrower carve-out is what applies here: a `dict`-typed field is opaque
 as a whole, so a carrier mixing closed leaves with open ones loses the
-closed ones too. A step list is exactly that mix. An acquisition's
+closed ones too. A step list is exactly that mix. A run's
 `operation_id` is a reference to a sibling stream and its `parameters` are
 freeform, and flattening the list to `list[dict[str, Any]]` would make
 the reference as unreadable as the freeform half.
@@ -47,16 +47,16 @@ from typing import Any, assert_never
 from uuid import UUID
 
 from keeper.execution.aggregates.procedure.state import (
-    AcquireStep,
     ComposedStep,
     ProcedureStep,
+    RunStep,
     SetStep,
 )
 from keeper.infrastructure.ports.event_store import StoredEvent
 from keeper.infrastructure.slices.payload import deserialize_or_raise
 
 _SET_KIND = "set"
-_ACQUIRE_KIND = "acquire"
+_RUN_KIND = "run"
 
 
 @dataclass(frozen=True)
@@ -108,9 +108,9 @@ def _step_to_payload(composed: ComposedStep) -> dict[str, Any]:
     match step:
         case SetStep():
             body: dict[str, Any] = {"kind": _SET_KIND, "record": step.record, "to": step.to}
-        case AcquireStep():
+        case RunStep():
             body = {
-                "kind": _ACQUIRE_KIND,
+                "kind": _RUN_KIND,
                 "operation_id": str(step.operation_id),
                 "parameters": step.parameters,
                 "scopes": list(step.scopes),
@@ -134,8 +134,8 @@ def _step_from_payload(raw: dict[str, Any]) -> ComposedStep:
     match raw.get("kind"):
         case "set":
             step = SetStep(record=raw["record"], to=float(raw["to"]))
-        case "acquire":
-            step = AcquireStep(
+        case "run":
+            step = RunStep(
                 operation_id=UUID(raw["operation_id"]),
                 parameters=dict(raw["parameters"]),
                 scopes=tuple(raw["scopes"]),

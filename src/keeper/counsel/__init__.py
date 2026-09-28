@@ -2,7 +2,7 @@
 
 Two aggregates. A Proposal is a run an actor put forward before anything
 has run it: which operation, with what values, who advised it, and the
-acquisition that took it if one has. An Inquiry is a question an actor put
+run that took it if one has. An Inquiry is a question an actor put
 to a thinker about one execution: what they wanted to know, and what came
 back. An actor is whoever authenticated in both, so a person and a piece
 of software make the same record and nothing on either says which.

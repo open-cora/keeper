@@ -9,7 +9,6 @@ from datetime import datetime
 from uuid import UUID
 
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
     ComposedStep,
     InvalidProcedureParametersError,
     Procedure,
@@ -17,6 +16,7 @@ from keeper.execution.aggregates.procedure import (
     ProcedureBeamline,
     ProcedureDefined,
     ProcedureName,
+    RunStep,
     validated_steps,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
@@ -31,7 +31,7 @@ class _ParametersRejectedError(ValueError):
     refusal this slice publishes also carries which step the reason came
     from. So the reason is caught in this private shape and re-raised in
     the public one, one line below, rather than leaving a caller with a
-    procedure told only that one of its acquisitions is wrong.
+    procedure told only that one of its runs is wrong.
     """
 
 
@@ -55,7 +55,7 @@ def decide(
         -> InvalidProcedureBeamlineError
       - The step list must be non-empty, within the length bound, and
         every step storable -> InvalidProcedureStepsError
-      - Every acquisition's parameters must satisfy the schema its operation
+      - Every run's parameters must satisfy the schema its operation
         declares -> InvalidProcedureParametersError
 
     The order is deliberate and runs cheapest first. The stream check
@@ -69,7 +69,7 @@ def decide(
     That a cited operation exists is NOT checked here. It needs a store, and
     the handler has already refused a procedure citing one that does not.
 
-    An acquisition supplying no parameters at all is accepted whatever
+    A run supplying no parameters at all is accepted whatever
     its operation requires, because the shared validator defers `required` to
     the point the values are acted on. Reporting a step's run has the
     same gap and for the same reason: the check here is carrier-side,
@@ -92,7 +92,7 @@ def decide(
         msg = f"a definition needs one id per step: {len(step_ids)} given for {len(steps)} steps"
         raise ValueError(msg)
     for index, step in enumerate(steps):
-        if not isinstance(step, AcquireStep):
+        if not isinstance(step, RunStep):
             continue
         try:
             validate_values_against_schema(

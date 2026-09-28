@@ -1,10 +1,10 @@
-"""MCP door for recording that an acquisition took a proposal.
+"""MCP door for recording that a run took a proposal.
 
 The same handler the HTTP route uses, fetched per call so it sees the
 bundle the lifespan wired rather than whatever existed at registration.
 
 This is the second half of the loop an agent drives over this surface.
-It proposed, something ran, and it resolved the acquisition by reading
+It proposed, something ran, and it resolved the run by reading
 back the execution that held it; this is where it says so.
 
 No idempotency key. MCP has no client-supplied retry tag to carry one,
@@ -44,7 +44,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
     @mcp.tool(
         name="take_proposal",
         description=(
-            "Record that an acquisition step was performed against a proposal. "
+            "Record that a run step was performed against a proposal. "
             "Refused if the proposal already has one, or if that step ran a "
             "different operation or no operation at all."
         ),

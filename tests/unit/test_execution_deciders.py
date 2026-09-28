@@ -39,12 +39,12 @@ from keeper.execution.aggregates.execution import (
     fold,
 )
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
     ComposedStep,
     Procedure,
     ProcedureBeamline,
     ProcedureName,
     ProcedureStep,
+    RunStep,
     SetStep,
 )
 from keeper.execution.features.claim_execution import ClaimExecution
@@ -192,7 +192,7 @@ def test_every_dispatched_step_cites_the_composed_step_it_came_from() -> None:
     """
     context = _procedure(
         SetStep(record="2bmb:m1", to=0.0),
-        AcquireStep(operation_id=_PLAN_ID, parameters={}, scopes=("2bmb:det:",)),
+        RunStep(operation_id=_PLAN_ID, parameters={}, scopes=("2bmb:det:",)),
     )
     events = decide_dispatch(
         None,

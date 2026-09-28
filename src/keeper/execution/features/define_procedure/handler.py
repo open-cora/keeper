@@ -4,9 +4,9 @@ Create-style shape. A freshly minted id provably has no history, so this
 handler skips the load-and-fold that an editing handler starts with and
 hands `state=None` straight to the decider.
 
-The operations the acquisitions cite are read and not touched, so one store is
+The operations the runs cite are read and not touched, so one store is
 written and there is no ordering to get right. Each distinct operation is read
-once: a procedure acquiring the same operation at twenty sample positions
+once: a procedure running the same operation at twenty sample positions
 should not replay that stream twenty times.
 
 A procedure citing an operation that does not exist is refused here rather than
@@ -22,7 +22,7 @@ from uuid import UUID
 from keeper.execution.aggregates.operation import Operation, OperationNotFoundError, load_operation
 from keeper.execution.aggregates.procedure import (
     PROCEDURE_STREAM_TYPE,
-    AcquireStep,
+    RunStep,
     to_payload,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
@@ -101,7 +101,7 @@ def bind(deps: Kernel) -> Handler:
 
         operations: dict[UUID, Operation] = {}
         for step in command.steps:
-            if not isinstance(step, AcquireStep) or step.operation_id in operations:
+            if not isinstance(step, RunStep) or step.operation_id in operations:
                 continue
             operation = await load_operation(deps.event_store, step.operation_id)
             if operation is None:

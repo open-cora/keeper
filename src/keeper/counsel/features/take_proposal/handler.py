@@ -1,4 +1,4 @@
-"""Record the acquisition: authorize, load both, decide, append.
+"""Record the run: authorize, load both, decide, append.
 
 Update-style, so this command names a stream that already has a row. The
 handler folds that history before deciding and passes the version it

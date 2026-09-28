@@ -82,8 +82,8 @@ PURSUIT_SCOPE_MAX_LENGTH = 200
 PURSUIT_MAX_SCOPES = 100
 """How many scopes one pursuit may be authorized over.
 
-Matched to the bound Execution puts on one acquisition's declared scopes,
-because a pursuit's scopes are what every acquisition it dispatches will
+Matched to the bound Execution puts on one run's declared scopes,
+because a pursuit's scopes are what every run it dispatches will
 declare. A pursuit allowed more than a step could carry would authorize
 something it can never spend.
 """
@@ -620,7 +620,7 @@ def validate_scopes(scopes: tuple[str, ...]) -> tuple[str, ...]:
     A function rather than a value object, because the thing being bounded
     is the tuple and not any one member, and a wrapper type around a tuple
     of strings would be a name for the parentheses. Execution checks the
-    same shape the same way on an acquisition's declared scopes.
+    same shape the same way on a run's declared scopes.
 
     An empty tuple is refused. A pursuit authorized over nothing could
     dispatch nothing, and recording one would be recording an intention

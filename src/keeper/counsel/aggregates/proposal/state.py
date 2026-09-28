@@ -23,8 +23,8 @@ record in this tree that names an operation takes for the same reason: the
 operation is a record on another stream, and a copy here would go stale the
 first time somebody defined a new one.
 
-That leaves a proposal carrying what an acquisition step carries, and
-the difference between them is that one happened. An acquisition is a
+That leaves a proposal carrying what a run step carries, and
+the difference between them is that one happened. A run is a
 step of a procedure this system composed and dispatched, so something
 drove it. A proposal points at nothing at all. That is not a missing
 field, it is the whole distinction: this is the one record in the tree
@@ -140,7 +140,7 @@ class InvalidProposalParametersError(ValueError):
 
     A proposal that could not be run is not a proposal, so the values
     are checked against the same schema, by the same shared validator,
-    that checks an acquisition's. Its own class rather than Execution's,
+    that checks a run's. Its own class rather than Execution's,
     because the two are refused on different surfaces and a caller
     reading `InvalidProcedureParametersError` from a proposal endpoint
     would go looking for a procedure.
@@ -148,7 +148,7 @@ class InvalidProposalParametersError(ValueError):
 
 
 class ProposalCannotBeTakenError(Exception):
-    """An acquisition cannot be recorded against this proposal.
+    """A run cannot be recorded against this proposal.
 
     Three causes, one class, which is the shape
     `ExecutionCannotBeClaimedError` also takes: one verb, more than one
@@ -164,8 +164,8 @@ class ProposalCannotBeTakenError(Exception):
 
     The third cause arrived with the step reference and is genuinely
     distinct rather than a mismatch against nothing. A mismatch tells a
-    caller it resolved the wrong acquisition; this tells it that what it
-    resolved is not an acquisition, so the fix is not to go looking for
+    caller it resolved the wrong run; this tells it that what it
+    resolved is not a run, so the fix is not to go looking for
     a closer match.
 
     All three are 409 because the caller's next move is the same in
@@ -205,7 +205,7 @@ class ProposalCannotBeTakenError(Exception):
     def plan_mismatch(
         cls, proposal_id: UUID, *, proposed_operation_id: UUID, step_operation_id: UUID
     ) -> "ProposalCannotBeTakenError":
-        """The cited acquisition ran a different operation from the one proposed."""
+        """The cited run ran a different operation from the one proposed."""
         return cls(
             proposal_id,
             f"it proposes operation {proposed_operation_id} "
@@ -243,7 +243,7 @@ class Proposal:
     it plays is carried by the record it sits on rather than by a second
     word in the field name.
 
-    `execution_id` and `step_id` are None until an acquisition is
+    `execution_id` and `step_id` are None until a run is
     recorded against this proposal, and are what say whether it is still
     open. Two fields rather than one, because a step is an entity inside
     the Execution aggregate rather than a stream of its own, so the root

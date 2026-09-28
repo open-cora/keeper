@@ -69,7 +69,7 @@ def _an_acquisition_of(client: TestClient, operation_id: str) -> tuple[str, str]
             "steps": [
                 {"kind": "set", "record": "2bmb:m1", "to": 0.0},
                 {
-                    "kind": "acquire",
+                    "kind": "run",
                     "operation_id": operation_id,
                     "parameters": {},
                     "scopes": ["2bmb:det:"],
@@ -106,8 +106,8 @@ def _a_move_in(client: TestClient) -> tuple[str, str]:
     return execution_id, step_id
 
 
-def _body(acquisition: tuple[str, str], **extra: str) -> dict[str, str]:
-    execution_id, step_id = acquisition
+def _body(run: tuple[str, str], **extra: str) -> dict[str, str]:
+    execution_id, step_id = run
     return {"execution_id": execution_id, "step_id": step_id, **extra}
 
 
@@ -225,7 +225,7 @@ def test_naming_a_plan_that_does_not_exist_is_404(client: TestClient) -> None:
 def test_taking_with_a_move_is_409_and_says_the_step_runs_no_plan(client: TestClient) -> None:
     """The refusal a run reference could not produce.
 
-    A run was always a run. A step is a move or an acquisition, so this
+    A run was always a run. A step is a move or a run, so this
     route can be handed a step that exists, belongs to a real execution,
     and still cannot have run what was proposed.
     """
@@ -664,8 +664,8 @@ def test_adopting_a_proposal_an_acquisition_already_took_is_409(client: TestClie
     with client:
         operation_id = _an_operation(client)
         proposal_id = _a_proposal(client, operation_id)
-        acquisition = _an_acquisition_of(client, operation_id)
-        taken = client.post(f"/proposals/{proposal_id}/take", json=_body(acquisition))
+        run = _an_acquisition_of(client, operation_id)
+        taken = client.post(f"/proposals/{proposal_id}/take", json=_body(run))
         assert taken.status_code == 204, taken.text
 
         refused = _adopt(client, proposal_id)

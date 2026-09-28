@@ -43,7 +43,7 @@ from keeper.custody.features.get_dataset import GetDataset
 from keeper.custody.features.register_dataset import RegisterDataset
 from keeper.execution import wire_execution
 from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
-from keeper.execution.aggregates.procedure import AcquireStep
+from keeper.execution.aggregates.procedure import RunStep
 from keeper.execution.features.define_operation import DefineOperation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -91,7 +91,7 @@ async def _an_acquisition(deps: Kernel) -> tuple[UUID, UUID]:
         DefineProcedure(
             name="one_scan",
             beamline="2-bm",
-            steps=(AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
+            steps=(RunStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),

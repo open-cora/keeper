@@ -23,7 +23,6 @@ from keeper.execution.aggregates.procedure import (
     PROCEDURE_MAX_STEPS,
     PROCEDURE_NAME_MAX_LENGTH,
     PROCEDURE_STREAM_TYPE,
-    AcquireStep,
     ComposedStep,
     InvalidProcedureBeamlineError,
     InvalidProcedureNameError,
@@ -32,6 +31,7 @@ from keeper.execution.aggregates.procedure import (
     ProcedureDefined,
     ProcedureName,
     ProcedureStep,
+    RunStep,
     SetStep,
     fold,
     from_stored,
@@ -64,13 +64,13 @@ def _stored(event_type: str, payload: dict[str, object]) -> StoredEvent:
     )
 
 
-def _acquire(**overrides: Any) -> AcquireStep:
+def _acquire(**overrides: Any) -> RunStep:
     fields: dict[str, Any] = {
         "operation_id": _PLAN_ID,
         "parameters": {"exposure_seconds": 0.2},
         "scopes": ("2bmb:m1",),
     }
-    return AcquireStep(**(fields | overrides))
+    return RunStep(**(fields | overrides))
 
 
 def _composed(*steps: ProcedureStep) -> tuple[ComposedStep, ...]:
@@ -195,7 +195,7 @@ def test_an_acquisition_scope_that_is_empty_after_trimming_is_refused() -> None:
 
 def test_a_move_carries_no_declared_scopes_because_its_record_is_the_claim() -> None:
     """The asymmetry between the two kinds, asserted rather than assumed:
-    a move is derivable and an acquisition is not."""
+    a move is derivable and a run is not."""
     assert not hasattr(SetStep(record="2bmb:m1", to=1.0), "scopes")
 
 
@@ -208,7 +208,7 @@ def test_the_stored_payload_carries_the_name_under_a_qualified_key() -> None:
 def test_the_stored_payload_discriminates_the_two_step_kinds() -> None:
     payload = to_payload(_defined())
     steps: list[dict[str, Any]] = payload["steps"]
-    assert [step["kind"] for step in steps] == ["set", "acquire"]
+    assert [step["kind"] for step in steps] == ["set", "run"]
 
 
 def test_folding_the_genesis_event_gives_the_procedure_it_describes() -> None:

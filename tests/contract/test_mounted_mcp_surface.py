@@ -355,11 +355,11 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
 
     The steps go out as a discriminated union and have to come back as
     one. A surface that flattened the two kinds to a common shape, or
-    dropped the parameters of an acquisition because a move has none,
+    dropped the parameters of a run because a move has none,
     would hand a caller a routine that is not the one it composed. That
     shows up here as an inequality on the whole list.
 
-    The acquisition cites an operation defined in the same session, because a
+    The run cites an operation defined in the same session, because a
     procedure citing an operation that does not exist is refused, which is the
     check that makes a procedure more than a list of strings.
     """
@@ -377,7 +377,7 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
         steps = [
             {"kind": "set", "record": "2bmb:m1", "to": 12.5},
             {
-                "kind": "acquire",
+                "kind": "run",
                 "operation_id": operation_id,
                 "parameters": {"exposure_seconds": 0.2},
                 "scopes": ["2bmb:m1", "2bmb:det:"],
@@ -434,13 +434,13 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         # Custody rides along on this walk rather than booting the
         # application again. A dataset names the step that produced it, so
         # it needs a dispatched execution rather than a run, and the
-        # cheapest real one is a procedure of a single acquisition. The
+        # cheapest real one is a procedure of a single run. The
         # cross-context read is exercised here through two surfaces rather
         # than through a handler call, the same way the operation read above is.
         # Custody rides along on this walk rather than booting the
         # application again. A dataset names the step that produced it, so
         # it needs a dispatched execution rather than a run, and the
-        # cheapest real one is a procedure of a single acquisition. The
+        # cheapest real one is a procedure of a single run. The
         # cross-context read is exercised here through two surfaces rather
         # than through a handler call, the same way the operation read above is.
         held_procedure = _call(
@@ -451,7 +451,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             beamline="2-bm",
             steps=[
                 {
-                    "kind": "acquire",
+                    "kind": "run",
                     "operation_id": operation_id,
                     "parameters": {"exposure_seconds": 0.1},
                     "scopes": ["2bmb:det:"],
@@ -479,9 +479,9 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
 
         # Counsel rides along for the same reason Custody does, and it
         # closes the loop the other two halves of this walk opened: a
-        # proposal of the same operation, and the acquisition that took it.
+        # proposal of the same operation, and the run that took it.
         # The step is the one Custody just registered data against, which
-        # is the shape the model asserts: one acquisition ran the operation,
+        # is the shape the model asserts: one run ran the operation,
         # produced the data, and answered the advice. The proposer is
         # what only this surface can show, because no request field
         # carries one.
@@ -651,7 +651,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         ]
         # The engine's own account of the step that opened a run, which
         # reaches this system from a different client than the driver.
-        acquiring = _call(client, live, "get_execution", execution_id=execution_id)["steps"][1][
+        running = _call(client, live, "get_execution", execution_id=execution_id)["steps"][1][
             "step_id"
         ]
         _call(
@@ -659,7 +659,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             live,
             "report_step_run",
             execution_id=execution_id,
-            step_id=acquiring,
+            step_id=running,
             reported="Started",
             engine_reference="uid-from-the-engine",
         )
@@ -668,7 +668,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             live,
             "report_step_run",
             execution_id=execution_id,
-            step_id=acquiring,
+            step_id=running,
             reported="Failed",
         )
         midway = _call(client, live, "get_execution", execution_id=execution_id)
@@ -833,7 +833,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "would leave the executions that most need closing as the ones that cannot"
     )
     assert [item["proposal_id"] for item in acted_on["items"]] == [proposal_id], (
-        "a proposal an acquisition took has to leave the open side and appear on the "
+        "a proposal a run took has to leave the open side and appear on the "
         "other, which is the one thing a single-event summary cannot show"
     )
     assert proposal_id not in {item["proposal_id"] for item in still_open["items"]}
@@ -903,7 +903,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         adopted_execution["execution_id"],
         adopted_execution["steps"][0]["step_id"],
     ), (
-        "the proposal points at the acquisition that was composed for it, which "
+        "the proposal points at the run that was composed for it, which "
         "is the join this context exists to hold, written in the same "
         "transaction that created the step"
     )

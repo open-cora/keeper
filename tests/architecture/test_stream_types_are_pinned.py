@@ -88,7 +88,7 @@ dispatches. The migration in the same change rebuilds the summary table
 and says what it cannot recover.
 
 `Run` was retired rather than renamed, and nothing took its place. A run
-and one acquisition step of a procedure were the same fact in two
+and one run step of a procedure were the same fact in two
 vocabularies, so the step is what other contexts point at now. Its rows
 are still in the events table and no code in this tree can load them,
 which is the state an entry here is for.

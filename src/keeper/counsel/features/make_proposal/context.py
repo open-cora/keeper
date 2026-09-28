@@ -8,7 +8,7 @@ in a different bounded context.
 So the handler does the reading and hands the result across as plain
 data, which is what keeps the decision testable without a store and
 replayable without one. The shape is `DefineProcedureContext`'s, for the
-same reason: a proposal and an acquisition step are checked against the
+same reason: a proposal and a run step are checked against the
 same schema by the same shared validator, and the only difference is
 which surface refuses.
 """

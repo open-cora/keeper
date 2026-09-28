@@ -8,24 +8,24 @@ each naming what it touches.
 An operation names a routine some engine already has, so its name is a handle
 in that engine's vocabulary and this system holds a reference to a thing
 it did not write. A procedure is authored here. Nothing anywhere holds
-this sequence of sets and acquisitions until this record says so, which
+this sequence of sets and runs until this record says so, which
 is the same split between citing and composing that separates `OperationName`
 from the steps below.
 
-The two compose rather than compete. An acquisition step cites an operation,
+The two compose rather than compete. A run step cites an operation,
 because asking an engine to run something means naming something the
 engine already knows.
 
 ## Two kinds of step, and only one of them declares what it touches
 
 A set sends one record to one value, so what it touches is the record
-it names and deriving that is exact. An acquisition hands a routine to
+it names and deriving that is exact. A run hands a routine to
 an engine, and nothing here can see inside the routine to work out which
-devices it will drive. So an acquisition declares its scopes and a set
+devices it will drive. So a run declares its scopes and a set
 does not have the option, which is not an inconsistency: one is derivable
 and the other is not.
 
-An acquisition that declared nothing would be a step this system believes
+A run that declared nothing would be a step this system believes
 touches no hardware, which is the belief that lets two of them run at
 once over one motor. Declaring at least one scope is required for that
 reason.
@@ -52,10 +52,10 @@ same command replayed produces the same record.
 
 ## Definition time is where the parameters are checked
 
-An acquisition's parameters are validated against the schema its operation
+A run's parameters are validated against the schema its operation
 declares, and the check runs when the procedure is defined rather than
 when it is walked. That is earlier and cheaper: a procedure with a
-malformed acquisition is refused before anything is dispatched, instead
+malformed run is refused before anything is dispatched, instead
 of failing partway through a traversal that has already moved motors.
 
 The check reads a sibling stream, so it happens in the handler and
@@ -101,7 +101,7 @@ PROCEDURE_SCOPE_MAX_LENGTH = 200
 """How long one declared scope may be."""
 
 PROCEDURE_MAX_SCOPES_PER_STEP = 100
-"""How many scopes one acquisition may declare.
+"""How many scopes one run may declare.
 
 A bound rather than no bound, because the list rides an append-only row
 and nothing else limits it. The number is generous: a tomography scan
@@ -140,7 +140,7 @@ class InvalidProcedureStepsError(ValueError):
 
     Covers the list and the steps in it: an empty procedure, one over the
     length bound, a set naming no record, a set sent to a value JSON
-    cannot carry, and an acquisition declaring no scopes.
+    cannot carry, and a run declaring no scopes.
 
     One class for all of them rather than one per shape. They arrive from
     the same field on the same command, a caller fixing any of them is
@@ -150,11 +150,11 @@ class InvalidProcedureStepsError(ValueError):
 
 
 class InvalidProcedureParametersError(ValueError):
-    """An acquisition's parameters do not satisfy the operation's schema.
+    """A run's parameters do not satisfy the operation's schema.
 
     Carries the reason the shared validator gave, which names the field
     and the constraint it failed, and the index of the step it came from,
-    because a procedure may hold several acquisitions and a caller told
+    because a procedure may hold several runs and a caller told
     only that one of them is wrong has to check each.
     """
 
@@ -243,7 +243,7 @@ class ProcedureBeamline:
 
     ## Why this is not derived from the steps
 
-    It could be. A set names a record and an acquisition declares
+    It could be. A set names a record and a run declares
     scopes, and both carry a prefix that says where they are. Deriving it
     would mean parsing that prefix, and the module docstring above says
     why this system does not: the grammar belongs to whatever drives the
@@ -271,7 +271,7 @@ class SetStep:
 
 
 @dataclass(frozen=True)
-class AcquireStep:
+class RunStep:
     """Ask an engine to run an operation, over devices this step declares.
 
     `parameters` is checked against the cited operation's schema at definition
@@ -285,7 +285,7 @@ class AcquireStep:
     scopes: tuple[str, ...] = ()
 
 
-ProcedureStep = SetStep | AcquireStep
+ProcedureStep = SetStep | RunStep
 """What a procedure is made of.
 
 Closed at two. A third kind is a class added here and to this alias, and
@@ -348,11 +348,11 @@ def _validated_move(index: int, step: SetStep) -> SetStep:
     return SetStep(record=record, to=step.to)
 
 
-def _validated_acquire(index: int, step: AcquireStep) -> AcquireStep:
-    """Trim an acquisition and refuse one this system will not store."""
+def _validated_run(index: int, step: RunStep) -> RunStep:
+    """Trim a run and refuse one this system will not store."""
     if not step.scopes:
         msg = (
-            f"Step {index} is an acquisition declaring no devices; nothing here can "
+            f"Step {index} is a run declaring no devices; nothing here can "
             "derive them from the operation, and a step believed to touch nothing is one "
             "that can run beside another over the same motor"
         )
@@ -376,7 +376,7 @@ def _validated_acquire(index: int, step: AcquireStep) -> AcquireStep:
             )
             raise InvalidProcedureStepsError(msg)
         trimmed.append(cleaned)
-    return AcquireStep(
+    return RunStep(
         operation_id=step.operation_id,
         parameters=dict(step.parameters),
         scopes=tuple(trimmed),
@@ -392,7 +392,7 @@ def validated_steps(raw: tuple[ProcedureStep, ...]) -> tuple[ProcedureStep, ...]
     validated is the list, and a type per step would have to be unwrapped
     everywhere a reader wants a step.
 
-    Says nothing about whether the operations the acquisitions cite exist.
+    Says nothing about whether the operations the runs cite exist.
     That needs a store and this is pure; the handler loads them and the
     decider checks what it is handed.
     """
@@ -410,8 +410,8 @@ def validated_steps(raw: tuple[ProcedureStep, ...]) -> tuple[ProcedureStep, ...]
         match step:
             case SetStep():
                 validated.append(_validated_move(index, step))
-            case AcquireStep():
-                validated.append(_validated_acquire(index, step))
+            case RunStep():
+                validated.append(_validated_run(index, step))
     return tuple(validated)
 
 
@@ -443,20 +443,20 @@ def describes(step: ProcedureStep) -> str:
     for display: a reader parsing one back into its parts is reading a
     sentence that this function is free to rewrite.
 
-    An acquisition names its operation by id rather than by name. The name
+    A run names its operation by id rather than by name. The name
     would read better and would mean loading a second stream per
-    acquisition to build a string nothing acts on. The id appearing here
+    run to build a string nothing acts on. The id appearing here
     is not how anything finds it; `runs_operation` below is.
     """
     match step:
         case SetStep():
             return f"set {step.record} to {step.to}"
-        case AcquireStep():
+        case RunStep():
             return f"acquire {step.operation_id} over {', '.join(step.scopes)}"
 
 
 def runs_operation(step: ProcedureStep) -> UUID | None:
-    """The operation an acquisition hands to an engine, or None for a set.
+    """The operation a run hands to an engine, or None for a set.
 
     What anything holding a step of an execution ends up asking, after
     following that step's reference back to the definition here. Counsel
@@ -471,7 +471,7 @@ def runs_operation(step: ProcedureStep) -> UUID | None:
     match step:
         case SetStep():
             return None
-        case AcquireStep():
+        case RunStep():
             return step.operation_id
 
 
@@ -488,7 +488,7 @@ class Procedure:
     `steps` are composed steps, so each carries the id this system minted
     for it at definition. That is what an execution's step cites, and it
     is why a reader here writes `composed.step` to reach the set or the
-    acquisition itself.
+    run itself.
     """
 
     id: UUID
@@ -513,7 +513,6 @@ __all__ = [
     "PROCEDURE_NAME_MAX_LENGTH",
     "PROCEDURE_RECORD_MAX_LENGTH",
     "PROCEDURE_SCOPE_MAX_LENGTH",
-    "AcquireStep",
     "ComposedStep",
     "InvalidProcedureBeamlineError",
     "InvalidProcedureNameError",
@@ -526,6 +525,7 @@ __all__ = [
     "ProcedureNotFoundError",
     "ProcedureStep",
     "ProcedureStepNotFoundError",
+    "RunStep",
     "SetStep",
     "describes",
     "runs_operation",

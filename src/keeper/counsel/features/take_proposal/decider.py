@@ -49,7 +49,7 @@ def decide(
     matters to what the caller is told. A set runs no operation, so a single
     comparison would refuse it anyway, with a message saying the step
     ran a different operation and naming none. That reads as a near miss and
-    sends a caller looking for the right acquisition, when what it has
+    sends a caller looking for the right run, when what it has
     is a step that could never take a proposal at all.
 
     **The operation is compared and the parameters are not.** Comparing the
@@ -57,7 +57,7 @@ def decide(
     execution, which is easy to do when one procedure is dispatched many
     times over. Comparing parameters would not be: an engine normalizes
     values and fills defaults, so what a step was dispatched with can
-    differ from what was proposed while still being the acquisition that
+    differ from what was proposed while still being the run that
     was proposed, and a dict comparison would refuse legitimate joins to
     catch a case nobody has seen.
 

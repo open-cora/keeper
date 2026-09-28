@@ -53,7 +53,7 @@ from keeper.counsel.features.take_proposal import TakeProposal
 from keeper.execution import wire_execution
 from keeper.execution.aggregates.execution import ExecutionNotFoundError, load_execution
 from keeper.execution.aggregates.operation import OperationNotFoundError
-from keeper.execution.aggregates.procedure import AcquireStep
+from keeper.execution.aggregates.procedure import RunStep
 from keeper.execution.features.define_operation import DefineOperation
 from keeper.execution.features.define_procedure import DefineProcedure
 from keeper.execution.features.dispatch_execution import DispatchExecution
@@ -96,7 +96,7 @@ async def _an_operation(deps: Kernel) -> UUID:
 
 
 async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UUID]:
-    """Compose and dispatch a procedure acquiring with this operation.
+    """Compose and dispatch a procedure running with this operation.
 
     Two more writes than the run this replaced, and they are the point:
     the step the take names cannot be conjured, so the cross-type read
@@ -107,7 +107,7 @@ async def _an_acquisition_of(deps: Kernel, operation_id: UUID) -> tuple[UUID, UU
         DefineProcedure(
             name="one_scan",
             beamline="2-bm",
-            steps=(AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
+            steps=(RunStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",)),),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),

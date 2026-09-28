@@ -2,7 +2,7 @@
 
 Pure, so every case here is a value in and a value or a refusal out. The
 one worth reading closely is the parameter check: a procedure may acquire
-several times, and a caller told only that one of its acquisitions is
+several times, and a caller told only that one of its runs is
 wrong has to check each by hand.
 """
 
@@ -14,7 +14,6 @@ import pytest
 
 from keeper.execution.aggregates.operation import Operation, OperationName
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
     ComposedStep,
     InvalidProcedureBeamlineError,
     InvalidProcedureNameError,
@@ -25,6 +24,7 @@ from keeper.execution.aggregates.procedure import (
     ProcedureBeamline,
     ProcedureName,
     ProcedureStep,
+    RunStep,
     SetStep,
 )
 from keeper.execution.features.define_procedure.command import DefineProcedure
@@ -53,13 +53,13 @@ def _context() -> DefineProcedureContext:
     )
 
 
-def _acquire(**overrides: Any) -> AcquireStep:
+def _acquire(**overrides: Any) -> RunStep:
     fields: dict[str, Any] = {
         "operation_id": _PLAN_ID,
         "parameters": {"exposure_seconds": 0.2},
         "scopes": ("2bmb:m1",),
     }
-    return AcquireStep(**(fields | overrides))
+    return RunStep(**(fields | overrides))
 
 
 def _command(

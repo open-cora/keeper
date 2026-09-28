@@ -23,9 +23,9 @@ from keeper.counsel.features.take_proposal import (
     decide,
 )
 from keeper.execution.aggregates.procedure import (
-    AcquireStep,
     ComposedStep,
     ProcedureStep,
+    RunStep,
     SetStep,
 )
 
@@ -56,7 +56,7 @@ def _taken(proposal: Proposal, *, by: UUID) -> Proposal:
 
 
 def _acquisition_of(operation_id: UUID | None) -> TakeProposalContext:
-    """The composed step behind the acquisition, as the handler found it.
+    """The composed step behind the run, as the handler found it.
 
     An operation of None is the move case: the step exists and was composed to
     drive a motor rather than to ask an engine for anything.
@@ -64,7 +64,7 @@ def _acquisition_of(operation_id: UUID | None) -> TakeProposalContext:
     step: ProcedureStep = (
         SetStep(record="2bmb:m1", to=0.0)
         if operation_id is None
-        else AcquireStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",))
+        else RunStep(operation_id=operation_id, parameters={}, scopes=("2bmb:det:",))
     )
     return TakeProposalContext(composed=ComposedStep(id=uuid4(), step=step))
 
@@ -153,7 +153,7 @@ def test_a_move_cannot_take_a_proposal_and_is_not_reported_as_a_mismatch() -> No
 
     What separates the two is the message. Told the step ran a different
     operation and given none to compare against, a caller goes looking for a
-    closer acquisition; told the step runs no operation at all, it knows the
+    closer run; told the step runs no operation at all, it knows the
     reference itself is wrong.
     """
     proposal = _open_proposal()

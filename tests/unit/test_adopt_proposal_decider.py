@@ -3,7 +3,7 @@
 The slice writes a procedure, an execution and this, and the other two
 are decided by Execution's own deciders. So what is checked here is the
 proposal's half: that it is refused unless the proposal is open, and
-that what it writes is the acquisition the same transaction is about to
+that what it writes is the run the same transaction is about to
 create.
 
 What is deliberately NOT checked here is the beamline and the devices.
