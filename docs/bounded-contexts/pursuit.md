@@ -30,7 +30,7 @@ Two of those fields are the reason the whole context exists. The beamline and th
 
 The whole context follows from one gap, and the gap is in [Counsel](counsel.md#what-a-proposal-does-not-say-and-why-the-caller-must).
 
-A proposal names a plan and the values to run it with. Turning one into work needs two more facts that a proposal does not carry: the beamline it runs at, and the scopes it may drive. Both are safety-bearing, and neither can be worked out from anything on the record. So adopting a proposal makes the caller state them, every time.
+A proposal names an operation and the values to run it with. Turning one into work needs two more facts that a proposal does not carry: the beamline it runs at, and the scopes it may drive. Both are safety-bearing, and neither can be worked out from anything on the record. So adopting a proposal makes the caller state them, every time.
 
 That is the right answer while the caller is a person. It becomes the wrong answer the moment the caller is software, because software stating a scope is software deciding what it may touch.
 
@@ -218,7 +218,7 @@ The store names the state in a column now instead of inferring it from which col
 
 Every status in this system is derived in the fold and stored nowhere. On the read side that is not the question, because a projection has to write something into a row, and the question is whether the row carries a status at all.
 
-Eight read models here, and five aggregates have a status at all: the plan, the procedure and the dataset have none, so their tables never faced the question. The five that did answer it two ways. The proposal and inquiry tables refuse a column, because their states only ever go forwards, so a nullable reference and a pair of nullable timestamps carry the whole of each and a status beside them would be one fact written twice. The execution, device and pursuit tables carry one.
+Eight read models here, and five aggregates have a status at all: the operation, the procedure and the dataset have none, so their tables never faced the question. The five that did answer it two ways. The proposal and inquiry tables refuse a column, because their states only ever go forwards, so a nullable reference and a pair of nullable timestamps carry the whole of each and a status beside them would be one fact written twice. The execution, device and pursuit tables carry one.
 
 The split is not stored against derived. It is whether the states go one way. A pursuit's do not: Held becomes Running when somebody resumes and may become Held again on the next round, so timestamps would have to record the last of an unbounded sequence rather than whether something happened. A device is the same shape, recovering much the way a pursuit resumes, which is why `proj_pursuit_pursuit_summary` is the third table here to carry a status and the second whose states revisit.
 
@@ -241,7 +241,7 @@ Four doors, which is more than any other context has, and the count is the price
                                             deciders
 ```
 
-Every door is sized by what this context actually imports, which is the only honest way to size one, and `test_tach_edges_are_used.py` is what keeps that true. `Execution`, `Plan`, `Proposal` and `Inquiry` are all loaded here and none of them is on a door, because the handler tests fields off them and hands them to deciders that declare their own types.
+Every door is sized by what this context actually imports, which is the only honest way to size one, and `test_tach_edges_are_used.py` is what keeps that true. `Execution`, `Operation`, `Proposal` and `Inquiry` are all loaded here and none of them is on a door, because the handler tests fields off them and hands them to deciders that declare their own types.
 
 The Execution feature door is one name, and it would have been six. `compose_one_run` was extracted from Counsel's adoption slice before this context's second caller was written, precisely so that two contexts would not hold two copies of one account of how Execution composes a run. That the door is narrower is the smaller half of the gain. The larger half is that neither caller any longer knows that a procedure is defined and then dispatched, or that the dispatch needs the procedure folded first.
 
