@@ -53,6 +53,10 @@ EXTERNAL_NAMES: frozenset[str] = frozenset(
     {
         # Postgres
         "AccessExclusiveLock",
+        # Postgres catalog: the trigger table and the function that renders
+        # one back as DDL, both read by the counsel notify test
+        "pg_trigger",
+        "pg_get_triggerdef",
         # starlette / fastapi / mcp
         "ServerErrorMiddleware",
         "Context",

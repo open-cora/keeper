@@ -56,7 +56,7 @@ from keeper.counsel.adapters.postgres_inquiry_summary_lookup import (
 )
 from keeper.counsel.aggregates.inquiry import InquiryStatus
 from keeper.counsel.aggregates.inquiry.summary import InquirySummaryPage
-from keeper.counsel.projections.inquiry_summary import InquirySummaryProjection
+from keeper.counsel.projections.inquiry_summary import PROJECTION_NAME, InquirySummaryProjection
 from keeper.counsel.waiting import INQUIRY_NOTIFY_CHANNEL
 from keeper.infrastructure.adapters.postgres_event_store import PostgresEventStore
 from keeper.infrastructure.projection.long_poll import await_a_row
@@ -79,6 +79,17 @@ _WOKEN = 2.0
 Generous by orders of magnitude against what a notify costs, because
 this runs against a container on whatever machine is free. What matters
 is the gap to `_NEVER`, which is the only other outcome.
+"""
+
+_ON_INSERT = 1 << 2
+_ON_DELETE = 1 << 3
+_ON_UPDATE = 1 << 4
+"""Which events a trigger is armed for, as `pg_trigger.tgtype` packs them.
+
+Postgres's own bit layout, written out because the catalog stores the
+number and not the words. `pg_get_triggerdef` renders the same fact as
+DDL and rides along in every failure message, so a reader never has to
+decode a bitmask to see what went wrong.
 """
 
 _LISTENING = 0.5
@@ -198,38 +209,50 @@ async def test_a_question_arriving_during_a_held_read_is_answered_without_waitin
         await signal.close()
 
 
-async def test_a_claim_on_an_open_question_does_not_wake_a_listener(
+async def test_the_trigger_announces_an_insert_and_neither_of_the_updates(
     db_pool: asyncpg.Pool,
 ) -> None:
     """The reason the trigger is AFTER INSERT and not AFTER INSERT OR UPDATE.
 
-    A claim moves a question off Open, which is the state being waited
-    for, so waking every held request for one would wake them all to
-    tell them the work is gone. Three events land in this table and only
-    the first of them is worth announcing.
+    A claim and an answer both move a question off Open, which is the
+    state being waited for, so announcing them would wake every held
+    request to tell it the work is gone. Three events land in this table
+    and only the first is worth a notify.
 
-    The question is asked and drained before the listener starts, so the
-    only thing that could fire during the wait is the claim's UPDATE.
+    Asserted against the catalog rather than by waiting to see nothing
+    arrive, which is what this test did first and what made it flake.
+    A negative claim about a signal can only be timed out, and the
+    margin between "not woken" and "woken" is whatever the machine is
+    doing: the first version passed with 0.6ms to spare and failed on a
+    loaded box. Worse, it could go green for the wrong reason, because a
+    claim slow enough to outlast the window looks exactly like a claim
+    that woke nothing.
+
+    The definition settles it with no clock in the picture. Postgres
+    will not fire an AFTER INSERT trigger on an UPDATE, so reading which
+    events it is armed for proves the behaviour rather than sampling it.
     """
-    questions = _Questions(db_pool)
-    asked = await questions.ask()
+    rows: list[asyncpg.Record] = await db_pool.fetch(
+        """
+        SELECT tgtype, pg_get_triggerdef(oid) AS definition
+        FROM pg_trigger
+        WHERE tgrelid = $1::regclass AND NOT tgisinternal
+        """,
+        PROJECTION_NAME,
+    )
 
-    signal = ListenNotifyWakeup(db_pool, channel=INQUIRY_NOTIFY_CHANNEL)
-    loop = asyncio.get_running_loop()
-    try:
-        waiting = asyncio.create_task(signal.wait(_WOKEN))
-        await asyncio.sleep(_LISTENING)
+    assert len(rows) == 1, f"expected one trigger on {PROJECTION_NAME}, found {len(rows)}"
+    armed_for: int = rows[0]["tgtype"]
+    definition: str = rows[0]["definition"]
 
-        started = loop.time()
-        await questions.claim(asked)
-        await waiting
-
-        assert loop.time() - started >= _WOKEN - _LISTENING, (
-            "the claim woke a held request, so the trigger is firing on UPDATE "
-            "and every waiting thinker is being told about work it cannot have"
-        )
-    finally:
-        await signal.close()
+    assert armed_for & _ON_INSERT, f"nothing announces a new question: {definition}"
+    assert not armed_for & _ON_UPDATE, (
+        "the trigger fires on UPDATE, so a claim or an answer wakes every waiting "
+        f"thinker to tell it the work is gone: {definition}"
+    )
+    assert not armed_for & _ON_DELETE, (
+        f"the trigger fires on DELETE, which announces a question that is not there: {definition}"
+    )
 
 
 async def test_a_question_already_open_is_answered_with_no_signal_at_all(
