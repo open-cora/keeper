@@ -65,7 +65,7 @@ The governing names live on the aggregate rather than in the slice that issues t
 | Remove one permission | `DELETE /policies/{policy_id}/permissions/{principal_id}/{command_name}` | `revoke_permission` | `204` |
 | Read the rulebook | `GET /policies/{policy_id}` | `get_policy` | `200` with the permissions |
 
-Every operation is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes above are declared once, in `apps/keeper/src/keeper/authority/routes.py`.
+Every operation is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes above are declared once, in `src/keeper/authority/routes.py`.
 
 Reading is authorized like everything else, and it is worth more here than on most reads: a rulebook is a map of everything the system will accept, so a caller who can read one learns where to aim without being permitted anything by it.
 
@@ -147,7 +147,7 @@ Granting and revoking do not take one. A replayed one of either is already refus
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/authority/
+   src/keeper/authority/
      aggregates/policy/      state, events, the fold, and how to load one
      adapters/
        policy_authorize.py   the real Authorize port: policy, then standing

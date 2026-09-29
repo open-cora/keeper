@@ -1,6 +1,6 @@
-"""Pursuit: what a person authorized a machine to do, and how far it may go.
+"""Pursuit: what an actor authorized a machine to do, and how far it may go.
 
-One aggregate, the Pursuit, and three operations on it. A pursuit is a
+One aggregate, the Pursuit, and eight operations on it. A pursuit is a
 bounded, goal-oriented, autonomous loop: it observes an execution, asks
 what should run next, dispatches the answer, and observes that in turn,
 toward one goal within one beamline, one set of scopes and one budget,
@@ -13,20 +13,29 @@ and adopting one composes a procedure and dispatches an execution in a
 single transaction. What adopting cannot do is decide that it should
 happen: two of the three facts a procedure needs beyond the proposal are
 safety-bearing, and neither the beamline nor the scopes may be inferred
-from anything. So a caller states them, every time, and the caller that
-states them has to be a person.
+from anything. So a caller states them, every time, and stating them is
+an act of authorization rather than a step of the work.
 
 That is the reason every step of the loop currently stops and waits for
-somebody. A pursuit is where the person states them once, with a goal and
-a limit attached, so that what follows is a statement already made being
+somebody. A pursuit is where they are stated once, with a goal and a
+limit attached, so that what follows is a statement already made being
 applied rather than a machine working something out.
+
+Nothing here checks who the caller is beyond authorizing the command. The
+MCP surface carries every verb including this one, on purpose, and
+`tools.py` holds that argument: a door an agent cannot reach is a door
+that gets worked around, and what keeps a standing authorization safe is
+that a budget cannot be raised, a scope cannot be widened, and every
+refusal is written down beside the pursuit that caused it. Who may
+authorize one is Authority's question, the way it is for every other
+command, and what the record holds either way is an actor.
 
 ## Why it is not part of Counsel
 
 Counsel is the record of advice, and its own glossary entry says it claims
 the advice and never the weighing. A pursuit is not advice. It is
-authorization, written by a person rather than an agent, lasting days
-rather than a moment, and it reaches both Counsel and Execution where
+authorization, lasting days rather than a moment, and it reaches both
+Counsel and Execution where
 Counsel reaches only Execution. Putting it there would make that sentence
 false and would widen that context's door to carry this context's
 coupling.

@@ -1,9 +1,9 @@
 """Adapters this bounded context supplies to its own read port.
 
 Eight, in four pairs, and each pair is the two halves of one question.
-The ports are declared with the aggregates they summarise, because a
-operation, a procedure, a run and an execution summary are all Execution's to
-define. The Postgres half of each reads the projection a deployment
+The ports are declared with the aggregates they summarise, because an
+operation, a procedure, a run and an execution summary are all Execution's
+to define. The Postgres half of each reads the projection a deployment
 maintains; the in-memory half folds the streams when there is no database
 to project into.
 

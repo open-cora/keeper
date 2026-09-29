@@ -43,10 +43,7 @@ from keeper.infrastructure.ports.authorize import (
 from keeper.infrastructure.ports.clock import (
     Clock,
     FakeClock,
-    FakeMonotonicClock,
-    MonotonicClock,
     SystemClock,
-    SystemMonotonicClock,
 )
 from keeper.infrastructure.ports.event_store import (
     ConcurrencyError,
@@ -94,7 +91,6 @@ __all__ = [
     "Deny",
     "EventStore",
     "FakeClock",
-    "FakeMonotonicClock",
     "FixedIdGenerator",
     "FixedIdGeneratorExhaustedError",
     "HashConflict",
@@ -105,14 +101,12 @@ __all__ = [
     "IntrospectionUnavailableError",
     "InvalidTokenError",
     "LockedRecent",
-    "MonotonicClock",
     "NewEvent",
     "PrincipalKind",
     "StoredEvent",
     "StreamAppend",
     "SubjectMapper",
     "SystemClock",
-    "SystemMonotonicClock",
     "TokenVerifier",
     "UUIDv7Generator",
     "VerifiedPrincipal",

@@ -57,8 +57,8 @@ class ExecutionSummary:
     says nothing ever took the execution up, which is a different failure from
     an execution whose driver died partway: that one shows as `RUNNING` with
     `reported_count` short of `step_count`, and stays that way. Nothing
-    here can tell either from something merely slow, which is the limit
-    the conductor's conducting page names rather than papers over.
+    here can tell either from something merely slow, which is a limit to
+    name rather than paper over.
     """
 
     execution_id: UUID

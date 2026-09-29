@@ -8,12 +8,12 @@ It holds two aggregates. The Proposal came first; most of the argument about it 
 
 ## What a Proposal is
 
-A proposal is a run put forward by an agent, before anything has run it.
+A proposal is a run put forward by an actor, before anything has run it.
 
 ```
    Proposal
      id            a UUID minted when the record is written
-     actor_id      the agent that put it forward
+     actor_id      the actor that put it forward
      operation_id       the operation it proposes running
      parameters    the values it proposes
      execution_id  the execution holding the step that took it, once one has
@@ -43,7 +43,7 @@ procedure for it and dispatches an execution.
 That execution is an ordinary dispatched execution, which is the whole
 trick. A conductor polls for those already and knows nothing about
 proposals, so adoption adds an entrance to the path that exists rather than
-a path of its own. Nothing in `apps/conductor` changed for it.
+a path of its own. Nothing in the conductor changed for it.
 
 ### What a proposal does not say, and why the caller must
 
@@ -205,7 +205,7 @@ Two consequences follow, and neither is a defect.
 
 **Nothing on the record says which kind proposed.** "Was this run human-directed or autonomous" is a real governance question at a facility and this system cannot currently answer it. The fix, if one is wanted, is a typed marker on the Actor rather than a field here: a kind copied onto every proposal is a second copy of a fact Access owns, which is the mistake [Custody](custody.md#why-it-holds-so-little) refused. Access holds no such marker today.
 
-This page still says "agent" in places, and means the autonomous case specifically when it does. Where it describes what the record holds, it says actor.
+This page still says "agent" in places, and means the autonomous case specifically when it does. Where it describes what the record holds, it says actor. The [glossary](../reference/glossary.md) draws that line for the whole project.
 
 ## Why an agent is not an aggregate here
 
@@ -227,7 +227,7 @@ An Agent aggregate earns its place when something needs to ask a question about 
 | Adopt one, and dispatch the work | `POST /proposals/{proposal_id}/adopt` | `adopt_proposal` | `201` with the execution |
 | Find them | `GET /proposals` | `list_proposals` | `200` with a page |
 
-Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `apps/keeper/src/keeper/counsel/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `src/keeper/counsel/routes.py`.
 
 The MCP surface is not incidental here. An agent holding this context's tools can read what operations exist, put a run forward, and later record what came of it, which is the first time the agent surface carries a conversation rather than a single call.
 
@@ -254,7 +254,7 @@ There would be no proposals table. Current state is recomputed by replaying a st
 
 **`actor_id` is on the payload and not on the command.** The handler writes the authenticated principal into it, so the caller controls who it proposed as exactly as much as a caller of `register_actor` controls the new actor's id, which is not at all.
 
-That duplicates the envelope's `principal_id` deliberately. The envelope is infrastructure, the fold never sees it, and "which agent advised this" is a domain question that should be answerable from the domain record rather than from the persistence wrapper around it. The cost is two sources that can disagree, since `principal_id` is null on anything written before the principal hook or by a backfill, and the payload field is the one the aggregate believes.
+That duplicates the envelope's `principal_id` deliberately. The envelope is infrastructure, the fold never sees it, and "which actor advised this" is a domain question that should be answerable from the domain record rather than from the persistence wrapper around it. The cost is two sources that can disagree, since `principal_id` is null on anything written before the principal hook or by a backfill, and the payload field is the one the aggregate believes.
 
 **`ProposalTaken` carries no actor, and the asymmetry is meant.** On the genesis the principal is the substance of the fact. On the join the caller is a messenger, and the fact of record is the run.
 
@@ -426,7 +426,7 @@ Between the asking and the answer, refused from anything but open, and not a gat
 
 A thinker handed its question never claims one, and answering from open moves the inquiry straight to answered. That is `claim_execution`'s posture and it is held for the same reason: a claim says who has the work, and refusing the answer would lose a conclusion this system was told in order to enforce an ordering the log does not have.
 
-The claim is worth less here than it is on an execution, and the difference is worth stating. There, two drivers each believing they own one traversal both move a motor. Here, two thinkers reading one execution cost two inference calls and possibly two proposals for one question. Real, but not dangerous. So the claim exists for the case where something goes looking for work it was not handed, and `list_inquiries` with the status set to Open is what that something reads.
+The claim is worth less here than it is on an execution, and the difference is worth stating. There, two drivers each believing they own one traversal both move a motor. Here, two thinkers reading one execution cost two inference calls and possibly two proposals for one question. Real, but not dangerous. So the claim exists for the case where something goes looking for work it was not handed, and `list_inquiries` with the status set to Open is what that something reads. That reader exists now: a thinker holds one of those requests open and answers whatever appears, which is what `wait` on that route and the insert trigger behind it are for.
 
 **Nothing expires a claim.** A thinker that dies holding one leaves a row that stays Claimed, and the listing narrowed to that status, with the time it was claimed on every row, is how an operator sees it. That is deliberately a view rather than a rule: a claim that timed itself out would release work this system cannot prove was abandoned. It is the same answer an orphaned execution gets, and for the same reason.
 
@@ -484,7 +484,7 @@ Execution, in one direction, for seven names. Nothing in Execution reaches back.
 
 `Execution` itself is not on the list. The handler loads one, searches its steps and passes the step across, so the type is never written down.
 
-This is the third cross-context door in the tree, and the doors are declared in `apps/keeper/tach.toml`.
+This is the third cross-context door in the tree, and the doors are declared in `tach.toml`.
 
 **A second door, onto the feature layer.** Adopting a proposal is the one read here that writes, and it is the only place in the tree where a context reaches a sibling's slices rather than its aggregates. Six names: two commands, the two contexts they are decided against, and the two deciders. It calls the pure half of each slice and not its handler, because a handler appends on its own and three appends are not the single one that slice exists to make.
 
@@ -501,7 +501,7 @@ The step, and not the execution around it. The execution is what makes the step 
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/counsel/
+   src/keeper/counsel/
      aggregates/proposal/       state, events, the fold, its two read paths, and
                                 the summary a list shows with the port over it
      aggregates/inquiry/        the same five modules, for the question and
@@ -556,7 +556,7 @@ Two stemmers grew by one word between them, both in the test tier. `made` is the
 
 **Approval.** A person saying yes before anything runs, which is where a beamline will want a human in the loop. `ProposalAccepted` is reserved for it. It is a third event and the one that turns `execution_id is None` into a real status enum.
 
-**Withdrawing and superseding.** Two more plausible events, neither designed, each arriving as a class on the stream rather than as a field edited onto `ProposalMade`. Note that declined is unavailable as a word: `apps/reporter/src/reporter/outcomes.py` already uses it for this system refusing a transition.
+**Withdrawing and superseding.** Two more plausible events, neither designed, each arriving as a class on the stream rather than as a field edited onto `ProposalMade`. Note that declined is unavailable as a word: the reporter already uses it for this system refusing a transition.
 
 **Any check that a taken proposal was followed.** The operation is compared and the parameters are not, so a run that took a proposal and ignored half of what it said is recorded as having taken it. Closing that now needs two things rather than one: a decision about what counts as the same parameters, and somewhere to read the dispatched values from, which is the procedure rather than the execution.
 

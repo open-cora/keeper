@@ -8,10 +8,10 @@ The mechanics a contributor (human or LLM) has to internalise before touching th
 
 Stop at any step and you have a working mental model of the layer above.
 
-1. **The ports**: `apps/keeper/src/keeper/infrastructure/ports/`. The infrastructure seams (`Clock`, `IdGenerator`, `EventStore`, `IdempotencyStore`, `Authorize`, `TokenVerifier`).
+1. **The ports**: `src/keeper/infrastructure/ports/`. The infrastructure seams (`Clock`, `IdGenerator`, `EventStore`, `IdempotencyStore`, `Authorize`, `TokenVerifier`).
 2. **The composition root**: `infrastructure/kernel.py` and `infrastructure/deps.py`. What every BC is handed, and where it is built.
-3. **The event-sourcing machinery**: `infrastructure/event_envelope.py`, `event_payload.py`, `evolver.py`, `idempotency.py`, `update_handler.py`.
-4. **One fitness test**: `apps/keeper/tests/architecture/test_fitness_scope.py`. What is enforced mechanically, and why most of this directory is not enforcing anything yet.
+3. **The event-sourcing machinery**: `infrastructure/slices/`, holding `envelope.py`, `payload.py`, `evolver.py`, `idempotency.py` and `principal.py`.
+4. **One fitness test**: `tests/architecture/test_fitness_scope.py`. What is enforced mechanically, and why most of this directory is not enforcing anything yet.
 5. **Vocabulary**: [Glossary](glossary.md).
 
 Once the first bounded context exists, a vertical slice becomes step one and everything above shifts down.
@@ -160,7 +160,7 @@ Two habits follow:
 
 A test nobody has watched fail is a file. Before a rule is trusted, break the thing it guards and confirm the rule, and ideally that rule alone, goes red.
 
-Run one mutation with `apps/keeper/tests/_mutation/harness.py`:
+Run one mutation with `tests/_mutation/harness.py`:
 
 ```
 cd apps/keeper
@@ -177,4 +177,4 @@ Run it once with no `-e` first. A baseline that reports SURVIVED is the proof th
 
 ## Per-BC test helpers
 
-When a BC accumulates its own seeding and setup helpers, typically at the rule of three, they live in `tests/unit/<bc>/_helpers.py`, matching the shared `tests/unit/_helpers.py` and `tests/integration/_helpers.py` that will appear alongside them. Neither the shared helpers nor a fitness test rejecting divergent names exists yet.
+When a BC accumulates its own seeding and setup helpers, typically at the rule of three, they go in a `_helpers.py` beside the tests that use them. None exists yet, in any tier, and neither does a fitness test rejecting divergent names, so the convention is stated here rather than shown.

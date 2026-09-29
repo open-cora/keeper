@@ -12,28 +12,74 @@ prove was abandoned.
 The objective rides on every row, unlike the proposal listing's
 parameters. It is bounded, and it is bounded partly so it can: a list of
 questions with the questions taken out is a list of identifiers.
+
+## Why this route can hold a request open
+
+One caller of this route is not a person. Something that thinks asks for
+the questions nobody has taken up, and it asks continuously, because
+that is how it learns there is work. Answered the ordinary way, that is
+a poll: a request every few seconds, almost all of them empty, and a
+pickup delay of half the interval.
+
+`wait` makes it a long poll instead. The request is held open until a
+question appears or the wait runs out, so a thinker sits on one open
+connection rather than asking repeatedly, and a question reaches it in
+milliseconds rather than at the next tick.
+
+The bound is a socket keepalive ceiling and not a latency budget.
+Connections held open indefinitely die in proxies and NAT tables without
+telling either end, so the request returns empty at the ceiling and the
+caller opens another. Nothing is lost in the gap between the two: a
+question landing there is sitting at Open in the database, and the next
+request returns it.
+
+**The signal is an optimization and the query is the truth.** A notify
+can be missed, which `waiting` explains, so each wait is itself bounded
+and the query runs again after it. A missed signal costs latency until
+the next look rather than a question nobody picks up.
+
+`wait` is on this surface and not on the MCP tool, which is the call the
+execution listing makes. A thinker going looking is an HTTP client, and
+an agent holding a tool call open for half a minute is a different thing
+wanting a different answer.
 """
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Final
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel
 
 from keeper.counsel.aggregates.inquiry import InquiryConclusion, InquiryStatus
+from keeper.counsel.aggregates.inquiry.summary import InquirySummaryPage
 from keeper.counsel.features.list_inquiries.handler import Handler
 from keeper.counsel.features.list_inquiries.query import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
     ListInquiries,
 )
+from keeper.infrastructure.projection.long_poll import await_a_row
+from keeper.infrastructure.projection.wakeup import WakeupSource
 from keeper.infrastructure.request import (
     ErrorResponse,
     get_correlation_id,
     get_principal_id,
     get_surface_id,
 )
+
+MAX_WAIT_SECONDS: Final = 60.0
+"""The longest a caller may ask this route to hold its request open.
+
+A ceiling on the socket rather than on the wait anybody wants. Thirty
+seconds is a thinker's usual ask; this leaves room above it and refuses
+the caller who would hold a connection for an hour.
+
+The same number the execution listing allows, and the same for a reason
+rather than by coincidence: what it bounds is how long any connection
+through this system may sit idle, which is a property of the deployment
+and not of what is being waited for.
+"""
 
 
 class InquirySummaryResponse(BaseModel):
@@ -59,6 +105,12 @@ class ListInquiriesResponse(BaseModel):
 
     items: list[InquirySummaryResponse]
     next_cursor: str | None
+
+
+def _get_signal(request: Request) -> WakeupSource:
+    """The wake-up source the application's lifespan is holding open."""
+    signal: WakeupSource = request.app.state.inquiry_signal
+    return signal
 
 
 def _get_handler(request: Request) -> Handler:
@@ -89,6 +141,7 @@ async def get_inquiries(
     cid: Annotated[UUID, Depends(get_correlation_id)],
     principal_id: Annotated[UUID, Depends(get_principal_id)],
     surface_id: Annotated[UUID, Depends(get_surface_id)],
+    signal: Annotated[WakeupSource, Depends(_get_signal)],
     inquiry_status: Annotated[
         InquiryStatus | None,
         Query(
@@ -99,13 +152,31 @@ async def get_inquiries(
     ] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
     cursor: Annotated[str | None, Query(description="Continue a previous page.")] = None,
+    wait: Annotated[
+        float,
+        Query(
+            ge=0,
+            le=MAX_WAIT_SECONDS,
+            description="Hold the request open for up to this many seconds rather than "
+            "answering an empty page, and return as soon as anything matches. How a "
+            "thinker waits for a question without polling. Zero answers at once.",
+        ),
+    ] = 0.0,
 ) -> ListInquiriesResponse:
-    page = await handler(
-        ListInquiries(status=inquiry_status, limit=limit, cursor=cursor),
-        principal_id=principal_id,
-        correlation_id=cid,
-        surface_id=surface_id,
-    )
+    query = ListInquiries(status=inquiry_status, limit=limit, cursor=cursor)
+
+    async def read() -> InquirySummaryPage:
+        return await handler(
+            query,
+            principal_id=principal_id,
+            correlation_id=cid,
+            surface_id=surface_id,
+        )
+
+    page = await read()
+    if not page.items and wait > 0:
+        page = await await_a_row(read, signal, wait)
+
     return ListInquiriesResponse(
         items=[
             InquirySummaryResponse(

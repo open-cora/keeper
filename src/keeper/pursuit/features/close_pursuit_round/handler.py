@@ -24,7 +24,7 @@ the only structural difference between them.
 ## Why the beamline and the scopes come from here
 
 They are the two facts a proposal underdetermines and the two that must
-never be inferred. A person stated them once when the pursuit was started,
+never be inferred. They were stated once when the pursuit was started,
 and this is where that statement is applied. Nothing in this handler could
 work them out and nothing tries: they are read off the pursuit, and a
 caller has no way to supply its own.

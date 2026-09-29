@@ -80,6 +80,11 @@ NAMESPACE_MODULES: frozenset[str] = frozenset(
         # dispatch a run, not a module about a result type, and naming it for
         # the type would name it for the smaller half of what it is.
         "execution/composing.py",
+        # Exports `await_a_row` plus `Page`, the Protocol bounding what that
+        # function takes and hands back. The module is the loop a held request
+        # runs, and the Protocol is there so the loop can span two contexts'
+        # pages without naming either.
+        "infrastructure/projection/long_poll.py",
     }
 )
 """Modules that export a public type and are still function namespaces.

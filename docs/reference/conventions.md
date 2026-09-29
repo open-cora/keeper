@@ -81,7 +81,7 @@ INSERT-only at the database role level, so a value written into a payload cannot
 be taken back out. Personal data belongs in a separate mutable table keyed by the
 subject's id, with the event payload carrying that id alone.
 
-**Enforced.** `apps/keeper/tests/architecture/test_events_carry_no_personal_data.py` reads every event dataclass and every payload builder in every bounded context and refuses a field whose name appears in its deny-list, camelCase spellings included. It ranges over aggregates, so a new one is covered the moment it exists.
+**Enforced.** `tests/architecture/test_events_carry_no_personal_data.py` reads every event dataclass and every payload builder in every bounded context and refuses a field whose name appears in its deny-list, camelCase spellings included. It ranges over aggregates, so a new one is covered the moment it exists.
 
 The check knows names, not contents. It stops a field called `email`; it cannot stop an `email` written into a field called `note`. That gap is what the last anti-pattern below is about.
 
@@ -155,7 +155,7 @@ Execution's six run commands are the first to take it. `define_operation`, in th
 - A naive datetime is not an instant. `datetime.fromisoformat` returns one without complaint, and writing it into a `timestamptz` column makes Postgres apply the session timezone, so the row ends up stating a time nobody sent.
 - Two spellings of one instant must be one value. The idempotency wrapper hashes a whole command, so a timestamp field joins that hash; a retry sending `Z` where the first attempt sent `+00:00` would otherwise be a different hash and come back as a conflict rather than the answer it already had.
 
-**A supplied timestamp is not compared against the clock.** There is no future check and no ordering check, which is deliberate rather than pending. The clock cannot be read from a decision function, so any such refusal would have to live in a handler, which is where domain rules do not go. `Clock.now()` can jump backward under an NTP correction, which the chassis says in `MonotonicClock`'s docstring, so it is a poor referee. And `recorded_at` already makes an absurd claim visible next to the truth.
+**A supplied timestamp is not compared against the clock.** There is no future check and no ordering check, which is deliberate rather than pending. The clock cannot be read from a decision function, so any such refusal would have to live in a handler, which is where domain rules do not go. `Clock.now()` can jump backward under an NTP correction, so it is a poor referee. And `recorded_at` already makes an absurd claim visible next to the truth.
 
 So a run may carry an `occurred_at` in the future, or before the run it belongs to. A reader ordering by it should order by `version` or `recorded_at` instead when they need the sequence this system actually observed.
 

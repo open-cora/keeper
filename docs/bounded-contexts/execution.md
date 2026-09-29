@@ -105,7 +105,7 @@ Two gaps in that check are worth stating rather than discovering. A run supplyin
 | Read one back | `GET /executions/{execution_id}` | `get_execution` | `200` with the execution and its steps |
 | Find executions | `GET /executions` | `list_executions` | `200` with a page of executions |
 
-Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/execution/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/execution/routes.py`.
 
 The four operations that move an existing execution take an optional `occurred_at`. The three that mint a record do not: defining an operation, composing a procedure and dispatching an execution all happen here, at the moment the record is written, so there is no earlier instant for a caller to report. That split is R8's, and it is explained under [When a report says it happened](#when-a-report-says-it-happened) below.
 
@@ -122,16 +122,17 @@ There are three derived tables, one per aggregate, and none holds state the fold
 ```
    OperationDefined        operation_id, operation_name, parameters_schema, occurred_at
 
-   ProcedureDefined   procedure_id, procedure_name, steps, occurred_at
+   ProcedureDefined   procedure_id, procedure_name, beamline, steps, occurred_at
 
    ExecutionDispatched  execution_id, procedure_id, procedure_name,
-                        steps, occurred_at
+                        beamline, steps, occurred_at
    ExecutionClaimed     execution_id, occurred_at
    ExecutionStepDone    execution_id, index, engine_reference, occurred_at
    ExecutionStepRefused execution_id, index, occurred_at
    ExecutionStepBroken  execution_id, index, cause, occurred_at
    ExecutionStepSkipped execution_id, index, occurred_at
-   ExecutionStepEngine*    execution_id, step_id, engine_reference, occurred_at
+   ExecutionStepEngine*    execution_id, step_id, occurred_at,
+                           and engine_reference on Started alone
    ExecutionEnded       execution_id, occurred_at
 ```
 
@@ -418,7 +419,7 @@ A run step gets talked about twice, by two clients that do not know about each o
    engine_state   what the engine said    Running, Paused, Completed, Aborted, Failed
 ```
 
-They are two fields because they can disagree, and the disagreement is the point. A spike drove four collisions into a real scan and every one of them ended `exit_status: "success"`, so neither observer is reliable and collapsing the two would make this system pick a winner between claims it cannot check. A step whose call returned while its engine reported a failure reads as `Done` and `Failed`, which is the honest record.
+They are two fields because they can disagree, and the disagreement is the point. A run whose data a second writer corrupted can still end in the engine's own word for success, so neither observer is reliable and collapsing the two would make this system pick a winner between claims it cannot check. A step whose call returned while its engine reported a failure reads as `Done` and `Failed`, which is the honest record.
 
 A set carries no engine state at all, because a set opens no run for anything to watch.
 
@@ -426,7 +427,7 @@ The five engine values are deliberately the five a run has. It is the same engin
 
 Neither account waits for the other. A driver may report its call returning before or after the engine reports the run ending, so requiring an order would refuse whichever arrived first. An engine's account is accepted even after an execution has been closed, because a driver that gave up does not stop the hardware from having done something, and that account is the only record of what it did.
 
-`Done` is the word most likely to be read as more than it is. Every corrupted scan in a spike came back reporting success, so the outcome says the call returned and nothing about whether the science worked. `Refused` is the only unambiguously good news in the set.
+`Done` is the word most likely to be read as more than it is. A run whose data was corrupted can still report success, so the outcome says the call returned and nothing about whether the science worked. `Refused` is the only unambiguously good news in the set.
 
 An outcome carries at most one detail, and two of the four carry none. A done step may name the run it opened and a broken step names the class that was raised. A refused step names nothing, and a skipped step never could.
 
@@ -499,7 +500,7 @@ What a driving surface would still add is the asking side of a pause, which is a
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/execution/
+   src/keeper/execution/
      aggregates/operation/           state, events, the fold, how to load one, and
                                 the summary a list shows with the port over it
      aggregates/procedure/      the same, for a procedure, whose state module
@@ -540,17 +541,17 @@ What a driving surface would still add is the asking side of a pause, which is a
 
 **A scan run by hand.** An engine run carrying no keeper reference cannot be recorded: there is no execution to hang it on, no step, and no way to make either out of a report. The engine keeps its own record, and a reported shape would be a purely additive change if one is wanted.
 
-The conductor's work intake. Something has to claim a dispatched execution and drive it, and nothing does: `dispatch_execution` writes a record that waits. `apps/conductor` holds the library that carries out a procedure and has no loop that goes looking for one. That is the largest single missing piece and it is what `Dispatched` is waiting for.
+The conductor's work intake. Something has to claim a dispatched execution and drive it, and nothing does: `dispatch_execution` writes a record that waits. The conductor holds the library that carries out a procedure and has no loop that goes looking for one. That is the largest single missing piece and it is what `Dispatched` is waiting for.
 
 The recording seam on that side is stale in three places at once and is being left alone until the loop is written, so that its signature is written against this surface rather than beside it.
 
 Anything about a pause beyond the fact of it. How long an engine has held a step paused, how many times it has, and what it is waiting for are all answerable from the events and none of them is on the read model. The first caller that needs one is the right place to decide whether it belongs there or in a projection.
 
-Any way to say that an engine run ended without saying how. The three terminals assume the engine knows which one happened and says so, and the first engine modelled does. A second one, driven in a spike, does not: it writes the same completion string whether the routine finished, the detector timed out or an operator stopped it, so the outcome exists only in a log nothing can read. Against that engine every step would be recorded `Completed`, including the failed ones, and "how many runs failed last week" would be answered confidently and wrongly.
+Any way to say that an engine run ended without saying how. The three terminals assume the engine knows which one happened and says so, and the first engine modelled does. Not every engine does: one may write the same completion string whether the routine finished, the detector timed out or an operator stopped it, so the outcome exists only in a log nothing can read. Against that engine every step would be recorded `Completed`, including the failed ones, and "how many runs failed last week" would be answered confidently and wrongly.
 
 Not decided here, because there is no caller: nothing reports from such an engine today. What the decision would be is a fourth terminal meaning the run is over and the reporter cannot say more, which is the same refusal to overclaim that picked `report` over `witness` above. Worth settling before a second direction is built on this aggregate, because the conducted path doubles what a wrong terminal set costs.
 
-Any way to hear from an engine that names its run only at the end. The engine reference arrives on the `Started` report and every later report is matched to a step by the id a driver carried into the engine's metadata, so the shape assumes a stream that opens with something identifiable. The first engine modelled does that. The second, driven in the same spike as the terminal question above, has nothing of the kind: its only per-scan identifier is the path of the file it writes, and that path is written by the routine that ends the scan.
+Any way to hear from an engine that names its run only at the end. The engine reference arrives on the `Started` report and every later report is matched to a step by the id a driver carried into the engine's metadata, so the shape assumes a stream that opens with something identifiable. The first engine modelled does that. An engine may have nothing of the kind, with its only per-run identifier the path of a file it writes, and that path written by the routine that ends the run.
 
 ```
    an engine that names its run at the start

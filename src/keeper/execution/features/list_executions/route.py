@@ -52,7 +52,7 @@ from keeper.execution.features.list_executions.query import (
     MAX_PAGE_SIZE,
     ListExecutions,
 )
-from keeper.execution.waiting import await_a_dispatch
+from keeper.infrastructure.projection.long_poll import await_a_row
 from keeper.infrastructure.projection.wakeup import WakeupSource
 from keeper.infrastructure.request import (
     ErrorResponse,
@@ -183,7 +183,7 @@ async def list_executions(
 
     page = await read()
     if not page.items and wait > 0:
-        page = await await_a_dispatch(read, signal, wait)
+        page = await await_a_row(read, signal, wait)
 
     return ListExecutionsResponse(
         items=[

@@ -57,6 +57,7 @@ from keeper.counsel import (
     register_counsel_tools,
     wire_counsel,
 )
+from keeper.counsel.waiting import waiting_lifespan as counsel_waiting_lifespan
 from keeper.custody import (
     register_custody_projections,
     register_custody_routes,
@@ -179,12 +180,16 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                     projection_worker_lifespan(deps, registry, settings),
                     idempotency_pruner_lifespan(deps),
                     waiting_lifespan(deps, settings) as dispatch_signal,
+                    counsel_waiting_lifespan(deps, settings) as inquiry_signal,
                 ):
-                    # Held open beside the workers so it is closed before the
-                    # pool is, for the reason the comment below gives. The
-                    # intake route reads it off app.state rather than through
-                    # the kernel, because it is one context's signal.
+                    # Held open beside the workers so they are closed before
+                    # the pool is, for the reason the comment below gives. A
+                    # held-request route reads its signal off app.state rather
+                    # than through the kernel, because each belongs to one
+                    # context: a conductor waits on a dispatch and a thinker
+                    # waits on a question, and neither wakes for the other.
                     app.state.dispatch_signal = dispatch_signal
+                    app.state.inquiry_signal = inquiry_signal
                     yield
             finally:
                 # Workers must stop before the pool closes, otherwise the next

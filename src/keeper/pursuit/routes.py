@@ -60,8 +60,8 @@ the contract tier walks both.
 
 Four classes on the 400 line where the sibling contexts have one or two,
 and the count is what a standing authorization costs. Every one of them
-guards a field a person is stating on behalf of a machine, so each refusal
-has to name which field rather than saying the request was malformed.
+guards a field stated on behalf of a machine, so each refusal has to name
+which field rather than saying the request was malformed.
 """
 
 from fastapi import FastAPI, Request, status

@@ -116,7 +116,7 @@ class InquiryAnswered:
     `proposal_id` is set when the conclusion is `Propose` and is None
     otherwise. The proposal is written first, on its own stream, and this
     cites it: a crash between the two leaves a proposal that reads as any
-    other agent's, which is the harmless direction to fail in.
+    other actor's, which is the harmless direction to fail in.
     """
 
     inquiry_id: UUID

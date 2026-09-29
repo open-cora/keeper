@@ -114,9 +114,9 @@ exactly what the shared port-contract suite exists to catch, and it would
 have caught this one.
 
 They do NOT touch `reported_indices`. That set counts what the DRIVER
-reported, which is how far the execution got; an engine's account of one run
-is a different question and adding to it would inflate the progress of a
-execution whose driver has said nothing.
+reported, which is how far the execution got; an engine's account of one
+run is a different question and adding to it would inflate the progress
+of an execution whose driver has said nothing.
 """
 
 _ENGINE_SQL = f"""

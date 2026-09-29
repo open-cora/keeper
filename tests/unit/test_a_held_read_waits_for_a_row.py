@@ -1,10 +1,15 @@
 """The long-poll's loop, without a socket or a database.
 
-`await_a_dispatch` is the whole of what `wait` adds to the listing
-route, and it is worth testing apart from FastAPI because what it
-promises is a timing property: it answers as soon as something matches,
-it gives up when the caller's wait runs out, and it never trusts the
-wake-up signal to tell it what happened.
+`await_a_row` is the whole of what `wait` adds to a listing route, and
+it is worth testing apart from FastAPI because what it promises is a
+timing property: it answers as soon as something matches, it gives up
+when the caller's wait runs out, and it never trusts the wake-up signal
+to tell it what happened.
+
+The loop is the chassis's and two contexts hold a request open with it.
+Execution's page is the vehicle here rather than the subject: what is
+under test takes any page and reads one thing off it, so proving it
+twice over two pages would prove it once.
 
 The signal is faked rather than driven, because the real one needs
 Postgres and what is being checked here is the loop's behaviour when a
@@ -20,7 +25,7 @@ import pytest
 
 from keeper.execution.aggregates.execution import ExecutionBeamline, ExecutionStatus
 from keeper.execution.aggregates.execution.summary import ExecutionSummary, ExecutionSummaryPage
-from keeper.execution.waiting import await_a_dispatch
+from keeper.infrastructure.projection.long_poll import await_a_row
 
 pytestmark = pytest.mark.unit
 
@@ -92,7 +97,7 @@ async def test_a_dispatch_arriving_during_the_wait_is_answered_without_waiting_i
     seconds and gets an answer as soon as there is one."""
     signal = _Signal()
 
-    page = await await_a_dispatch(_reads(_page(empty=False)), signal, wait=30.0)
+    page = await await_a_row(_reads(_page(empty=False)), signal, wait=30.0)
 
     assert page.items
     assert len(signal.waits) == 1
@@ -103,7 +108,7 @@ async def test_nothing_arriving_returns_an_empty_page_rather_than_raising() -> N
     which is most of what an idle beamline ever gets."""
     signal = _Signal()
 
-    page = await await_a_dispatch(_reads(_page(empty=True)), signal, wait=0.05)
+    page = await await_a_row(_reads(_page(empty=True)), signal, wait=0.05)
 
     assert page.items == []
     assert signal.waits, "it waited rather than answering immediately"
@@ -119,7 +124,7 @@ async def test_a_signal_that_fires_with_nothing_behind_it_does_not_end_the_wait(
     """
     signal = _Signal()
 
-    page = await await_a_dispatch(
+    page = await await_a_row(
         _reads(_page(empty=True), _page(empty=True), _page(empty=False)), signal, wait=30.0
     )
 
@@ -129,7 +134,7 @@ async def test_a_signal_that_fires_with_nothing_behind_it_does_not_end_the_wait(
 
 async def test_no_single_wait_runs_for_the_callers_whole_request() -> None:
     """A notify arriving between a query and the wait after it is lost,
-    which `waiting` says of both channels. The ceiling is what
+    which `long_poll` says of both channels. The ceiling is what
     turns that from a dispatch nobody picks up into a slower pickup.
 
     Asked for thirty seconds and asserted on what each individual wait
@@ -137,7 +142,7 @@ async def test_no_single_wait_runs_for_the_callers_whole_request() -> None:
     """
     signal = _Signal()
 
-    await await_a_dispatch(
+    await await_a_row(
         _reads(_page(empty=True), _page(empty=True), _page(empty=False)), signal, wait=30.0
     )
 
@@ -151,7 +156,7 @@ async def test_no_single_wait_runs_for_the_callers_whole_request() -> None:
 async def test_a_wait_that_has_already_run_out_reads_once_and_answers() -> None:
     signal = _Signal()
 
-    page = await await_a_dispatch(_reads(_page(empty=True)), signal, wait=0.0)
+    page = await await_a_row(_reads(_page(empty=True)), signal, wait=0.0)
 
     assert page.items == []
     assert signal.waits == []

@@ -1,16 +1,17 @@
 """One row per operation, and the port that reads those rows.
 
-The Run's sibling, and the same shape for the same reason: `read.py`
-answers a question that names an operation, and this answers the ones that do
-not. Which operation is called `count`, and what can be run at all.
+The Execution's sibling, and the same shape for the same reason:
+`read.py` answers a question that names an operation, and this answers
+the ones that do not. Which operation is called `count`, and what can be
+run at all.
 
 ## Why a name lookup cannot promise one answer
 
-Two operations may deliberately share a name. The Operation state module says why:
-one routine constrained two ways is two operations, and which one an
-run step cites is what says how it was constrained. So this
-returns a page, and a caller asking by name has to decide what more than
-one means.
+Two operations may deliberately share a name. The Operation state module
+says why: one routine constrained two ways is two operations, and which
+one a run step cites is what says how it was constrained. So this returns
+a page, and a caller asking by name has to decide what more than one
+means.
 
 That decision is the caller's and not this system's. An operator who
 wants one answer pins an operation id; a caller that cannot choose refuses and

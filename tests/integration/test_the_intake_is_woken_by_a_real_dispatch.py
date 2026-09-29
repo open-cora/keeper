@@ -14,7 +14,7 @@ that seems slow at a beamline nobody is timing.
 ## What is real here and what is not
 
 Real: Postgres, the trigger, `LISTEN`/`NOTIFY`, the projection worker's
-advance, and `await_a_dispatch` reading through the actual adapter.
+advance, and `await_a_row` reading through the actual adapter.
 
 Not real: HTTP. The route's contribution is parsing `wait` and calling
 this function, which the contract tier already covers. Standing up a
@@ -24,7 +24,7 @@ measurement slow.
 ## The signal is tested apart from the loop, and that is the point
 
 The obvious test, holding a whole intake request open and timing it,
-passes whether or not anything wakes it. `await_a_dispatch` bounds each
+passes whether or not anything wakes it. `await_a_row` bounds each
 wait at a second and re-queries after it, so a request with a dead
 signal still finds the row on its next look, about a second late and
 well inside any bound a loaded machine tolerates. That test would be
@@ -51,8 +51,9 @@ from keeper.execution.adapters.postgres_execution_summary_lookup import (
 from keeper.execution.aggregates.execution import ExecutionBeamline, ExecutionStatus
 from keeper.execution.aggregates.execution.summary import ExecutionSummaryPage
 from keeper.execution.projections.execution_summary import ExecutionSummaryProjection
-from keeper.execution.waiting import DISPATCH_NOTIFY_CHANNEL, await_a_dispatch
+from keeper.execution.waiting import DISPATCH_NOTIFY_CHANNEL
 from keeper.infrastructure.adapters.postgres_event_store import PostgresEventStore
+from keeper.infrastructure.projection.long_poll import await_a_row
 from keeper.infrastructure.projection.wakeup import ListenNotifyWakeup
 from keeper.infrastructure.projection.worker import advance_subscriber_once
 from tests._port_contracts._writers import EventStoreExecutionWriter
@@ -166,9 +167,7 @@ async def test_a_held_request_answers_with_the_work_the_signal_announced(
     signal = ListenNotifyWakeup(db_pool, channel=DISPATCH_NOTIFY_CHANNEL)
 
     try:
-        held = asyncio.create_task(
-            await_a_dispatch(lambda: _read(db_pool, beamline), signal, _NEVER)
-        )
+        held = asyncio.create_task(await_a_row(lambda: _read(db_pool, beamline), signal, _NEVER))
         await asyncio.sleep(_LISTENING)
         assert not held.done(), "the request answered before there was anything to answer with"
 
@@ -195,7 +194,7 @@ async def test_a_dispatch_to_another_beamline_does_not_answer_this_request(
     signal = ListenNotifyWakeup(db_pool, channel=DISPATCH_NOTIFY_CHANNEL)
 
     try:
-        held = asyncio.create_task(await_a_dispatch(lambda: _read(db_pool, mine), signal, 2.0))
+        held = asyncio.create_task(await_a_row(lambda: _read(db_pool, mine), signal, 2.0))
         await asyncio.sleep(_LISTENING)
 
         await _dispatch_and_project(db_pool, beamline=theirs)

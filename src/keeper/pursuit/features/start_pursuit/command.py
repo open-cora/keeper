@@ -10,7 +10,7 @@ class StartPursuit:
     """Authorize work toward this goal, at this beamline, over these scopes, within this budget.
 
     Every field is the caller's and every field is load-bearing. This is
-    the one place a person states what a machine may then do without being
+    the one place an actor states what a machine may then do without being
     asked again, so there is nothing here that could sensibly be defaulted:
     a beamline this system picked, a scope list it inferred or a budget it
     made up would each be the system authorizing itself.

@@ -11,7 +11,7 @@ class OpenPursuitRound:
     Two fields, and the second is the only thing a caller decides. The
     question is the pursuit's goal, unchanged every round, so there is
     nothing here to phrase: a caller that could word the question would be
-    able to ask something the person who authorized the pursuit did not.
+    able to ask something whoever authorized the pursuit did not.
 
     `execution_id` is what the round observes. It is also the retry guard,
     because a pursuit refuses a second round about an execution it has

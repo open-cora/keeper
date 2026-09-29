@@ -13,13 +13,11 @@ conclusions write nothing anywhere else, and before the Inquiry existed
 they had nowhere to land at all, so the only thinking this system could see
 was the arm that happened to produce advice.
 
-## Why the record is here and not on a Run
+## Why the record is here and not on an Execution
 
-A proposal looks like a run that has not started, and modelling it as
-one would save a context. A run's genesis requires an external
-reference and a proposal has none; a pre-start status would add a second
-claim to what Running means; and a proposal nothing came of would be a
-run that never ran, sitting in every count of how many runs there were.
+A proposal looks like a step nothing has driven yet, and modelling it as
+one would save a context. Two things stop it, and the Proposal state
+module carries them.
 
 ## The join this context adds
 
@@ -30,18 +28,21 @@ loop.
 
 Nothing writes that join automatically. The reporter has never heard of
 a proposal, and Execution knows nothing of this context and is not told,
-so the agent that proposed is the one that closes it: it submits with a
+so whoever proposed is the one that closes it: it submits with a
 reference of its own choosing, resolves that reference through the run
 listing, and records the result here.
 
 ## What it reaches across for
 
-Execution, in one direction, and nothing reaches back. Making a
-proposal loads an operation, because the decision checks the proposed values
-against the schema the operation declares. Taking one loads a run, because
-the decision compares the operation the run actually ran against the operation
-that was proposed. Making an inquiry loads an execution, because the
-record keeps how many steps there were to see when the question was put.
+Execution, in one direction, and nothing reaches back. Making a proposal
+loads an operation, because the decision checks the proposed values
+against the schema the operation declares. Taking one loads an execution
+and the procedure it was dispatched from, because a step is an entity
+inside an execution rather than a stream of its own, and the decision
+compares the operation the cited step was composed to run against the
+operation that was proposed. Making an inquiry loads an execution,
+because the record keeps how many steps there were to see when the
+question was put.
 
 One read goes sideways rather than across. Answering an inquiry with a
 `Propose` conclusion loads the proposal it names, to establish that it

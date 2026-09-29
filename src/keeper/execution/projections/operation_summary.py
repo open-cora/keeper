@@ -1,9 +1,9 @@
 """Keep `proj_execution_operation_summary` in step with the operation streams.
 
-The Run projection's sibling, and much the smaller of the two, because a
-operation has one event. There are no transitions to fold, so there is no
-status table and no update statement: an operation stream is a single row that
-arrives once and never moves.
+The Execution projection's sibling, and much the smaller of the two,
+because an operation has one event. There are no transitions to fold, so
+there is no status table and no update statement: an operation stream is
+a single row that arrives once and never moves.
 
 That makes idempotency easy rather than absent. `ON CONFLICT (operation_id) DO
 NOTHING` is what makes a replayed batch harmless, and it is load-bearing

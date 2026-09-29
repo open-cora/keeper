@@ -54,7 +54,8 @@ shape.
 The middleware dispatches `expected_audience` per-path: MCP paths
 bind to `SYSTEM_MCP_STREAMABLE_HTTP_SURFACE_ID`, other paths bind to
 `SYSTEM_HTTP_SURFACE_ID`. Tool handlers read the verified principal
-via `keeper.api.mcp_principal.get_mcp_principal_id(ctx)`, which pulls
+via `keeper.infrastructure.slices.principal.get_mcp_principal_id(ctx)`,
+which pulls
 `ctx.request_context.request.state.principal`: the same Starlette
 Request object this middleware stashed on.
 

@@ -4,7 +4,7 @@ No decider, no append, no clock. A read produces no events, so there is
 nothing for a pure decision function to decide and nothing to make
 reproducible on replay.
 
-Authorization still happens. A proposal says which agent advised what,
+Authorization still happens. A proposal says which actor advised what,
 and whether anybody acted on it, which is more than a deployment
 necessarily wants every caller to learn.
 

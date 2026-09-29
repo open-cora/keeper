@@ -104,7 +104,7 @@ def decide(
     Nothing checks the engine reference either. Whatever watches the
     engine records that run on its own schedule, so at this moment the
     run may not exist anywhere yet, and a check would refuse the common
-    case. See the conductor's conducting page.
+    case.
     """
     if state is None:
         raise ExecutionNotFoundError(command.execution_id)

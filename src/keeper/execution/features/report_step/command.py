@@ -30,9 +30,9 @@ class ReportExecutionStep:
     class where there is no field to get wrong.
 
     `occurred_at` is when the step ended, as the caller reports it. A
-    caller who omits it gets the moment the report arrived, which for a
-    execution reporting steps as they happen is close enough to be the usual
-    case.
+    caller who omits it gets the moment the report arrived, which for an
+    execution reporting steps as they happen is close enough to be the
+    usual case.
     """
 
     execution_id: UUID
