@@ -35,11 +35,11 @@ bounded context rather than in `build_kernel`, and it is here because
 this is where composition belongs once the thing being composed is a
 context's own.
 
-The three slices that mint an id take the idempotency wrapper: defining a
-operation, defining a procedure, and dispatching an execution. In each of them
-the server mints the id, so a retry with no key would leave a second
-record of one act. Everything else names a record that already exists,
-and the domain refuses the second write on its own.
+The three slices that mint an id take the idempotency wrapper: defining
+an operation, defining a procedure, and dispatching an execution. In each
+of them the server mints the id, so a retry with no key would leave a
+second record of one act. Everything else names a record that already
+exists, and the domain refuses the second write on its own.
 """
 
 from dataclasses import dataclass

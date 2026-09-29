@@ -14,9 +14,9 @@ Nothing here hands back the version the state was folded from, and the
 sibling loader that would is absent on purpose. That version is what a
 writing handler passes as its expected version so two callers acting at
 once produce one append and one conflict, and it matters only where a
-handler appends to a stream that already has rows. Nothing appends to a
-operation after its genesis, so the loader that returns it arrives with the
-first command that does.
+handler appends to a stream that already has rows. Nothing appends to an
+operation after its genesis, so the loader that returns it arrives with
+the first command that does.
 
 Lives with the aggregate rather than with a slice because it reads the
 aggregate's whole stream, whatever command happened to write each row.

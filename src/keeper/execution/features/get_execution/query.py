@@ -8,7 +8,7 @@ from uuid import UUID
 class GetExecution:
     """Read the execution with this id, and every step it holds.
 
-    By this system's id, not by the driver's own reference. Finding a
+    By this system's id, not by the driver's own reference. Finding an
     execution from a reference is the other question, and a fold cannot
     answer it: it would mean replaying every execution stream to see which
     one matches. That query needs a maintained table and a slice of its

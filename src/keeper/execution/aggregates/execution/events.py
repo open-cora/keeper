@@ -53,28 +53,17 @@ never a count of this module.
 
 ## Why the third group says Engine and not Run
 
-It said Run until it did not, and the word came from one run
-engine's document format, where a routine that is running opens a run and
-gets an identifier for it. These six events relay what such an engine was
-reported to have done.
-
-Borrowing that word was wrong twice over. This system does not model a
-run: it had an aggregate by that name and deleted it, precisely because a
-run and a run step were the same fact written twice, so a class
-here named for one named something the model no longer contains. And the
-word is one engine's, which is the kind of vocabulary this context
-refuses everywhere else. `procedure` declines to parse a scope grammar
-because the grammar belongs to whatever drives the procedure, and a
-beamline is asserted rather than read out of a record prefix for the same
-reason. An event class is this system's own permanent vocabulary rather
-than a value passing through, so another system's noun has no business
-being one. The check in `test_the_domain_names_no_product.py` is the same
-rule for prose.
+These six relay what an engine was reported to have done with one run
+step. Naming them for the run would collide with the step kind of that
+name, because the middle group already holds the driver's account of the
+same step, and two groups spelled Run would put one word over two
+accounts that are allowed to disagree.
 
 Engine is this context's own word for the role, and it is already load
 bearing: `EngineState` is what the record holds, `EngineReport` is what a
 caller sends, and `engine_state` and `engine_reference` are the fields on
-a step. These six events were the only place that said otherwise.
+a step. Naming the group for the observer is what says whose account it
+is, and a class carries that where a field could be set wrong about it.
 
 ## Why the word is not dropped altogether
 

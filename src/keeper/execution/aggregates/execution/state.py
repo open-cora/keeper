@@ -9,18 +9,11 @@ An execution is one traversal of a procedure, and a procedure is a
 routine composed here: sets and runs in an order, each declaring
 the devices it touches.
 
-There used to be a Run aggregate beside it, one carrying-out of one operation,
-recorded because an engine had run something and this system was told.
-It is gone, and the reason is that it and a run step were the
-same fact written twice once this system started composing the work: a
-step cites an operation and carries the parameters it was dispatched with,
-which is all a run's genesis held beyond the engine's own reference for
-it. That reference is on the step too, as `engine_reference`.
-
-Most steps cause no run in any engine at all. A set drives a motor and
-opens nothing, so recording an execution as a run would have lost every
-step that was not a run, which is most of them. That asymmetry
-is why the collapse went this direction rather than the other.
+What it counts is steps and not runs, because most steps cause no run in
+any engine at all. A set drives a motor and opens nothing, so a record
+kept in runs would lose every step that was not one, which is most of
+them. Where a step did open one, the engine's own name for it rides on
+the step, as `engine_reference`.
 
 ## What is copied onto the record, and what is cited
 
@@ -84,12 +77,12 @@ contradict the event it rode in on, and the fold would have to pick a
 winner.
 
 The four are not degrees of success. `DONE` means the seam returned
-without raising and says nothing about whether the science worked, which
-is the distinction the run findings forced and the one word here
-most likely to be read as more than it is. `REFUSED` is the only good
-news in the set: a claim conflict stopped the step before it touched
-anything. `BROKEN` means the seam raised. `SKIPPED` means the execution had
-already stopped before reaching this step.
+without raising and says nothing about whether the science worked, and it
+is the one word here most likely to be read as more than it is.
+`REFUSED` is the only good news in the set: a claim conflict stopped the
+step before it touched anything. `BROKEN` means the seam raised.
+`SKIPPED` means the execution had already stopped before reaching this
+step.
 
 ## Why a broken step keeps a class name and not a message
 

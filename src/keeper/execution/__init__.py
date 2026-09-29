@@ -3,7 +3,7 @@
 Owns what this system can be asked to run, what it composed out of that,
 and what happened when it was carried out.
 
-    operation        a routine an engine already has, by the name that engine
+    operation   a routine an engine already has, by the name that engine
                 knows it by, and the schema its parameters must satisfy.
 
     procedure   a routine this system composed: ordered steps, each of
@@ -13,9 +13,9 @@ and what happened when it was carried out.
                 perform, and how each of them ended.
 
 Three aggregates in one context because none of them can be checked
-without the others. A run's parameters are checked against the
-operation it cites, and a dispatch copies a procedure's steps onto the record
-it opens. Across a context boundary each of those would have to reach
+without the others. A run's parameters are checked against the operation
+it cites, and a dispatch copies a procedure's steps onto the record it
+opens. Across a context boundary each of those would have to reach
 through a sibling's read-side surface for a relationship neither side
 can be without.
 
@@ -29,10 +29,9 @@ existence by reporting a run that had already happened.
 
 What still comes from outside is how the work went, on two channels that
 can disagree. A driver says what it observed of each step, and whatever
-watches an engine says what that engine did to the run one run
-opened. Both are relayed claims rather than things this system saw, and
-neither is treated as the other's correction: `ExecutionStep` carries
-both.
+watches an engine says what that engine did to the run one step opened.
+Both are relayed claims rather than things this system saw, and neither
+is treated as the other's correction: `ExecutionStep` carries both.
 
 Reported rather than witnessed, which was the first word here and was
 wrong. To witness is to have been present and able to vouch for what
