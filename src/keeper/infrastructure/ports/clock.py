@@ -48,7 +48,7 @@ class MonotonicClock(Protocol):
     time, event `occurred_at`, budget windows), which can jump backward
     under an NTP correction, so a duration measured across such a jump is
     wrong or negative. Measuring a duration is therefore not `Clock`'s
-    job to do, and this is the port that does it.
+    job to do.
     """
 
     def now(self) -> float: ...
