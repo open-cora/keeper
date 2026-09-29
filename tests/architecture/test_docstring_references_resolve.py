@@ -87,6 +87,17 @@ EXTERNAL_NAMES: frozenset[str] = frozenset(
         "client_max_body_size",
         # Cedar, named in the same corpus comparison as AuthorizationManager
         "is_authorized",
+        # PyJWT's header reader, named beside `decode_complete` above
+        "get_unverified_header",
+        # structlog's test helper, named by the logging setup that must not
+        # defeat it
+        "capture_logs",
+        # The MCP python-sdk transport module, named by the surface that
+        # binds an audience per path
+        "streamable_http",
+        # The stdlib decorator internal, named where the dataclass machinery
+        # is explained
+        "_process_class",
     }
 )
 """CamelCase names that are real but defined outside this repository.
@@ -154,10 +165,11 @@ _SPAN = re.compile(r"`([^`\n]+)`")
 """Anything between backticks, on one line.
 
 The span is not the name. Prose writes `Kernel.authz`, `SomeEnum(payload[k])`
-and `Optional[X] = None`, and the name a reader would go looking for is the
-head of each: the part before the first dot, bracket or parenthesis. Matching
-the whole span instead is what let a dotted reference to a class this
-repository does not have sit in a shipping adapter."""
+and `Optional[X] = None`, and every dotted segment is a name a reader may go
+looking for. Matching the whole span is what let a dotted reference to a
+class this repository does not have sit in a shipping adapter; resolving only
+the first segment leaves the mirror of that, a dead class behind a live
+module, which is how a conductor citation outlived its class by a rename."""
 
 _NAME_SHAPES = (
     re.compile(r"^[A-Z][a-zA-Z0-9]*[a-z][a-zA-Z0-9]*$"),
@@ -181,8 +193,8 @@ promise an operator slice that does not exist."""
 
 
 def _cited_names(doc: str) -> list[str]:
-    """Heads of every backticked span whose shape says it names code."""
-    heads: list[str] = []
+    """Every segment of every backticked span whose shape says it names code."""
+    cited: list[str] = []
     for span in _SPAN.findall(doc):
         span = span.strip()
         # A span with a space inside it is a phrase, not a reference:
@@ -190,10 +202,13 @@ def _cited_names(doc: str) -> list[str]:
         # `two words`. Only a single token can be looked up.
         if not span or " " in span:
             continue
-        head = re.split(r"[.(\[]", span, maxsplit=1)[0]
-        if head and any(shape.match(head) for shape in _NAME_SHAPES):
-            heads.append(head)
-    return heads
+        path = re.split(r"[(\[]", span, maxsplit=1)[0]
+        cited.extend(
+            part
+            for part in path.split(".")
+            if part and any(shape.match(part) for shape in _NAME_SHAPES)
+        )
+    return cited
 
 
 _FILE_PATH = re.compile(r"`?\b([A-Za-z0-9_./-]+\.(?:py|sql|md|toml|yml|yaml|hcl|cff))\b`?")

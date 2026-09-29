@@ -316,7 +316,7 @@ Refusing a second round about a run it has already asked about is what makes ope
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/pursuit/
+   src/keeper/pursuit/
      aggregates/pursuit/        state, events, the fold, its two read paths, and
                                 the summary a list shows with the port over it
      adapters/                  the two ways to read a summary: the projection

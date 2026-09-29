@@ -105,7 +105,7 @@ Two gaps in that check are worth stating rather than discovering. A run supplyin
 | Read one back | `GET /executions/{execution_id}` | `get_execution` | `200` with the execution and its steps |
 | Find executions | `GET /executions` | `list_executions` | `200` with a page of executions |
 
-Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/execution/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/execution/routes.py`.
 
 The four operations that move an existing execution take an optional `occurred_at`. The three that mint a record do not: defining an operation, composing a procedure and dispatching an execution all happen here, at the moment the record is written, so there is no earlier instant for a caller to report. That split is R8's, and it is explained under [When a report says it happened](#when-a-report-says-it-happened) below.
 
@@ -500,7 +500,7 @@ What a driving surface would still add is the asking side of a pause, which is a
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/execution/
+   src/keeper/execution/
      aggregates/operation/           state, events, the fold, how to load one, and
                                 the summary a list shows with the port over it
      aggregates/procedure/      the same, for a procedure, whose state module
@@ -541,7 +541,7 @@ What a driving surface would still add is the asking side of a pause, which is a
 
 **A scan run by hand.** An engine run carrying no keeper reference cannot be recorded: there is no execution to hang it on, no step, and no way to make either out of a report. The engine keeps its own record, and a reported shape would be a purely additive change if one is wanted.
 
-The conductor's work intake. Something has to claim a dispatched execution and drive it, and nothing does: `dispatch_execution` writes a record that waits. `apps/conductor` holds the library that carries out a procedure and has no loop that goes looking for one. That is the largest single missing piece and it is what `Dispatched` is waiting for.
+The conductor's work intake. Something has to claim a dispatched execution and drive it, and nothing does: `dispatch_execution` writes a record that waits. The conductor holds the library that carries out a procedure and has no loop that goes looking for one. That is the largest single missing piece and it is what `Dispatched` is waiting for.
 
 The recording seam on that side is stale in three places at once and is being left alone until the loop is written, so that its signature is written against this surface rather than beside it.
 

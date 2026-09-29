@@ -35,7 +35,7 @@ something a client does not have belongs here and nowhere else.
 A test that finds nothing to check reports green while examining an empty set,
 and that looks exactly like green while examining everything.
 
-So the suite in `apps/keeper/tests/architecture/` guards its own reach.
+So the suite in `tests/architecture/` guards its own reach.
 `test_fitness_scope.py` pins the discovered context, aggregate and slice counts
 to checked-in integers, and any rule that enumerates opens with a guard that
 fails when its set is empty.

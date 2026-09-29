@@ -81,7 +81,7 @@ INSERT-only at the database role level, so a value written into a payload cannot
 be taken back out. Personal data belongs in a separate mutable table keyed by the
 subject's id, with the event payload carrying that id alone.
 
-**Enforced.** `apps/keeper/tests/architecture/test_events_carry_no_personal_data.py` reads every event dataclass and every payload builder in every bounded context and refuses a field whose name appears in its deny-list, camelCase spellings included. It ranges over aggregates, so a new one is covered the moment it exists.
+**Enforced.** `tests/architecture/test_events_carry_no_personal_data.py` reads every event dataclass and every payload builder in every bounded context and refuses a field whose name appears in its deny-list, camelCase spellings included. It ranges over aggregates, so a new one is covered the moment it exists.
 
 The check knows names, not contents. It stops a field called `email`; it cannot stop an `email` written into a field called `note`. That gap is what the last anti-pattern below is about.
 

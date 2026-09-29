@@ -43,7 +43,7 @@ procedure for it and dispatches an execution.
 That execution is an ordinary dispatched execution, which is the whole
 trick. A conductor polls for those already and knows nothing about
 proposals, so adoption adds an entrance to the path that exists rather than
-a path of its own. Nothing in `apps/conductor` changed for it.
+a path of its own. Nothing in the conductor changed for it.
 
 ### What a proposal does not say, and why the caller must
 
@@ -227,7 +227,7 @@ An Agent aggregate earns its place when something needs to ask a question about 
 | Adopt one, and dispatch the work | `POST /proposals/{proposal_id}/adopt` | `adopt_proposal` | `201` with the execution |
 | Find them | `GET /proposals` | `list_proposals` | `200` with a page |
 
-Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `apps/keeper/src/keeper/counsel/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler, with the status codes declared once in `src/keeper/counsel/routes.py`.
 
 The MCP surface is not incidental here. An agent holding this context's tools can read what operations exist, put a run forward, and later record what came of it, which is the first time the agent surface carries a conversation rather than a single call.
 
@@ -484,7 +484,7 @@ Execution, in one direction, for seven names. Nothing in Execution reaches back.
 
 `Execution` itself is not on the list. The handler loads one, searches its steps and passes the step across, so the type is never written down.
 
-This is the third cross-context door in the tree, and the doors are declared in `apps/keeper/tach.toml`.
+This is the third cross-context door in the tree, and the doors are declared in `tach.toml`.
 
 **A second door, onto the feature layer.** Adopting a proposal is the one read here that writes, and it is the only place in the tree where a context reaches a sibling's slices rather than its aggregates. Six names: two commands, the two contexts they are decided against, and the two deciders. It calls the pure half of each slice and not its handler, because a handler appends on its own and three appends are not the single one that slice exists to make.
 
@@ -501,7 +501,7 @@ The step, and not the execution around it. The execution is what makes the step 
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/counsel/
+   src/keeper/counsel/
      aggregates/proposal/       state, events, the fold, its two read paths, and
                                 the summary a list shows with the port over it
      aggregates/inquiry/        the same five modules, for the question and
@@ -556,7 +556,7 @@ Two stemmers grew by one word between them, both in the test tier. `made` is the
 
 **Approval.** A person saying yes before anything runs, which is where a beamline will want a human in the loop. `ProposalAccepted` is reserved for it. It is a third event and the one that turns `execution_id is None` into a real status enum.
 
-**Withdrawing and superseding.** Two more plausible events, neither designed, each arriving as a class on the stream rather than as a field edited onto `ProposalMade`. Note that declined is unavailable as a word: `apps/reporter/src/reporter/outcomes.py` already uses it for this system refusing a transition.
+**Withdrawing and superseding.** Two more plausible events, neither designed, each arriving as a class on the stream rather than as a field edited onto `ProposalMade`. Note that declined is unavailable as a word: the reporter already uses it for this system refusing a transition.
 
 **Any check that a taken proposal was followed.** The operation is compared and the parameters are not, so a run that took a proposal and ignored half of what it said is recorded as having taken it. Closing that now needs two things rather than one: a decision about what counts as the same parameters, and somewhere to read the dispatched values from, which is the procedure rather than the execution.
 

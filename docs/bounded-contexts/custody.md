@@ -48,7 +48,7 @@ Custody says what this one can back: where the thing is, and on whose word. It i
 | Read one back | `GET /datasets/{dataset_id}` | `get_dataset` | `200` with the dataset |
 | Find what one run produced | `GET /datasets` | `list_datasets` | `200` with a page of datasets |
 
-Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `apps/keeper/src/keeper/custody/routes.py`.
+Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/custody/routes.py`.
 
 `POST /datasets` creates a record of something that already exists elsewhere, not the data. Nothing here reaches the store and nothing here could: a caller that can see the data is the one that knows its address.
 
@@ -114,7 +114,7 @@ Execution, in one direction, for two names. Nothing in Execution reaches back.
    execution.load_execution   refuse a dataset citing a step that is not there
 ```
 
-This is the second cross-context door in the tree and the doors are declared in `apps/keeper/tach.toml`. The first, from Authority into Access, exposes one name.
+This is the second cross-context door in the tree and the doors are declared in `tach.toml`. The first, from Authority into Access, exposes one name.
 
 `load_execution` is an existence check and nothing more, made twice: that the execution is there, and that it holds the step named. `register_dataset` has no `context.py`, which is the difference from `define_procedure` next door: that slice loads an operation per run because its decision reads their schemas, so sibling state is an input. This decision needs nothing from the execution. Existence is the handler's to check and state is the decider's, which is the split [Patterns](../reference/patterns.md#cross-aggregate-validation) draws between a 404 and a refusal, and a context holder carrying a value nothing reads would be a door held open for nobody.
 
@@ -151,7 +151,7 @@ Two things are this context's own.
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/custody/
+   src/keeper/custody/
      aggregates/dataset/        state, events, the fold, how to load one, and
                                 the summary a list shows with the port over it
      adapters/                  the two ways to read a summary: the projection

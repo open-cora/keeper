@@ -14,7 +14,7 @@ keeper/
 └── <bc>/             one package per bounded context
 ```
 
-The contract is declared in `apps/keeper/tach.toml` and checked by `uv run tach check`:
+The contract is declared in `tach.toml` and checked by `uv run tach check`:
 
 - `shared` depends on nothing.
 - `infrastructure` depends only on `shared`.

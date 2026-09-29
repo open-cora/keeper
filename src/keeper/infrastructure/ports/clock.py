@@ -47,10 +47,8 @@ class MonotonicClock(Protocol):
     Distinct from `Clock`: `Clock.now()` is wall-clock `datetime` (domain
     time, event `occurred_at`, budget windows), which can jump backward
     under an NTP correction, so a duration measured across such a jump is
-    wrong or negative. Elapsed GPU time (the serving meter in
-    `keeper.infrastructure.observability.gpu_accounting`) must read from a
-    monotonic source, so it lives on its own port rather than reusing
-    `Clock`.
+    wrong or negative. Measuring a duration is therefore not `Clock`'s
+    job to do, and this is the port that does it.
     """
 
     def now(self) -> float: ...

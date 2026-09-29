@@ -7,12 +7,14 @@ wait early.
 
 ## Why this is Execution's and not the chassis's
 
-The mechanism is the chassis's. `ListenNotifyWakeup` already exists, is
-already shared by every projection's advance loop, and takes the channel
-to listen on. What is Execution's is which channel, and the reason that
-channel exists at all: `proj_execution_execution_summary` is this
-context's table and the trigger that announces a row landing in it is in
-this context's migration.
+The mechanism is the chassis's, and all of it is there.
+`ListenNotifyWakeup` takes the channel to listen on, and `await_a_row`
+holds the query-wait-query loop that every held request runs.
+
+What is Execution's is which channel, and the reason that channel exists
+at all: `proj_execution_execution_summary` is this context's table and
+the trigger that announces a row landing in it is in this context's
+migration.
 
 That split is the one the kernel's docstring draws. A bounded context
 that needs an additional Postgres-backed thing builds it from the pool
@@ -30,25 +32,19 @@ that adds the trigger holds the long version.
 
 ## Nothing here is load-bearing for correctness
 
-A notify that arrives while no listener is connected is lost, and so is
-one arriving between a reader's query and its wait. Both are true of the
-projection worker's channel and are why it treats the advance query as
-the source of truth. The intake does the same: it queries, waits with a
-ceiling, and queries again. A missed signal costs latency until the next
-look, never a dispatch nobody picks up, because the work sits durably at
-`Dispatched` whatever this does.
+A notify arriving while no listener is connected is lost, and so is one
+arriving between a reader's query and its wait. `long_poll` explains
+what that costs and why it is only latency.
 
 So a deployment with `projection_use_listen_notify` off, or one running
 with no database at all, gets `PollOnlyWakeup` and a slower intake rather
 than a broken one.
 """
 
-import asyncio
 import contextlib
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator
 from typing import Final
 
-from keeper.execution.aggregates.execution.summary import ExecutionSummaryPage
 from keeper.infrastructure.kernel import Kernel
 from keeper.infrastructure.logging import get_logger
 from keeper.infrastructure.projection.wakeup import (
@@ -66,49 +62,6 @@ fires for every row that lands there and a second reader with another
 question would wait on the same one.
 """
 
-_SIGNAL_CEILING_SECONDS: Final = 1.0
-"""How long one wait inside a held request may last before looking again.
-
-The signal can be missed, so this is the bound on how long a miss costs.
-It is not the projection worker's poll interval and should not be tied to
-it: that one governs how stale a read model may get with nobody asking,
-and this one governs how long somebody actively waiting keeps waiting
-after a lost notify.
-"""
-
-
-async def await_a_dispatch(
-    read: Callable[[], Awaitable[ExecutionSummaryPage]],
-    signal: WakeupSource,
-    wait: float,
-) -> ExecutionSummaryPage:
-    """Re-read until something matches or the caller's wait runs out.
-
-    Query, wait, query again, never wait-and-report-what-the-signal-said.
-    A notify carries no rows and can be missed entirely, so the query is
-    what answers and the signal only decides when to run it.
-
-    The loop's clock is the event loop's, not the domain clock on the
-    kernel. What is being measured is how long a socket has been held,
-    which is not a fact about the beamline and has no business being
-    reported or replayed.
-
-    Returns the last empty page on expiry rather than raising. A caller
-    that waited and found nothing is in the ordinary case, not a failed
-    one, and an empty page is what it asked for.
-    """
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + wait
-    while True:
-        remaining = deadline - loop.time()
-        if remaining <= 0:
-            return await read()
-        await signal.wait(min(remaining, _SIGNAL_CEILING_SECONDS))
-        page = await read()
-        if page.items:
-            return page
-
-
 _log = get_logger(__name__)
 
 
@@ -123,9 +76,10 @@ async def waiting_lifespan(deps: Kernel, settings: Settings) -> AsyncGenerator[W
     release races `pool.close()`.
 
     Falls back to `PollOnlyWakeup` with no pool or with LISTEN/NOTIFY
-    switched off, which is what `app_env=test` runs. Every intake
-    request in that environment passes no wait at all, so nothing
-    sleeps.
+    switched off, which is what `app_env=test` runs. A held request
+    there re-reads on a plain sleep, and no test asks it to: the one
+    that passes a wait has work waiting already, so the first read
+    answers and the loop is never entered.
     """
     source: WakeupSource = (
         ListenNotifyWakeup(deps.pool, channel=DISPATCH_NOTIFY_CHANNEL)
@@ -144,4 +98,4 @@ async def waiting_lifespan(deps: Kernel, settings: Settings) -> AsyncGenerator[W
         _log.info("execution.waiting.stopped")
 
 
-__all__ = ["DISPATCH_NOTIFY_CHANNEL", "await_a_dispatch", "waiting_lifespan"]
+__all__ = ["DISPATCH_NOTIFY_CHANNEL", "waiting_lifespan"]

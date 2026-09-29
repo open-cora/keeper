@@ -178,7 +178,7 @@ A row carries every field the single read has, plus two timestamps. That is unli
 ## Where the code is
 
 ```
-   apps/keeper/src/keeper/equipment/
+   src/keeper/equipment/
      aggregates/device/      the fields, the events, and how one is read back
      features/
        register_device/      one directory per operation
