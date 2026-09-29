@@ -3,10 +3,11 @@
 `POST /proposals`, carrying the operation a run is proposed of and the values
 proposed for it.
 
-A POST that creates the thing it names, unlike `POST /runs` and
-`POST /datasets` next door, which create records of acts that already
-happened elsewhere. Here the request IS the act: whoever proposed
-something has done so by the time this returns.
+A POST that creates the thing it names, unlike
+`POST /executions/{execution_id}/steps/{step_id}/run` and `POST /datasets`
+next door, which create records of acts that already happened elsewhere.
+Here the request IS the act: whoever proposed something has done so by the
+time this returns.
 
 There is no `occurred_at` in the body for that reason, and no proposer
 either. Both are the handler's, the first from the clock and the second

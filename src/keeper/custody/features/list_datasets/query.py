@@ -30,8 +30,14 @@ class ListDatasets:
 
     `step_id` narrows to what one run produced, which is the whole reason
     this slice exists. It is a keeper id rather than an engine's, because
-    that is what the record carries and a caller holding an engine's uid
-    resolves it through `GET /runs` first.
+    that is what the record carries.
+
+    Nothing here turns an engine's own reference into one. A step carries
+    that reference and no slice is keyed on it, so a caller holding one
+    already knows the execution it belongs to, or it has nothing to ask
+    with. That is deliberate rather than missing: whatever dispatched the
+    work carried both ids into the engine's metadata, so the side that
+    holds an engine reference holds the keeper's ids beside it.
 
     Not guaranteed to match at most one dataset. How many datasets a run
     produces is the reporting side's policy rather than a rule here, so
