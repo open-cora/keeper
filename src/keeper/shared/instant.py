@@ -50,9 +50,9 @@ A decision function cannot read a clock, by rule and by test, so the
 comparison would have to happen in a handler, which is the one layer this
 tree keeps domain refusals out of.
 
-The clock is a poor referee anyway. `MonotonicClock` exists because
-`Clock.now()` can jump backward under an NTP correction, so "later than
-now" is not a stable question to ask of it.
+The clock is a poor referee anyway. `Clock.now()` can jump backward
+under an NTP correction, so "later than now" is not a stable question to
+ask of it.
 
 And the answer is recoverable without asking. `recorded_at` is written by
 the database, never by this application, so a caller cannot touch it. A
