@@ -602,6 +602,33 @@ def test_a_listed_inquiry_carries_the_question_itself(client: TestClient) -> Non
     assert page.json()["items"][0]["objective"] == "is one scan enough"
 
 
+def test_a_wait_returns_at_once_when_there_is_already_a_question(client: TestClient) -> None:
+    """The long poll only holds a request that would answer empty."""
+    with client:
+        execution_id, _step_id = _an_acquisition_of(client, _an_operation(client))
+        waiting = _an_inquiry(client, execution_id, objective="is one scan enough")
+
+        page = client.get("/inquiries", params={"status": "Open", "wait": 30})
+
+    assert page.status_code == 200, page.text
+    assert [item["inquiry_id"] for item in page.json()["items"]] == [waiting]
+
+
+def test_a_wait_past_the_ceiling_is_refused_rather_than_silently_shortened(
+    client: TestClient,
+) -> None:
+    """A caller that asked to hold a connection for an hour gets told no.
+
+    Bounded at the boundary rather than clamped, because a clamp would
+    have the caller believe it is waiting far longer than it is and
+    treat every return as a real answer.
+    """
+    with client:
+        page = client.get("/inquiries", params={"wait": 3600})
+
+    assert page.status_code == 422, page.text
+
+
 def _adopt(client: TestClient, proposal_id: str, **overrides: Any) -> Any:
     body: dict[str, Any] = {"beamline": "2-bm", "scopes": ["2bmb:det:"]}
     body.update(overrides)
