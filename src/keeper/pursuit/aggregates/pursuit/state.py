@@ -12,12 +12,12 @@ adopting one composes a procedure and dispatches an execution. What
 adopting cannot do on its own is decide that it should happen. Two of the
 three facts a procedure needs beyond the proposal are safety-bearing, the
 beamline it runs at and the scopes it may drive, and neither may be
-inferred from anything. So a caller states them, every time, and the caller
-that states them has to be a person.
+inferred from anything. So a caller states them, every time, and stating
+them is an act of authorization rather than a step of the work.
 
-A pursuit is where a person states them once. It is a standing
-authorization with a goal attached and a limit on how far it may run,
-written to a log nobody can edit. Everything that acts inside one is
+A pursuit is where they are stated once. It is a standing authorization
+with a goal attached and a limit on how far it may run, written to a log
+nobody can edit. Everything that acts inside one is
 checked against it, and every refusal is on the record beside it.
 
 ## Why the thing acting on it is not here

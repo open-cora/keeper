@@ -35,7 +35,7 @@ from keeper.infrastructure.slices.payload import deserialize_or_raise
 
 @dataclass(frozen=True)
 class PursuitStarted:
-    """A person authorized a bounded loop toward a goal.
+    """An actor authorized a bounded loop toward a goal.
 
     Started rather than opened, defined or created. Opening is what happens
     to an inquiry and says a thing is now awaiting an answer, which is not
@@ -72,7 +72,7 @@ class PursuitStarted:
 
 @dataclass(frozen=True)
 class PursuitWithdrawn:
-    """A person revoked the authorization before it ran itself out.
+    """An actor revoked the authorization before it ran itself out.
 
     Withdrawn rather than stopped or cancelled. Stopped is the state rather
     than the act, and three different acts will reach it, so spending the
@@ -198,7 +198,7 @@ class PursuitRoundClosed:
 
 @dataclass(frozen=True)
 class PursuitResumed:
-    """A person put a held pursuit back to work.
+    """An actor put a held pursuit back to work.
 
     The counterpart to the two outcomes that hold rather than stop. A
     thinker with nothing to go on and a thinker asking for a person are

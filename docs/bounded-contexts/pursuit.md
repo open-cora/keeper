@@ -1,10 +1,10 @@
 # Pursuit
 
-Pursuit is the bounded context that answers one question: what has a person authorized a machine to go and do on its own, and how far may it get.
+Pursuit is the bounded context that answers one question: what has an actor authorized a machine to go and do on its own, and how far may it get.
 
 It holds one aggregate. A pursuit is a bounded, goal-oriented, autonomous loop: it observes an execution, asks what should run next, dispatches the answer and observes that in turn, toward one goal within one beamline, one set of scopes and one budget, until the objective is met or a stopping condition is reached. Eight operations.
 
-It is the newest context here, and the second whose subject is a permission rather than a thing. Authority holds the rulebook, which says which principals may call which commands and is general, standing and about the system. A pursuit is one person's authorization of one goal, bounded and revocable and about a stretch of time. The rulebook says an agent may adopt proposals at all; a pursuit is why one particular adoption at one particular beamline is allowed to happen with nobody watching.
+It is the newest context here, and the second whose subject is a permission rather than a thing. Authority holds the rulebook, which says which principals may call which commands and is general, standing and about the system. A pursuit is one actor's authorization of one goal, bounded and revocable and about a stretch of time. The rulebook says an agent may adopt proposals at all; a pursuit is why one particular adoption at one particular beamline is allowed to happen with nobody watching.
 
 ## What a Pursuit is
 
@@ -24,7 +24,7 @@ One person's standing permission for a machine to chase one goal, with limits on
      stopped_by  who took it back, if anybody did
 ```
 
-Two of those fields are the reason the whole context exists. The beamline and the scopes say where a machine may work and what it may touch, and a person states both once here rather than every time something acts. Everything else is the record of what that permission went on to cause.
+Two of those fields are the reason the whole context exists. The beamline and the scopes say where a machine may work and what it may touch, and both are stated once here rather than every time something acts. Everything else is the record of what that permission went on to cause.
 
 ## The two facts that may not be inferred
 
@@ -34,7 +34,9 @@ A proposal names an operation and the values to run it with. Turning one into wo
 
 That is the right answer while the caller is a person. It becomes the wrong answer the moment the caller is software, because software stating a scope is software deciding what it may touch.
 
-A pursuit is where a person states them once.
+A pursuit is where they are stated once.
+
+Nothing in this context checks that whoever states them is a person, and the MCP surface carries every verb including `start_pursuit`. That is deliberate: a door an agent cannot reach is a door that gets worked around, and who may authorize a loop is [Authority](authority.md)'s question rather than this one's. What this context does instead is make the statement once and then unalterable: a budget cannot be raised, a scope cannot be widened, and every refusal is written down beside the pursuit that caused it.
 
 ```
    without a pursuit          with a pursuit
@@ -45,7 +47,7 @@ A pursuit is where a person states them once.
    person adopts              the round applies what they stated
 ```
 
-Nothing in the closing handler could work the two out and nothing tries. They are read off the pursuit, and no caller has any way to supply its own. The permission is checked against a record written by a person, and every refusal is written down beside it.
+Nothing in the closing handler could work the two out and nothing tries. They are read off the pursuit, and no caller has any way to supply its own. The permission is checked against a record written when the pursuit was started, and every refusal is written down beside it.
 
 ## Why it is called Pursuit
 

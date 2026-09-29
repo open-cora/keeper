@@ -14,7 +14,7 @@ It is a record and a gate, and the gate matters more as the work stops being wat
 
 **Whether a run was any good.** A report says what something was told, not what was true. An instrument reporting success is a claim, and treating a claim as a measurement is how a system produces confident wrong data. So the record says `reported` and never `witnessed`.
 
-**What a machine may touch, based on what a machine said.** Two things can never be guessed: which beamline a suggestion runs at, and which equipment it may drive. A person states both once, when they grant the permission, and everything after that uses what the person said rather than what the suggestion implied.
+**What a machine may touch, based on what a machine said.** Two things can never be guessed: which beamline a suggestion runs at, and which equipment it may drive. Both are stated once, when the permission is granted, and everything after that uses what was stated rather than what the suggestion implied.
 
 ## What it holds
 

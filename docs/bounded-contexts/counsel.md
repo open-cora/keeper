@@ -8,12 +8,12 @@ It holds two aggregates. The Proposal came first; most of the argument about it 
 
 ## What a Proposal is
 
-A proposal is a run put forward by an agent, before anything has run it.
+A proposal is a run put forward by an actor, before anything has run it.
 
 ```
    Proposal
      id            a UUID minted when the record is written
-     actor_id      the agent that put it forward
+     actor_id      the actor that put it forward
      operation_id       the operation it proposes running
      parameters    the values it proposes
      execution_id  the execution holding the step that took it, once one has
@@ -205,7 +205,7 @@ Two consequences follow, and neither is a defect.
 
 **Nothing on the record says which kind proposed.** "Was this run human-directed or autonomous" is a real governance question at a facility and this system cannot currently answer it. The fix, if one is wanted, is a typed marker on the Actor rather than a field here: a kind copied onto every proposal is a second copy of a fact Access owns, which is the mistake [Custody](custody.md#why-it-holds-so-little) refused. Access holds no such marker today.
 
-This page still says "agent" in places, and means the autonomous case specifically when it does. Where it describes what the record holds, it says actor.
+This page still says "agent" in places, and means the autonomous case specifically when it does. Where it describes what the record holds, it says actor. The [glossary](../reference/glossary.md) draws that line for the whole project.
 
 ## Why an agent is not an aggregate here
 
@@ -254,7 +254,7 @@ There would be no proposals table. Current state is recomputed by replaying a st
 
 **`actor_id` is on the payload and not on the command.** The handler writes the authenticated principal into it, so the caller controls who it proposed as exactly as much as a caller of `register_actor` controls the new actor's id, which is not at all.
 
-That duplicates the envelope's `principal_id` deliberately. The envelope is infrastructure, the fold never sees it, and "which agent advised this" is a domain question that should be answerable from the domain record rather than from the persistence wrapper around it. The cost is two sources that can disagree, since `principal_id` is null on anything written before the principal hook or by a backfill, and the payload field is the one the aggregate believes.
+That duplicates the envelope's `principal_id` deliberately. The envelope is infrastructure, the fold never sees it, and "which actor advised this" is a domain question that should be answerable from the domain record rather than from the persistence wrapper around it. The cost is two sources that can disagree, since `principal_id` is null on anything written before the principal hook or by a backfill, and the payload field is the one the aggregate believes.
 
 **`ProposalTaken` carries no actor, and the asymmetry is meant.** On the genesis the principal is the substance of the fact. On the join the caller is a messenger, and the fact of record is the run.
 

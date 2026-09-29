@@ -42,7 +42,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
     @mcp.tool(
         name="get_proposal",
         description=(
-            "Read a proposal by id: which agent put it forward, the operation and "
+            "Read a proposal by id: which actor put it forward, the operation and "
             "values it proposes, and the run that took it if one has."
         ),
     )
