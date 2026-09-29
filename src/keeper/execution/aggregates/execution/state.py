@@ -224,11 +224,11 @@ class EngineState(StrEnum):
     touched anything. This is what the engine said about itself, relayed
     by whatever watches that engine.
 
-    The two can disagree, and the disagreement is the point.
-    a spike drove four collisions into a real scan
-    and every one of them ended `exit_status: "success"`, so neither
-    observer is reliable and collapsing them would make this system pick
-    a winner between two claims it cannot check. A set carries None
+    The two can disagree, and the disagreement is the point. A run whose
+    data a second writer corrupted can still end in the engine's own word
+    for success, so neither observer is reliable and collapsing them
+    would make this system pick a winner between two claims it cannot
+    check. A set carries None
     here, because a set opens no run for anything to watch.
 
     Five values, and they are one engine's lifecycle rather than a

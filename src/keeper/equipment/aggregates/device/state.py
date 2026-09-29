@@ -6,15 +6,14 @@ what state it was last reported in.
 ## What identifies it, and why it is not the name
 
 `external_ref` is the handle, and it is the only thing here two
-independent clients will agree on. That is a finding rather than a
-preference: a spike built the same motor twice from two
-startup profiles, under two different names, both connected at once,
-with nothing anywhere recording that they were one device. A control
-library's name for a device is a constructor argument, so it survives
-exactly as long as the process that chose it.
+independent clients will agree on. A control library's name for a device
+is a constructor argument, so it survives exactly as long as the process
+that chose it: two startup profiles can build one motor under two names,
+both connected at once, with nothing anywhere recording that they are one
+device.
 
-The facility-side label is no better. The one the spike found is served
-empty, writable by any client, and free text.
+The facility-side label is no better. It is free text, writable by any
+client, and under no obligation to be filled in at all.
 
 So the reference is the address the control system publishes the device
 at, as the same open-scheme pair a run and a dataset carry. What a
@@ -48,13 +47,12 @@ Faulted is the only one that is a claim about the world.
 
 **Available does not mean the device works.** It means no fault has been
 reported and none stands. That is the same caveat a run's Running
-carries, and here it is weaker still, for three measured reasons. A
-fault is at-most-once, delivered only to whoever was subscribed when it
-happened. A reporter's cached view of an alarm outlives the device it
-describes, so the value path fails loudly while the alarm path fails
-silently. And hardware outlives the thing driving it, with no ending
-emitted on any path. All three are in a spike
-and the third is a spike's.
+carries, and here it is weaker still, for three reasons. A fault is
+at-most-once, delivered only to whoever was subscribed when it happened.
+A reporter's cached view of an alarm outlives the device it describes, so
+the value path fails loudly while the alarm path fails silently. And
+hardware outlives the thing driving it, with no ending emitted on any
+path.
 
 ## What a fault is, and what is not stored
 
@@ -72,9 +70,9 @@ hardware health this system never made.
 
 Readings, of any kind. A single device publishes tens of signals that
 move continuously, and an append-only log is the wrong home for them.
-Nor the device's configuration: the spike found seven of thirteen
-configuration values on one station were a named person, one call away,
-which makes the easy implementation the dangerous one.
+Nor the device's configuration: a station's configuration routinely
+carries a named person, one call away, which makes the easy
+implementation the dangerous one.
 
 Nor an interval. "Was this device faulted while that run was going" is
 not answerable here and the absence is deliberate. Faults are point
@@ -222,9 +220,9 @@ class DeviceCannotBeRecoveredError(Exception):
     The two are not equally likely, and the status on the refusal is
     what lets a caller tell the cases apart. A duplicate fault is
     usually a redelivery. A recovery against an available device usually
-    means the reporter missed the fault, which the spike says is the
-    ordinary failure rather than the exotic one, because a fault is
-    delivered only to whoever was subscribed at the time.
+    means the reporter missed the fault, which is the ordinary failure
+    rather than the exotic one, because a fault is delivered only to
+    whoever was subscribed at the time.
     """
 
     def __init__(self, device_id: UUID, status: DeviceStatus) -> None:

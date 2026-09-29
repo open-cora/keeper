@@ -22,13 +22,13 @@ The status is not a field anybody sets. It is worked out from the events on the 
 
 ## Why the address is the identity
 
-A device's record carries an **external reference**, the same open-scheme `(scheme, value)` pair a dataset carries, and it is required. That is a measured decision rather than a preference, and the measurement is in a spike.
+A device's record carries an **external reference**, the same open-scheme `(scheme, value)` pair a dataset carries, and it is required. The alternatives were considered and each of them moves.
 
-The spike built the same motor twice, from two startup profiles, against one control system. It answered to two different names at once, both connected, both correct, with nothing anywhere recording that they were one device. A control library's name for a device is an argument passed at construction, so it survives exactly as long as the process that chose it and changes whenever somebody edits a profile.
+A control library's name for a device is an argument passed at construction, so it survives exactly as long as the process that chose it and changes whenever somebody edits a profile. Two startup profiles can build one motor under two names, both connected at once, both correct, with nothing anywhere recording that they are one device.
 
-The facility-side label is no better. The one description field the spike found was served empty and writable by any client.
+The facility-side label is no better. It is free text, writable by any client, and under no obligation to be filled in at all.
 
-So the address is what two independent clients will agree on, and nothing else is. Note what that concedes: an address is a deployment's configuration, and a control system can be rebuilt under a new one, so it is stable in practice rather than guaranteed. It is still the best available, and better than the case a sibling spike found next door, where the closest thing to a run's identity was an output file path.
+So the address is what two independent clients will agree on, and nothing else is. Note what that concedes: an address is a deployment's configuration, and a control system can be rebuilt under a new one, so it is stable in practice rather than guaranteed. It is still the best available, and better than an engine whose closest thing to a run's identity is the path of a file it writes.
 
 **Nothing enforces that an address is unique across devices.** An event-sourced aggregate has no consistency boundary spanning its siblings, so registering one motor twice makes two records and nothing notices. That gap matters more here than it does for a dataset: a caller resolving a dataset is reading, and a caller resolving a device is about to write to whatever comes back. What this context does about it is refuse to hide it. The listing returns both, and an adapter that finds two has to decide rather than be handed one at random.
 
@@ -52,11 +52,11 @@ Three values, derived in the fold from which events the stream carries and store
 
 The three split by voice, and that split is the shape of the whole aggregate. Available and Retired are this system's own bookkeeping. Faulted is the only one that is a claim about the world.
 
-**Available does not mean the device works.** It means no fault has been reported and none stands. That is the same caveat a run's `Running` carries, and here it is weaker, for three reasons the spikes measured rather than assumed:
+**Available does not mean the device works.** It means no fault has been reported and none stands. That is the same caveat a run's `Running` carries, and here it is weaker, for three reasons:
 
 - A fault is delivered at most once, to whoever happened to be subscribed when it happened. A reporter that restarted was not.
 - A reporter's cached view of an alarm outlives the device it describes. With the control system stopped, reading the value fails loudly and reading the alarm returns the last number seen, silently, with nothing in the call saying it is stale.
-- Hardware outlives the thing driving it, and no ending is emitted on any path. That one is a spike's finding rather than this context's spike, and it closes the same door from the third side.
+- Hardware outlives the thing driving it, and no ending is emitted on any path. That closes the same door from a third side.
 
 Together those say what a reporter has to be: something that reports faults it saw, not something whose silence means anything. A device nobody watched reads as available forever, the way a run nobody ended reads as running.
 
@@ -95,11 +95,11 @@ Every event carries an `occurred_at` regardless, because the envelope needs one.
 
 ## What this context does not hold
 
-Each of these is a decision, and the first three are backed by what the spike measured rather than by a guess.
+Each of these is a decision rather than an omission, and the reason is given with it.
 
 **No readings.** One device publishes tens of signals that move continuously. An append-only log is the wrong home for them, and the right home is a time-series store this system holds at most a reference to.
 
-**No configuration.** Seven of the thirteen configuration values on one simulated station were a named person, all of them one call away. That makes the easy implementation the dangerous one, and the spike also found the obvious redaction rule to be wrong: matching on the word `user` also drops a motor's user coordinate offset, which is calibration.
+**No configuration.** A station's configuration routinely carries a named person, one call away, which makes the easy implementation the dangerous one. The obvious redaction rule is wrong too: matching on the word `user` also drops a motor's user coordinate offset, which is calibration and not a person.
 
 **No intervals.** "Was this device faulted while that run was going" is not answerable here, and the absence is deliberate. Faults are point events with a time. Deriving a span from two of them reads as precision while resting on a clear nobody may have seen, and one missed clear extends the span forever.
 

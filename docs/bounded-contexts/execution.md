@@ -419,7 +419,7 @@ A run step gets talked about twice, by two clients that do not know about each o
    engine_state   what the engine said    Running, Paused, Completed, Aborted, Failed
 ```
 
-They are two fields because they can disagree, and the disagreement is the point. A spike drove four collisions into a real scan and every one of them ended `exit_status: "success"`, so neither observer is reliable and collapsing the two would make this system pick a winner between claims it cannot check. A step whose call returned while its engine reported a failure reads as `Done` and `Failed`, which is the honest record.
+They are two fields because they can disagree, and the disagreement is the point. A run whose data a second writer corrupted can still end in the engine's own word for success, so neither observer is reliable and collapsing the two would make this system pick a winner between claims it cannot check. A step whose call returned while its engine reported a failure reads as `Done` and `Failed`, which is the honest record.
 
 A set carries no engine state at all, because a set opens no run for anything to watch.
 
@@ -427,7 +427,7 @@ The five engine values are deliberately the five a run has. It is the same engin
 
 Neither account waits for the other. A driver may report its call returning before or after the engine reports the run ending, so requiring an order would refuse whichever arrived first. An engine's account is accepted even after an execution has been closed, because a driver that gave up does not stop the hardware from having done something, and that account is the only record of what it did.
 
-`Done` is the word most likely to be read as more than it is. Every corrupted scan in a spike came back reporting success, so the outcome says the call returned and nothing about whether the science worked. `Refused` is the only unambiguously good news in the set.
+`Done` is the word most likely to be read as more than it is. A run whose data was corrupted can still report success, so the outcome says the call returned and nothing about whether the science worked. `Refused` is the only unambiguously good news in the set.
 
 An outcome carries at most one detail, and two of the four carry none. A done step may name the run it opened and a broken step names the class that was raised. A refused step names nothing, and a skipped step never could.
 
@@ -547,11 +547,11 @@ The recording seam on that side is stale in three places at once and is being le
 
 Anything about a pause beyond the fact of it. How long an engine has held a step paused, how many times it has, and what it is waiting for are all answerable from the events and none of them is on the read model. The first caller that needs one is the right place to decide whether it belongs there or in a projection.
 
-Any way to say that an engine run ended without saying how. The three terminals assume the engine knows which one happened and says so, and the first engine modelled does. A second one, driven in a spike, does not: it writes the same completion string whether the routine finished, the detector timed out or an operator stopped it, so the outcome exists only in a log nothing can read. Against that engine every step would be recorded `Completed`, including the failed ones, and "how many runs failed last week" would be answered confidently and wrongly.
+Any way to say that an engine run ended without saying how. The three terminals assume the engine knows which one happened and says so, and the first engine modelled does. Not every engine does: one may write the same completion string whether the routine finished, the detector timed out or an operator stopped it, so the outcome exists only in a log nothing can read. Against that engine every step would be recorded `Completed`, including the failed ones, and "how many runs failed last week" would be answered confidently and wrongly.
 
 Not decided here, because there is no caller: nothing reports from such an engine today. What the decision would be is a fourth terminal meaning the run is over and the reporter cannot say more, which is the same refusal to overclaim that picked `report` over `witness` above. Worth settling before a second direction is built on this aggregate, because the conducted path doubles what a wrong terminal set costs.
 
-Any way to hear from an engine that names its run only at the end. The engine reference arrives on the `Started` report and every later report is matched to a step by the id a driver carried into the engine's metadata, so the shape assumes a stream that opens with something identifiable. The first engine modelled does that. The second, driven in the same spike as the terminal question above, has nothing of the kind: its only per-scan identifier is the path of the file it writes, and that path is written by the routine that ends the scan.
+Any way to hear from an engine that names its run only at the end. The engine reference arrives on the `Started` report and every later report is matched to a step by the id a driver carried into the engine's metadata, so the shape assumes a stream that opens with something identifiable. The first engine modelled does that. An engine may have nothing of the kind, with its only per-run identifier the path of a file it writes, and that path written by the routine that ends the run.
 
 ```
    an engine that names its run at the start

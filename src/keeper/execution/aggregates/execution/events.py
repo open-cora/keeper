@@ -167,11 +167,10 @@ class ExecutionClaimed:
 class ExecutionStepDone:
     """A step's seam returned without raising.
 
-    Says nothing about whether the step did what it meant to. Every
-    corrupted scan measured in a spike came back
-    reporting success, so this is a claim this system was given rather
-    than a fact it checked, and a word here meaning more would launder
-    the one into the other.
+    Says nothing about whether the step did what it meant to. A run whose
+    data was corrupted can still return success, so this is a claim this
+    system was given rather than a fact it checked, and a word here
+    meaning more would launder the one into the other.
 
     `engine_reference` is what the engine calls the run this step opened,
     for a run step that opened one. None for a set, which opens
@@ -303,8 +302,7 @@ class ExecutionStepEngineCompleted:
     """The engine reached its own end.
 
     Says the engine reported success, and nothing about whether the
-    science worked. Every corrupted scan in a spike
-    ended this way.
+    science worked. A run whose data was corrupted ends this way too.
     """
 
     execution_id: UUID

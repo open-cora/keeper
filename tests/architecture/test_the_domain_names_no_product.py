@@ -115,8 +115,8 @@ PRODUCT_TERMS: frozenset[str] = frozenset(
         # and more damaging if it is, because a control system is further
         # from anything these contexts model than the engine is.
         "epics",
-        # A second engine, which a spike drove to find out whether the run
-        # model was general or only well named. Listed for the same reason
+        # A second engine, modelled to find out whether the run model was
+        # general or only well named. Listed for the same reason
         # the first one is, and more urgently: a page arguing from two
         # engines is likelier to want to name them.
         "tomoscan",
