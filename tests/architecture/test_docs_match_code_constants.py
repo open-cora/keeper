@@ -42,14 +42,14 @@ from tests.architecture.test_fitness_scope import (
 pytestmark = pytest.mark.architecture
 
 _CONVENTIONS = APP_ROOT / "docs" / "reference" / "conventions.md"
-_HOME = APP_ROOT / "docs" / "index.md"
+_CHANGING_IT = APP_ROOT / "docs" / "reference" / "index.md"
 
 _SCOPE_COUNT_LINES: tuple[tuple[str, str, int], ...] = (
     ("bounded contexts", r"^   bounded contexts\s+(\d+)\s", EXPECTED_BC_COUNT),
     ("aggregates", r"^   aggregates\s+(\d+)\s", EXPECTED_AGGREGATE_COUNT),
     ("slices", r"^   slices\s+(\d+)\s", EXPECTED_SLICE_COUNT),
 )
-"""The three counts the home page prints, and the pins they must equal.
+"""The three counts the "Changing it" page prints, and the pins they must equal.
 
 Imported from the fitness-scope module rather than recomputed, so this
 compares the page against the same integer a reader would find by
@@ -124,9 +124,9 @@ def test_docs_schema_keywords_match_the_allowlist() -> None:
     )
 
 
-def test_the_home_page_is_readable_at_the_path_this_check_uses() -> None:
+def test_the_changing_it_page_is_readable_at_the_path_this_check_uses() -> None:
     """Guard the path, so a moved page fails loudly instead of vacuously."""
-    assert _HOME.is_file(), f"{_HOME} is missing, so the count checks read nothing."
+    assert _CHANGING_IT.is_file(), f"{_CHANGING_IT} is missing, so the count checks read nothing."
 
 
 @pytest.mark.parametrize(
@@ -134,22 +134,23 @@ def test_the_home_page_is_readable_at_the_path_this_check_uses() -> None:
     _SCOPE_COUNT_LINES,
     ids=[label for label, _pattern, _expected in _SCOPE_COUNT_LINES],
 )
-def test_the_home_page_counts_match_the_fitness_scope_pins(
+def test_the_changing_it_page_counts_match_the_fitness_scope_pins(
     label: str, pattern: str, expected: int
 ) -> None:
-    """The home page prints these and claims they cannot drift.
+    """The "Changing it" page prints these and claims they cannot drift.
 
     They could, and they had. The block is a code fence rather than a
     bullet, so the anchor is the row's label and leading spaces; a rewrite
     that reformats the block fails here rather than matching nothing.
     """
-    found = re.findall(pattern, _HOME.read_text(encoding="utf-8"), re.MULTILINE)
+    found = re.findall(pattern, _CHANGING_IT.read_text(encoding="utf-8"), re.MULTILINE)
     assert len(found) == 1, (
-        f"Expected exactly one '{label}' row in the home page's count block, "
+        f"Expected exactly one '{label}' row in the count block on "
+        f"docs/reference/index.md, "
         f"found {len(found)}. If the block was reformatted, update the pattern "
         "here in the same commit."
     )
     assert int(found[0]) == expected, (
-        f"docs/index.md says {found[0]} {label}; test_fitness_scope.py pins "
+        f"docs/reference/index.md says {found[0]} {label}; test_fitness_scope.py pins "
         f"{expected}. The page says these cannot drift, so make that true."
     )
