@@ -25,12 +25,20 @@ ExecStartPre=/bin/bash -c 'for _ in $(seq 1 60); do podman exec keeper-postgres 
 # against the same bookmarks. Scaling the HTTP surface means separating the
 # projection runner first, which this deployment does not do.
 #
-# Bound to loopback because this deployment sets no production-tier APP_ENV
-# and therefore authenticates nobody: the principal comes from a request
-# header anyone could send. Widening this address and configuring
-# authentication are one change, never two, and the environment file is
-# where the other half lives.
-ExecStart=@APP_DIR@/.venv/bin/uvicorn keeper.api.main:app --host 127.0.0.1 --port @API_PORT@
+# This is the one service reachable off this host, and the only one that
+# should be. The database and the JWKS stay on loopback, because their only
+# readers are here.
+#
+# uvicorn terminates TLS itself, which is why there is no proxy in front and
+# why this needs no privileged port and no root. Two things guard the port
+# and they answer different questions: TLS makes the wire private and proves
+# the server, and the bearer token says which beamline is calling. Serving
+# plaintext here as well would undo both, because a token sent in the clear
+# is a token anyone on the path can replay, so there is no second port.
+ExecStart=@APP_DIR@/.venv/bin/uvicorn keeper.api.main:app \
+    --host @API_BIND@ --port @API_PORT@ \
+    --ssl-keyfile @CORA_ROOT@/etc/tls/server.key \
+    --ssl-certfile @CORA_ROOT@/etc/tls/server.crt
 
 Restart=always
 RestartSec=15

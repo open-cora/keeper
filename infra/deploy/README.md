@@ -68,37 +68,62 @@ reissuing five files.
 mode 600, and nothing here should ever be copied to more than one beamline.
 The private key never leaves the keeper's host.
 
-Verify both directions after installing, because a check that only tries the
-valid case cannot tell an enforcing deployment from an open one:
+`install.sh` verifies both directions itself and refuses to finish if an
+anonymous request is answered, because a check that only tries the valid
+case cannot tell an enforcing deployment from an open one. That exact
+mistake shipped an unauthenticated API here once already.
 
 ```bash
-curl -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/devices
-curl -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(cat "$CORA_ROOT/etc/tokens/2-bm.token")" \
-  http://127.0.0.1:8000/devices
+curl --cacert "$CORA_ROOT/etc/tls/ca.crt" -o /dev/null -w '%{http_code}\n' \
+  "https://$HOST:8443/devices"
+curl --cacert "$CORA_ROOT/etc/tls/ca.crt" -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $(cat "$CORA_ROOT/etc/tokens/2-bm.token")" \
+  "https://$HOST:8443/devices"
 ```
 
 401 then 200. `/health` answers without a token on purpose, so a liveness
 check needs no credential.
 
+## The wire
+
+`issue_tls.py` mints a small CA and a server certificate for the name
+clients dial, and uvicorn terminates TLS itself, so there is no proxy, no
+privileged port and no root. **The API is the only thing reachable off the
+host.** The database and the JWKS stay on loopback because nothing else
+reads them.
+
+There is no plaintext port, deliberately. A token sent in the clear is a
+token anyone on the path can lift and replay, so offering both would undo
+the reason for having either.
+
+A private CA rather than a public one because the keeper answers on a
+facility address with no inbound path from the internet, so an HTTP or DNS
+challenge cannot complete, and a search of the host found no internal
+issuing service. A CA plus a leaf rather than one self-signed certificate so
+that reissuing the server key never means touching every client again.
+
+**Each beamline needs exactly two files**, and no more: its own token, and
+`ca.crt` so it can verify the server. Neither is a secret shared with any
+other beamline, and the CA private key signs nothing else and never leaves
+the keeper's host.
+
+**TLS and the token answer different questions and neither should grow into
+the other.** TLS makes the wire private and proves the server; the token
+says which beamline is calling. Swapping this CA for a facility one later is
+a certificate on the server and a path on each client, and changes no part
+of the design.
+
+The certificate expires. 825 days for the leaf, ten years for the CA, and
+reissuing the leaf is deleting it and running `install.sh` again.
+
 ## What it is not
 
-**No TLS, and no authorization policy.** `APP_ENV` is set to a value that is
-not a production tier, which is accurate rather than a placeholder: a
-production tier refuses to boot without an authorization policy, and the
-first policy has to be authored through the API before anything can be
-authorized against it. Authentication does not wait for that, which is why
-it is on here and the tier is not.
-
-That missing TLS is the whole reason everything binds `127.0.0.1`. Reach the
-API through a tunnel:
-
-```bash
-ssh -N -L 8000:127.0.0.1:8000 <host>
-```
-
-**Widening the bind address and terminating TLS are one change, never two.**
-A token over plain HTTP off this host is a token anyone on the path can
-lift and replay.
+**No authorization policy.** `APP_ENV` is set to a value that is not a
+production tier, which is accurate rather than a placeholder: a production
+tier refuses to boot without a policy, and the first policy has to be
+authored through the API before anything can be authorized against it.
+Authentication does not wait for that, which is why it is on here and the
+tier is not.
 
 **No backups.** The database is a bind mount at `$CORA_ROOT/pgdata`, so
 `pg_dump` through the container is the whole story for now.
@@ -130,8 +155,9 @@ podman unshare rm -rf "$CORA_ROOT/pgdata"
 
 | | |
 | --- | --- |
-| `install.sh` | preflight, secrets, virtualenv, tokens, units, migrations, start |
+| `install.sh` | preflight, secrets, virtualenv, tokens, certificate, units, migrations, start |
 | `issue_tokens.py` | the signing key, the JWKS, one token per caller |
+| `issue_tls.py` | the private CA and the server certificate |
 | `keeper-postgres.service.in` | the database, a rootless container |
 | `keeper-jwks.service.in` | the public key, served for the verifier |
 | `keeper.service.in` | the HTTP surface |

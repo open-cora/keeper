@@ -26,7 +26,17 @@ set -euo pipefail
 
 CORA_ROOT="${CORA_ROOT:-/local/cora}"
 PG_PORT="${PG_PORT:-5433}"
-API_PORT="${API_PORT:-8000}"
+API_PORT="${API_PORT:-8443}"
+
+# The address the API answers on, and the only thing this deployment exposes
+# beyond the host. TLS and the bearer token are what make that safe; the bind
+# address is not a security control and is not treated as one.
+API_BIND="${API_BIND:-0.0.0.0}"
+
+# The name clients dial, which has to be a name the certificate carries.
+# Defaults to this host's own idea of itself, the same source ConditionHost
+# uses, so the two cannot disagree.
+TLS_HOST="${TLS_HOST:-$(hostname)}"
 JWKS_PORT="${JWKS_PORT:-8081}"
 
 # One token per caller. The four beamlines run a conductor and a reporter
@@ -132,6 +142,11 @@ echo "Tokens"
   ${SUBJECTS} | sed 's/^/  /'
 echo
 
+echo "Certificate"
+"${APP_DIR}/.venv/bin/python3" "${SCRIPT_DIR}/issue_tls.py" \
+  --root "${CORA_ROOT}" --host "${TLS_HOST}" --also ${TLS_ALSO:-} | sed 's/^/  /'
+echo
+
 echo "Environment"
 # Read as one line: systemd's EnvironmentFile has no line continuation, and
 # pydantic-settings parses this field as JSON.
@@ -157,6 +172,7 @@ render() {
       -e "s|@PG_PORT@|${PG_PORT}|g" \
       -e "s|@API_PORT@|${API_PORT}|g" \
       -e "s|@JWKS_PORT@|${JWKS_PORT}|g" \
+      -e "s|@API_BIND@|${API_BIND}|g" \
       "$1" > "$2"
 }
 render "${SCRIPT_DIR}/keeper-postgres.service.in" "${UNIT_DIR}/keeper-postgres.service"
@@ -204,8 +220,34 @@ systemctl --user restart keeper.service
 sleep 3
 systemctl --user is-active --quiet keeper.service \
   || die "keeper.service did not stay up; see: journalctl --user -u keeper.service or ${CORA_ROOT}/log/keeper.log"
-say "running"
+
+# Both directions, because a check that only tries the valid case cannot
+# tell an enforcing deployment from an open one. This exact mistake shipped
+# an unauthenticated API here once already.
+CA="${CORA_ROOT}/etc/tls/ca.crt"
+base="https://${TLS_HOST}:${API_PORT}"
+for _ in $(seq 1 15); do
+  curl -fsS --cacert "${CA}" --max-time 5 "${base}/health" >/dev/null 2>&1 && break
+  sleep 2
+done
+curl -fsS --cacert "${CA}" --max-time 5 "${base}/health" >/dev/null \
+  || die "the API is not answering over TLS at ${base}"
+
+anonymous="$(curl -sS --cacert "${CA}" -o /dev/null -w '%{http_code}' "${base}/devices")"
+[ "${anonymous}" = "401" ] \
+  || die "an unauthenticated request got ${anonymous}, not 401; this deployment is open"
+
+first="$(printf '%s' "${SUBJECTS}" | awk '{print $1}')"
+authenticated="$(curl -sS --cacert "${CA}" -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer $(cat "${CORA_ROOT}/etc/tokens/${first}.token")" "${base}/devices")"
+[ "${authenticated}" = "200" ] \
+  || die "a token from ${first} got ${authenticated}, not 200"
+
+say "running, refusing anonymous callers and accepting signed ones"
 echo
 
-echo "Done. The API is on 127.0.0.1:${API_PORT} and reachable from your machine with:"
-echo "    ssh -N -L ${API_PORT}:127.0.0.1:${API_PORT} ${DEPLOY_HOST}"
+echo "Done. The API is at ${base}"
+echo
+echo "Each beamline needs two files from ${CORA_ROOT}/etc, and no more than two:"
+echo "    tokens/<beamline>.token   into the home of that beamline, mode 600"
+echo "    tls/ca.crt                so it can verify this server"
