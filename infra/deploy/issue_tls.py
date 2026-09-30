@@ -94,6 +94,12 @@ def load_or_create_ca(
         .not_valid_before(now - dt.timedelta(minutes=5))
         .not_valid_after(now + CA_LIFETIME)
         .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        # A key identifier on the authority and a matching one on the leaf.
+        # Not decoration: OpenSSL 3 refuses a chain whose leaf carries no
+        # Authority Key Identifier, so without this pair Python clients fail
+        # verification while curl, which is more forgiving, still succeeds.
+        # That asymmetry is exactly how this was missed the first time.
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
         .add_extension(
             x509.KeyUsage(
                 digital_signature=False,
@@ -155,6 +161,11 @@ def issue_leaf(
         .not_valid_after(now + LEAF_LIFETIME)
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
         .add_extension(subject_alt_names(host, extra), critical=False)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            critical=False,
+        )
         .add_extension(
             x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]), critical=False
         )
