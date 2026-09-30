@@ -104,6 +104,7 @@ Two gaps in that check are worth stating rather than discovering. A run supplyin
 | Nothing more is coming | `POST /executions/{execution_id}/end` | `end_execution` | `204` |
 | Read one back | `GET /executions/{execution_id}` | `get_execution` | `200` with the execution and its steps |
 | Find executions | `GET /executions` | `list_executions` | `200` with a page of executions |
+| Find runs nothing filed | `GET /steps/without-datasets` | `list_steps_without_datasets` | `200` with a page of steps |
 
 Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/execution/routes.py`.
 
@@ -526,12 +527,13 @@ What a driving surface would still add is the asking side of a pause, which is a
        end_execution/
        get_execution/
        list_executions/
+       list_steps_without_datasets/  the one read here that also sees Custody
      routes.py                  HTTP mounting and the error-to-status mapping
      tools.py                   MCP tool registration
      wire.py                    which handler gets idempotency, which gets tracing
 ```
 
-**Thirteen directories where there were twenty-one.** Eight went with an aggregate this context no longer has, and six of those were its transitions: five near-identical handlers plus a genesis. [Layout](../reference/layout.md#bc-root-extras) records a shared shell for them that was built and then reverted, and the decision it records is still the live one, because the same question came up again here and was answered the other way.
+**Fourteen directories where there were twenty-one.** Eight went with an aggregate this context no longer has, and six of those were its transitions: five near-identical handlers plus a genesis. [Layout](../reference/layout.md#bc-root-extras) records a shared shell for them that was built and then reverted, and the decision it records is still the live one, because the same question came up again here and was answered the other way.
 
 `report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what that aggregate did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
 

@@ -58,6 +58,7 @@ EXPECTED_OPENAPI_PATHS = frozenset(
         "/procedures/{procedure_id}",
         "/executions",
         "/executions/{execution_id}",
+        "/steps/without-datasets",
         "/executions/{execution_id}/steps",
         "/executions/{execution_id}/steps/{step_id}/run",
         "/executions/{execution_id}/claim",

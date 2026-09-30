@@ -81,6 +81,7 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "end_execution",
         "get_execution",
         "list_executions",
+        "list_steps_without_datasets",
         "register_dataset",
         "get_dataset",
         "list_datasets",
@@ -476,6 +477,13 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         dataset_id = registered["dataset_id"]
         held = _call(client, live, "get_dataset", dataset_id=dataset_id)
         produced = _call(client, live, "list_datasets", step_id=produced_by)
+
+        # The other direction, on the same step: what this execution
+        # produced and nothing recorded. Nothing, because the step above
+        # was never reported and so named no run, which is the answer
+        # that proves the tool reads the two halves together rather than
+        # listing every step it can see.
+        gaps = _call(client, live, "list_steps_without_datasets", beamline="2-bm")
 
         # Counsel rides along for the same reason Custody does, and it
         # closes the loop the other two halves of this walk opened: a
@@ -962,6 +970,11 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "is the one thing this record must never read as"
     )
     assert [item["dataset_id"] for item in produced["items"]] == [dataset_id]
+    assert gaps["items"] == [], (
+        "the step this walk registered data against was never reported, so it "
+        "named no run, and a gap listing that showed it would be counting every "
+        "step a facility ever dispatched rather than the runs that produced data"
+    )
     assert held == {
         "dataset_id": dataset_id,
         "execution_id": held_execution,

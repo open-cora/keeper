@@ -67,9 +67,9 @@ The model is split into seven bounded contexts. Each answers one question, and t
                              Equipment, Pursuit
    aggregates         10     Actor, Policy, Operation, Procedure, Execution,
                              Dataset, Proposal, Inquiry, Device, Pursuit
-   slices             48     four on Actor, four on Policy,
+   slices             49     four on Actor, four on Policy,
                              three on Operation, three on Procedure,
-                             seven on Execution, three on Dataset,
+                             eight on Execution, three on Dataset,
                              five on Proposal, five on Inquiry,
                              six on Device, eight on Pursuit
 ```

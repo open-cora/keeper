@@ -528,7 +528,15 @@ class EventStoreExecutionWriter:
         steps: list[str],
         at: datetime,
         beamline: str = "2-bm",
+        step_ids: list[UUID] | None = None,
     ) -> None:
+        """Dispatch an execution, optionally with step ids the caller knows.
+
+        `step_ids` exists for the contracts that go on to name a step
+        from outside, which a dataset does. Minted here when it is not
+        given, because most callers only care that the steps exist.
+        """
+        chosen = step_ids if step_ids is not None else [uuid4() for _ in steps]
         await self._append(
             execution_id,
             event=ExecutionDispatched(
@@ -537,8 +545,8 @@ class EventStoreExecutionWriter:
                 procedure_name="align_then_scan",
                 beamline=beamline,
                 steps=[
-                    DispatchedStep(id=uuid4(), describes=text, procedure_step_id=uuid4())
-                    for text in steps
+                    DispatchedStep(id=step_id, describes=text, procedure_step_id=uuid4())
+                    for step_id, text in zip(chosen, steps, strict=True)
                 ],
                 occurred_at=at,
             ),
@@ -552,11 +560,27 @@ class EventStoreExecutionWriter:
             command_name="ClaimExecution",
         )
 
-    async def step(self, *, execution_id: UUID, index: int, at: datetime) -> None:
+    async def step(
+        self,
+        *,
+        execution_id: UUID,
+        index: int,
+        at: datetime,
+        engine_reference: str | None = None,
+    ) -> None:
+        """Report one step done, naming the run it opened when it opened one.
+
+        `engine_reference` defaults to nothing, which is a step that
+        opened no run. The summary contract does not care either way;
+        the step contract is entirely about which steps named one.
+        """
         await self._append(
             execution_id,
             event=ExecutionStepDone(
-                execution_id=execution_id, index=index, engine_reference=None, occurred_at=at
+                execution_id=execution_id,
+                index=index,
+                engine_reference=engine_reference,
+                occurred_at=at,
             ),
             command_name="ReportExecutionStep",
         )
