@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from keeper.equipment.aggregates.device import DeviceName
+from keeper.equipment.aggregates.device import DeviceBeamline, DeviceGroup, DeviceName
 from keeper.shared.identifier import Identifier
 
 
@@ -48,6 +48,8 @@ class RegisterDevice:
 
     external_ref: Identifier
     name: DeviceName
+    beamline: DeviceBeamline
+    group: DeviceGroup | None = None
 
 
 __all__ = ["RegisterDevice"]

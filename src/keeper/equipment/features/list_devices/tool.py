@@ -32,6 +32,8 @@ class DeviceSummaryItem(BaseModel):
     external_ref_scheme: str
     external_ref_value: str
     name: str
+    beamline: str
+    group: str | None
     status: DeviceStatus
     registered_at: datetime
     updated_at: datetime
@@ -62,6 +64,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
         ctx: Context[Any, Any, Any],
         external_ref_scheme: str | None = None,
         external_ref_value: str | None = None,
+        beamline: str | None = None,
         status: DeviceStatus | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
         cursor: str | None = None,
@@ -71,6 +74,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
             ListDevices.with_external_ref(
                 scheme=external_ref_scheme,
                 value=external_ref_value,
+                beamline=beamline,
                 status=status,
                 limit=limit,
                 cursor=cursor,
@@ -88,6 +92,8 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
                     external_ref_scheme=summary.external_ref.scheme,
                     external_ref_value=summary.external_ref.value,
                     name=summary.name,
+                    beamline=summary.beamline,
+                    group=summary.group,
                     status=summary.status,
                     registered_at=summary.registered_at,
                     updated_at=summary.updated_at,

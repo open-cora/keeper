@@ -47,8 +47,15 @@ class DeviceWriter(Protocol):
         external_ref: Identifier,
         device_name: str,
         at: datetime,
+        beamline: str = "2-bm",
+        group: str | None = None,
     ) -> None:
-        """Enrol a device."""
+        """Enrol a device.
+
+        The two labels default so that a check about paging or ordering
+        does not have to say where its devices are. A check about the
+        beamline filter says it.
+        """
         ...
 
     async def fault(self, *, device_id: UUID, at: datetime) -> None:
@@ -96,6 +103,8 @@ async def _one_device(
     minute: int,
     value: str | None = None,
     device_name: str = "a device",
+    beamline: str = "2-bm",
+    group: str | None = None,
 ) -> UUID:
     device_id = uuid4()
     await writer.register(
@@ -103,6 +112,8 @@ async def _one_device(
         external_ref=Identifier(scheme=_SCHEME, value=value or str(uuid4())),
         device_name=device_name,
         at=_at(minute),
+        beamline=beamline,
+        group=group,
     )
     return device_id
 
@@ -111,7 +122,9 @@ async def check_an_empty_read_model_returns_an_empty_page(
     lookup: DeviceSummaryLookup, writer: DeviceWriter
 ) -> None:
     _ = writer
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
     assert page.items == []
     assert page.next_cursor is None
 
@@ -126,14 +139,20 @@ async def check_a_new_device_shows_with_its_address_label_and_time(
         external_ref=reference,
         device_name="sample x translation",
         at=_EPOCH,
+        beamline="2-bm",
+        group="sample-stack",
     )
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.device_id == device_id
     assert summary.external_ref == reference
     assert summary.name == "sample x translation"
+    assert summary.beamline == "2-bm"
+    assert summary.group == "sample-stack"
     assert summary.registered_at == _EPOCH
 
 
@@ -144,7 +163,9 @@ async def check_a_new_device_is_available(
     by the projection, and the two have to agree."""
     await _one_device(writer, minute=0)
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.status is DeviceStatus.AVAILABLE
@@ -159,7 +180,9 @@ async def check_a_device_that_never_moved_was_updated_when_it_was_registered(
     last event of a one-event stream."""
     await _one_device(writer, minute=0)
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.updated_at == summary.registered_at == _EPOCH
@@ -171,7 +194,9 @@ async def check_a_faulted_device_reads_as_faulted_at_the_reported_time(
     device_id = await _one_device(writer, minute=0)
     await writer.fault(device_id=device_id, at=_at(5))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.status is DeviceStatus.FAULTED
@@ -187,7 +212,9 @@ async def check_a_recovered_device_reads_as_available_again(
     await writer.fault(device_id=device_id, at=_at(5))
     await writer.recover(device_id=device_id, at=_at(9))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.status is DeviceStatus.AVAILABLE
@@ -200,7 +227,9 @@ async def check_a_retired_device_reads_as_retired(
     device_id = await _one_device(writer, minute=0)
     await writer.retire(device_id=device_id, at=_at(3))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.status is DeviceStatus.RETIRED
@@ -215,7 +244,9 @@ async def check_a_faulted_device_can_be_retired_without_recovering_first(
     await writer.fault(device_id=device_id, at=_at(1))
     await writer.retire(device_id=device_id, at=_at(2))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     (summary,) = page.items
     assert summary.status is DeviceStatus.RETIRED
@@ -229,7 +260,9 @@ async def check_a_transition_does_not_move_when_the_device_was_registered(
     device_id = await _one_device(writer, minute=0)
     await writer.fault(device_id=device_id, at=_at(5))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     assert page.items[0].registered_at == _EPOCH
 
@@ -242,6 +275,7 @@ async def check_the_address_filter_returns_only_the_device_at_that_address(
     await _one_device(writer, minute=1, value="station-1:m2")
 
     page = await lookup.list_devices(
+        beamline=None,
         external_ref=Identifier(scheme=_SCHEME, value="station-1:m1"),
         status=None,
         limit=_PAGE,
@@ -265,6 +299,7 @@ async def check_the_address_filter_matches_the_scheme_as_well_as_the_value(
     )
 
     page = await lookup.list_devices(
+        beamline=None,
         external_ref=Identifier(scheme=_SCHEME, value="station-1:m1"),
         status=None,
         limit=_PAGE,
@@ -284,6 +319,7 @@ async def check_two_devices_at_one_address_both_come_back(
     second = await _one_device(writer, minute=1, value="station-1:m1")
 
     page = await lookup.list_devices(
+        beamline=None,
         external_ref=Identifier(scheme=_SCHEME, value="station-1:m1"),
         status=None,
         limit=_PAGE,
@@ -301,7 +337,7 @@ async def check_the_status_filter_returns_only_devices_in_that_state(
     await writer.fault(device_id=faulted, at=_at(2))
 
     page = await lookup.list_devices(
-        external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
+        beamline=None, external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
     )
 
     assert [summary.device_id for summary in page.items] == [faulted]
@@ -315,12 +351,12 @@ async def check_a_device_leaves_the_faulted_side_once_it_recovers(
     device_id = await _one_device(writer, minute=0)
     await writer.fault(device_id=device_id, at=_at(1))
     while_faulted = await lookup.list_devices(
-        external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
+        beamline=None, external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
     )
 
     await writer.recover(device_id=device_id, at=_at(2))
     after = await lookup.list_devices(
-        external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
+        beamline=None, external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
     )
 
     assert [summary.device_id for summary in while_faulted.items] == [device_id]
@@ -338,7 +374,9 @@ async def check_no_filter_returns_every_status(
     await writer.fault(device_id=faulted, at=_at(3))
     await writer.retire(device_id=retired, at=_at(4))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     assert {summary.device_id for summary in page.items} == {available, faulted, retired}
 
@@ -353,6 +391,7 @@ async def check_the_two_filters_combine(lookup: DeviceSummaryLookup, writer: Dev
     await writer.fault(device_id=elsewhere, at=_at(4))
 
     page = await lookup.list_devices(
+        beamline=None,
         external_ref=Identifier(scheme=_SCHEME, value="station-1:m1"),
         status=DeviceStatus.FAULTED,
         limit=_PAGE,
@@ -368,7 +407,7 @@ async def check_nothing_faulted_returns_an_empty_page(
     await _one_device(writer, minute=0)
 
     page = await lookup.list_devices(
-        external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
+        beamline=None, external_ref=None, status=DeviceStatus.FAULTED, limit=_PAGE, cursor=None
     )
 
     assert page.items == []
@@ -382,7 +421,9 @@ async def check_devices_come_back_newest_first(
     middle = await _one_device(writer, minute=1)
     newest = await _one_device(writer, minute=2)
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     assert [summary.device_id for summary in page.items] == [newest, middle, oldest]
 
@@ -397,7 +438,9 @@ async def check_ordering_is_on_registration_and_a_fault_does_not_reorder(
     newest = await _one_device(writer, minute=1)
     await writer.fault(device_id=oldest, at=_at(9))
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=_PAGE, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
 
     assert [summary.device_id for summary in page.items] == [newest, oldest]
 
@@ -408,12 +451,14 @@ async def check_a_full_page_hands_back_a_cursor_that_continues_it(
     oldest = await _one_device(writer, minute=0)
     newest = await _one_device(writer, minute=1)
 
-    first = await lookup.list_devices(external_ref=None, status=None, limit=1, cursor=None)
+    first = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=1, cursor=None
+    )
     assert [summary.device_id for summary in first.items] == [newest]
     assert first.next_cursor is not None
 
     second = await lookup.list_devices(
-        external_ref=None, status=None, limit=1, cursor=first.next_cursor
+        beamline=None, external_ref=None, status=None, limit=1, cursor=first.next_cursor
     )
     assert [summary.device_id for summary in second.items] == [oldest]
 
@@ -423,7 +468,9 @@ async def check_the_last_page_hands_back_no_cursor(
 ) -> None:
     await _one_device(writer, minute=0)
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=1, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=1, cursor=None
+    )
 
     assert page.next_cursor is None
 
@@ -440,13 +487,17 @@ async def check_a_cursor_narrows_within_a_filter(
     await writer.fault(device_id=newer_faulted, at=_at(4))
 
     first = await lookup.list_devices(
-        external_ref=None, status=DeviceStatus.FAULTED, limit=1, cursor=None
+        beamline=None, external_ref=None, status=DeviceStatus.FAULTED, limit=1, cursor=None
     )
     assert [summary.device_id for summary in first.items] == [newer_faulted]
     assert first.next_cursor is not None
 
     second = await lookup.list_devices(
-        external_ref=None, status=DeviceStatus.FAULTED, limit=1, cursor=first.next_cursor
+        beamline=None,
+        external_ref=None,
+        status=DeviceStatus.FAULTED,
+        limit=1,
+        cursor=first.next_cursor,
     )
     assert [summary.device_id for summary in second.items] == [older_faulted]
     assert available not in {summary.device_id for summary in second.items}
@@ -464,7 +515,9 @@ async def check_devices_registered_at_one_instant_page_without_repeating_or_skip
     seen: list[UUID] = []
     cursor: str | None = None
     while True:
-        page = await lookup.list_devices(external_ref=None, status=None, limit=2, cursor=cursor)
+        page = await lookup.list_devices(
+            beamline=None, external_ref=None, status=None, limit=2, cursor=cursor
+        )
         seen.extend(summary.device_id for summary in page.items)
         cursor = page.next_cursor
         if cursor is None:
@@ -480,7 +533,7 @@ async def check_a_cursor_that_did_not_come_from_a_response_is_refused(
     _ = writer
     with pytest.raises(InvalidCursorError):
         await lookup.list_devices(
-            external_ref=None, status=None, limit=_PAGE, cursor="not-a-cursor"
+            beamline=None, external_ref=None, status=None, limit=_PAGE, cursor="not-a-cursor"
         )
 
 
@@ -490,6 +543,7 @@ async def check_a_cursor_past_the_end_returns_an_empty_page(
     await _one_device(writer, minute=5)
 
     page = await lookup.list_devices(
+        beamline=None,
         external_ref=None,
         status=None,
         limit=_PAGE,
@@ -498,6 +552,69 @@ async def check_a_cursor_past_the_end_returns_an_empty_page(
 
     assert page.items == []
     assert page.next_cursor is None
+
+
+async def check_a_device_in_no_group_reads_back_with_none(
+    lookup: DeviceSummaryLookup, writer: DeviceWriter
+) -> None:
+    await _one_device(writer, minute=0, group=None)
+
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
+
+    (summary,) = page.items
+    assert summary.group is None
+
+
+async def check_the_beamline_filter_returns_only_devices_at_that_beamline(
+    lookup: DeviceSummaryLookup, writer: DeviceWriter
+) -> None:
+    wanted = await _one_device(writer, minute=0, beamline="19-bm")
+    await _one_device(writer, minute=1, beamline="7-bm")
+
+    page = await lookup.list_devices(
+        beamline="19-bm", external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
+
+    assert [summary.device_id for summary in page.items] == [wanted]
+
+
+async def check_the_beamline_filter_matches_as_written(
+    lookup: DeviceSummaryLookup, writer: DeviceWriter
+) -> None:
+    """A beamline is stored as given, so a differently cased ask finds nothing.
+
+    The keeper compares a beamline as written everywhere else, and a
+    listing that normalised would disagree with a dispatch that did not.
+    """
+    await _one_device(writer, minute=0, beamline="19-bm")
+
+    page = await lookup.list_devices(
+        beamline="19-BM", external_ref=None, status=None, limit=_PAGE, cursor=None
+    )
+
+    assert page.items == []
+
+
+async def check_the_beamline_filter_combines_with_the_status_filter(
+    lookup: DeviceSummaryLookup, writer: DeviceWriter
+) -> None:
+    faulted_here = await _one_device(writer, minute=0, beamline="19-bm")
+    await _one_device(writer, minute=1, beamline="19-bm")
+    faulted_elsewhere = await _one_device(writer, minute=2, beamline="7-bm")
+    await writer.fault(device_id=faulted_here, at=_at(3))
+    await writer.fault(device_id=faulted_elsewhere, at=_at(4))
+
+    page = await lookup.list_devices(
+        beamline="19-bm",
+        external_ref=None,
+        status=DeviceStatus.FAULTED,
+        limit=_PAGE,
+        cursor=None,
+    )
+
+    assert [summary.device_id for summary in page.items] == [faulted_here]
 
 
 CHECKS: tuple[Check, ...] = (
@@ -517,6 +634,10 @@ CHECKS: tuple[Check, ...] = (
     check_a_device_leaves_the_faulted_side_once_it_recovers,
     check_no_filter_returns_every_status,
     check_the_two_filters_combine,
+    check_a_device_in_no_group_reads_back_with_none,
+    check_the_beamline_filter_returns_only_devices_at_that_beamline,
+    check_the_beamline_filter_matches_as_written,
+    check_the_beamline_filter_combines_with_the_status_filter,
     check_nothing_faulted_returns_an_empty_page,
     check_devices_come_back_newest_first,
     check_ordering_is_on_registration_and_a_fault_does_not_reorder,

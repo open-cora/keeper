@@ -54,12 +54,16 @@ class _DrainingDeviceWriter:
         external_ref: Identifier,
         device_name: str,
         at: datetime,
+        beamline: str = "2-bm",
+        group: str | None = None,
     ) -> None:
         await self._writer.register(
             device_id=device_id,
             external_ref=external_ref,
             device_name=device_name,
             at=at,
+            beamline=beamline,
+            group=group,
         )
         await self._drain()
 
@@ -131,7 +135,11 @@ async def test_a_device_event_does_not_move_another_contexts_bookmark(
     assert execution_bookmark == 0
     assert (
         len(
-            (await lookup.list_devices(external_ref=None, status=None, limit=10, cursor=None)).items
+            (
+                await lookup.list_devices(
+                    beamline=None, external_ref=None, status=None, limit=10, cursor=None
+                )
+            ).items
         )
         == 1
     )
@@ -154,7 +162,9 @@ async def test_replaying_a_batch_of_every_event_leaves_the_table_as_it_was(
     await writer.fault(device_id=device_id, at=_WHEN + timedelta(minutes=1))
     await writer.recover(device_id=device_id, at=_WHEN + timedelta(minutes=2))
     await writer.retire(device_id=device_id, at=_WHEN + timedelta(minutes=3))
-    first = await lookup.list_devices(external_ref=None, status=None, limit=10, cursor=None)
+    first = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=10, cursor=None
+    )
 
     async with db_pool.acquire() as conn:
         await conn.execute(
@@ -166,7 +176,9 @@ async def test_replaying_a_batch_of_every_event_leaves_the_table_as_it_was(
         pass
 
     assert (
-        await lookup.list_devices(external_ref=None, status=None, limit=10, cursor=None)
+        await lookup.list_devices(
+            beamline=None, external_ref=None, status=None, limit=10, cursor=None
+        )
     ) == first
 
 
@@ -208,7 +220,9 @@ async def test_a_fault_arriving_before_its_genesis_does_not_wedge_the_projection
     while await advance_subscriber_once(db_pool, DeviceSummaryProjection()):
         pass
 
-    page = await lookup.list_devices(external_ref=None, status=None, limit=10, cursor=None)
+    page = await lookup.list_devices(
+        beamline=None, external_ref=None, status=None, limit=10, cursor=None
+    )
     found = {summary.device_id for summary in page.items}
     assert later in found, "the projection carried on past the orphan"
     assert orphan not in found, "an update with no row writes nothing"

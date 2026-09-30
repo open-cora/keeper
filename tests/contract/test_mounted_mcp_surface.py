@@ -599,6 +599,8 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             external_ref_scheme="epics-prefix",
             external_ref_value="2bmb:m1",
             name="sample x translation",
+            beamline="2-bm",
+            group="sample-stack",
         )
         device_id = enrolled["device_id"]
         resolved = _call(

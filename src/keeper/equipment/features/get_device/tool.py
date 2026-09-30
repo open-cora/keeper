@@ -30,6 +30,8 @@ class GetDeviceOutput(BaseModel):
     external_ref_scheme: str
     external_ref_value: str
     name: str
+    beamline: str
+    group: str | None
     status: DeviceStatus = Field(
         description=(
             "What this system has been told. Available means no fault has been "
@@ -66,5 +68,7 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
             external_ref_scheme=device.external_ref.scheme,
             external_ref_value=device.external_ref.value,
             name=device.name.value,
+            beamline=device.beamline.value,
+            group=device.group.value if device.group is not None else None,
             status=device.status,
         )

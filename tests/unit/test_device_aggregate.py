@@ -7,9 +7,11 @@ reaches its own status, recovery returns to a status the device already
 held, and none of the three moves anything but the status.
 
 The round trip matters more here than it does next door. The genesis
-re-validates two value objects on the way back out of the log, so a
+re-validates three value objects on the way back out of the log, so a
 payload that could not be built today has to fail on read rather than
-become state nothing checked.
+become state nothing checked. The group is the fourth field and the
+odd one: absent is a legal value for it, so the trip has to preserve
+the difference between no group and a blank one.
 """
 
 from datetime import UTC, datetime
@@ -19,13 +21,17 @@ import pytest
 
 from keeper.equipment.aggregates.device import (
     Device,
+    DeviceBeamline,
     DeviceEvent,
     DeviceFaulted,
+    DeviceGroup,
     DeviceName,
     DeviceRecovered,
     DeviceRegistered,
     DeviceRetired,
     DeviceStatus,
+    InvalidDeviceBeamlineError,
+    InvalidDeviceGroupError,
     InvalidDeviceNameError,
     evolve,
     fold,
@@ -47,6 +53,8 @@ def _registered(**overrides: object) -> DeviceRegistered:
         "external_ref_scheme": _REF.scheme,
         "external_ref_value": _REF.value,
         "device_name": "sample x translation",
+        "beamline": "2-bm",
+        "group": "sample-stack",
         "occurred_at": _WHEN,
     }
     fields.update(overrides)
@@ -83,8 +91,23 @@ def test_folding_a_genesis_gives_an_available_device() -> None:
         id=registered.device_id,
         external_ref=_REF,
         name=DeviceName("sample x translation"),
+        beamline=DeviceBeamline("2-bm"),
+        group=DeviceGroup("sample-stack"),
         status=DeviceStatus.AVAILABLE,
     )
+
+
+def test_folding_a_genesis_without_a_group_leaves_the_device_in_none() -> None:
+    state = fold([_registered(group=None)])
+
+    assert state is not None
+    assert state.group is None
+
+
+def test_a_device_in_no_group_survives_the_trip_through_the_log() -> None:
+    registered = _registered(group=None)
+
+    assert from_stored(_stored(registered)) == registered
 
 
 def test_a_new_device_is_not_retired() -> None:
@@ -195,8 +218,10 @@ def test_every_event_survives_the_trip_through_the_log(event: DeviceEvent) -> No
     [
         ("external_ref_value", InvalidIdentifierError),
         ("device_name", InvalidDeviceNameError),
+        ("beamline", InvalidDeviceBeamlineError),
+        ("group", InvalidDeviceGroupError),
     ],
-    ids=["reference", "label"],
+    ids=["reference", "label", "beamline", "group"],
 )
 def test_the_genesis_revalidates_its_value_objects_on_the_way_back(
     field: str, error: type[Exception]

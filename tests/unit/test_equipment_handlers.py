@@ -19,7 +19,9 @@ import pytest
 from keeper.equipment.adapters import InMemoryDeviceSummaryLookup
 from keeper.equipment.aggregates.device import (
     DEVICE_STREAM_TYPE,
+    DeviceBeamline,
     DeviceCannotBeRecoveredError,
+    DeviceGroup,
     DeviceName,
     DeviceNotFoundError,
     DeviceStatus,
@@ -91,6 +93,8 @@ async def _a_device(deps: Kernel, *, value: str = "2bmb:m1") -> UUID:
         RegisterDevice(
             external_ref=Identifier(scheme="epics-prefix", value=value),
             name=DeviceName("sample x translation"),
+            beamline=DeviceBeamline("2-bm"),
+            group=DeviceGroup("sample-stack"),
         ),
         principal_id=uuid4(),
         correlation_id=uuid4(),
@@ -272,7 +276,11 @@ async def test_every_handler_asks_the_authorization_port_first(call: str) -> Non
     with pytest.raises(UnauthorizedError):
         if call == "register":
             await bind_register(deps)(
-                RegisterDevice(external_ref=_REF, name=DeviceName("a device")),
+                RegisterDevice(
+                    external_ref=_REF,
+                    name=DeviceName("a device"),
+                    beamline=DeviceBeamline("2-bm"),
+                ),
                 principal_id=principal,
                 correlation_id=cid,
             )

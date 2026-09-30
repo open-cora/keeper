@@ -24,7 +24,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request, status
 from pydantic import BaseModel, Field
 
-from keeper.equipment.aggregates.device import DEVICE_NAME_MAX_LENGTH, DeviceName
+from keeper.equipment.aggregates.device import (
+    DEVICE_BEAMLINE_MAX_LENGTH,
+    DEVICE_GROUP_MAX_LENGTH,
+    DEVICE_NAME_MAX_LENGTH,
+    DeviceBeamline,
+    DeviceGroup,
+    DeviceName,
+)
 from keeper.equipment.features.register_device.command import RegisterDevice
 from keeper.equipment.features.register_device.handler import IdempotentHandler
 from keeper.infrastructure.request import (
@@ -66,6 +73,8 @@ class RegisterDeviceRequest(BaseModel):
 
     external_ref: ExternalRefBody
     name: str = Field(min_length=1, max_length=DEVICE_NAME_MAX_LENGTH)
+    beamline: str = Field(min_length=1, max_length=DEVICE_BEAMLINE_MAX_LENGTH)
+    group: str | None = Field(default=None, min_length=1, max_length=DEVICE_GROUP_MAX_LENGTH)
 
 
 class RegisterDeviceResponse(BaseModel):
@@ -116,6 +125,8 @@ async def post_devices(
         RegisterDevice(
             external_ref=Identifier(scheme=body.external_ref.scheme, value=body.external_ref.value),
             name=DeviceName(body.name),
+            beamline=DeviceBeamline(body.beamline),
+            group=DeviceGroup(body.group) if body.group is not None else None,
         ),
         principal_id=principal_id,
         correlation_id=cid,

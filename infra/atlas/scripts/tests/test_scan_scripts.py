@@ -87,7 +87,9 @@ class TestScanDestructiveDdl:
         result = run_scan(DESTRUCTIVE_SCRIPT, tmp_path, f)
         assert result.returncode == 1
 
-    def test_scan_destructive_ddl_marker_on_prior_statement_does_not_exempt_next_line(self, tmp_path):
+    def test_scan_destructive_ddl_marker_on_prior_statement_does_not_exempt_next_line(
+        self, tmp_path
+    ):
         # F1 case 1 from the review that reopened this check: a marker on
         # one DROP must not carry over to an unmarked DROP right below it.
         f = write_sql(
@@ -112,6 +114,7 @@ class TestScanDestructiveDdl:
         result = run_scan(DESTRUCTIVE_SCRIPT, tmp_path, f)
         assert result.returncode == 1
         assert "line=2" in result.stderr
+
 
 class TestScanConstraintDrops:
     def test_scan_constraint_drops_clean_file_passes(self, tmp_path):
@@ -140,9 +143,7 @@ class TestScanConstraintDrops:
         f = write_sql(
             tmp_path,
             "gap.sql",
-            "-- atlas:safety:allow=drop-index-allowed-data-preserving\n"
-            "\n"
-            "DROP INDEX IF EXISTS i;\n",
+            "-- atlas:safety:allow=drop-index-allowed-data-preserving\n\nDROP INDEX IF EXISTS i;\n",
         )
         result = run_scan(CONSTRAINT_SCRIPT, tmp_path, f)
         assert result.returncode == 0, result.stderr
@@ -151,8 +152,7 @@ class TestScanConstraintDrops:
         f = write_sql(
             tmp_path,
             "addback.sql",
-            "ALTER TABLE t DROP CONSTRAINT a;\n"
-            "ALTER TABLE t ADD CONSTRAINT a CHECK (x > 0);\n",
+            "ALTER TABLE t DROP CONSTRAINT a;\nALTER TABLE t ADD CONSTRAINT a CHECK (x > 0);\n",
         )
         result = run_scan(CONSTRAINT_SCRIPT, tmp_path, f)
         assert result.returncode == 0, result.stderr

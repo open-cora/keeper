@@ -8,13 +8,15 @@ The hardware itself lives outside, at a beamline, driven by whatever **control s
 
 ## What a Device is
 
-One piece of hardware, and three facts about it.
+One piece of hardware, and a few facts about it.
 
 ```
    Device
      id            a UUID minted when the device is added
      external_ref  where the control system publishes it
      name          a label this system wrote, for a person to read
+     beamline      where it is, as the descriptor directory writes it
+     group         which cluster it belongs to there, or nothing
      status        Available, Faulted or Retired
 ```
 
@@ -39,6 +41,12 @@ So the address is what two independent clients will agree on, and nothing else i
 **An adapter must not copy the facility's description field into it.** That field is free text somebody typed at a beamline, and free text swept in from outside is how a person's name reaches a table that cannot be edited. The same rule, for the same reason, keeps a message off a broken step and a reason off a deactivated actor.
 
 On the event the field is `device_name` rather than `name`, qualified the way an operation's is, because the personal-data check reads field names and cannot tell a piece of hardware's label from a person's.
+
+`beamline` and `group` are labels of the same kind, authored here and subject to the same rule against copying a facility field into them. Neither is qualified on the event, and that is not an inconsistency: the check matches a field name exactly against a closed list of the words a person's details arrive under, and neither of these is one or could be mistaken for one. A procedure's `beamline` is bare next door for the same reason.
+
+`beamline` exists because one installation serves several of them, and without it the register cannot be asked about any single one: listing the devices at a beamline would mean reading every device everywhere and matching on the shape of an address, which is a convention nothing here enforces.
+
+`group` is which functional cluster a device belongs to at its own beamline, and it is absent for the many that belong to none. A motor whose only description is the channel it occupies in a crate is part of nothing anybody has named, and a value there would be invented rather than recorded. The pair is meant together: a group name means different hardware at each beamline, so a group without a beamline beside it does not pick out a set.
 
 ## The status, and what it does not claim
 
@@ -105,6 +113,8 @@ Each of these is a decision rather than an omission, and the reason is given wit
 
 **No tree.** Where one device stops is a client-side composition: thirty signals under one station, arranged by classes a profile author wrote, while the control system publishes a flat namespace of addresses and has never heard of the station. So what is registered is the thing the address names.
 
+**No catalog, and `group` is not the beginning of one.** A group is a value rows share rather than a thing that owns them: it exists while some device says that word and stops existing when the last one stops. There is no group record, no parent, no membership held anywhere else, no ordering within one, and nothing that can be said about a group rather than about a device. What that refuses is the portable vocabulary of families, assemblies and models a cross-facility inventory needs, which is a vocabulary other people would have to agree with and none has been asked.
+
 ## What it reaches across for
 
 Nothing, in either direction, and it is the first context in this tree with no cross-context door at all.
@@ -134,7 +144,7 @@ There is no devices table. A device is worked out by replaying its events every 
 
 ```
    DeviceRegistered   device_id, external_ref_scheme, external_ref_value,
-                      device_name, occurred_at
+                      device_name, beamline, group, occurred_at
    DeviceFaulted      device_id, occurred_at
    DeviceRecovered    device_id, occurred_at
    DeviceRetired      device_id, occurred_at
@@ -165,15 +175,19 @@ Retired refuses all three transitions, not just retirement. A device this system
 
 Adding a device takes a retry key, so sending the same one twice returns the first answer instead of making a second record. The three transitions do not take one: a repeat is already refused by the rules above, so a key would buy a friendlier status code rather than stop a second write.
 
-## The listing, and why it has two filters
+## The listing, and why it has three filters
 
-`GET /devices` filters by address and by status, where the sibling listings have one filter each and argue against adding more. Both of these have a caller.
+`GET /devices` filters by address, by status and by beamline, where the sibling listings have one filter each and argue against adding more. All three have a caller.
 
 The address filter is what makes the context usable by an adapter at all. A reporter holds the address it is subscribed to and nothing else, because ids are minted here, so resolving one to an id is its first call and every fault it later reports depends on it. That is the same resolution an agent already performs against the run listing before it can record what took its proposal.
 
 The status filter is the operator's question, and the one the context exists to answer: what is broken right now.
 
-A row carries every field the single read has, plus two timestamps. That is unlike the three summaries beside it, each of which drops a field for being unbounded. A device has none: the label is bounded and everything else is an id, a word or a time. So a caller that finds what it wanted in a page needs no second call.
+The beamline filter is the question an installation serving four beamlines cannot otherwise be asked, and the reason the field exists at all.
+
+**There is deliberately no filter on the group**, and the same rule about callers is why. Every row carries its group, so grouping one beamline's listing is something a caller does with what it already holds. A server-side filter earns its place the day something composes work from a group and asks for one directly, and not before: the column is information, and a parameter nothing calls is the thing the sibling listings decline by name.
+
+A row carries every field the single read has, plus two timestamps. That is unlike the three summaries beside it, each of which drops a field for being unbounded. A device has none: all three labels are bounded and everything else is an id, a word or a time. So a caller that finds what it wanted in a page needs no second call.
 
 ## Where the code is
 

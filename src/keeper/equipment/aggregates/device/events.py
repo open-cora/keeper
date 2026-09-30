@@ -32,6 +32,18 @@ stop. The qualifier earns more here than it does there, because the one
 value this field must never hold is a control system's own description
 field, which is where an operator's free text lives.
 
+`beamline` and `group` are NOT qualified, and the difference is not an
+inconsistency. That check matches a field name exactly against a closed
+list of the words a person's details arrive under, and neither of these
+is one of them or could be mistaken for one. `ProcedureDefined` carries
+a bare `beamline` next door for the same reason. Qualifying them here
+would imply a hazard that is not there and would read as though the
+rule were about hardware fields in general.
+
+`group` travels as `str | None`, because absent is how a device says it
+belongs to no cluster, and a group nobody has named is the normal case
+rather than a gap.
+
 ## Why the three transitions carry nothing but a time
 
 No severity, no reason, no reporter. The severity is left off because a
@@ -76,6 +88,8 @@ class DeviceRegistered:
     external_ref_scheme: str
     external_ref_value: str
     device_name: str
+    beamline: str
+    group: str | None
     occurred_at: datetime
 
 
@@ -153,6 +167,8 @@ def to_payload(event: DeviceEvent) -> dict[str, Any]:
                 "external_ref_scheme": event.external_ref_scheme,
                 "external_ref_value": event.external_ref_value,
                 "device_name": event.device_name,
+                "beamline": event.beamline,
+                "group": event.group,
                 "occurred_at": event.occurred_at.isoformat(),
             }
         case DeviceFaulted() | DeviceRecovered() | DeviceRetired():
@@ -185,6 +201,8 @@ def from_stored(stored: StoredEvent) -> DeviceEvent:
                     external_ref_scheme=payload["external_ref_scheme"],
                     external_ref_value=payload["external_ref_value"],
                     device_name=payload["device_name"],
+                    beamline=payload["beamline"],
+                    group=payload["group"],
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
                 extra=(ValueError,),

@@ -266,7 +266,7 @@ Rounds are a subcollection rather than a verb, because opening one creates somet
 
 The single read carries the whole authorization: the goal, the beamline, the scopes, the budget, who authorized it, whether it still stands and who stopped it. Every field is what somebody would be reading it to check.
 
-The listing has two filters, which is [Equipment's](equipment.md#the-listing-and-why-it-has-two-filters) shape rather than Counsel's, and for a comparable reason: both filters have a caller who cannot work without one. The extra against the sibling listings is the beamline, and a pursuit names one in a way a proposal or an inquiry does not, because it is the authorization to run work there. So `?beamline=2-bm&status=Running` is the question somebody standing at a beamline asks, and `?status=Held` is the other one, which loops have stopped asking and are waiting for a person. Each row says which of the two answerable conclusions put it there, because one needs attention and the other needs data.
+The listing has two filters, which follows [Equipment's](equipment.md#the-listing-and-why-it-has-three-filters) rule rather than Counsel's, and for a comparable reason: both filters have a caller who cannot work without one. The extra against the sibling listings is the beamline, and a pursuit names one in a way a proposal or an inquiry does not, because it is the authorization to run work there. So `?beamline=2-bm&status=Running` is the question somebody standing at a beamline asks, and `?status=Held` is the other one, which loops have stopped asking and are waiting for a person. Each row says which of the two answerable conclusions put it there, because one needs attention and the other needs data.
 
 ## What the stream holds
 

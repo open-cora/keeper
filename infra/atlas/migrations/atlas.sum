@@ -1,4 +1,4 @@
-h1:6Lk5sHBCiModMXcBjJYKRBzF+Wjha5QOwSvLudvRIns=
+h1:hVo8AHglO95egrMniIuE8aKcyyBVoARLw9Nh8GxEOAg=
 20260915120000_init_baseline.sql h1:U/KeoVEsf6ojwo/9l35o+UllxBsxJ1zDHFvc/qxPJSw=
 20260919143000_execution_run_summary.sql h1:1TRPXnX0QbpV+EJz2QysmnHT3M+1OLoH3GaGB2FAGpA=
 20260919170000_execution_plan_summary.sql h1:4pdwiw2/J/OXsFGxCobyJAYtBJxcqv0TGRBgfQBkb/8=
@@ -21,3 +21,4 @@ h1:6Lk5sHBCiModMXcBjJYKRBzF+Wjha5QOwSvLudvRIns=
 20260928150000_idempotency_can_store_an_empty_result.sql h1:EojZ6Z0mJWtHCtvceKuD2osqeBTV+1TX5u7fJKrclJY=
 20260928170000_execution_plan_becomes_operation.sql h1:uuXreyVEnJae8WHidnkoQdS8d84hER8TbuRD1e4gyGc=
 20260929031032_counsel_inquiry_summary_announces_a_question.sql h1:WgLTu9FNqxGjN2UcZt4TizmGjLTaJASmDokNPT0lAbI=
+20260929182409_equipment_device_carries_a_beamline_and_a_group.sql h1:TufPGrkNGWPXqtdWq6XBjnoSuWTmmQZyJEcTgd5vWlk=

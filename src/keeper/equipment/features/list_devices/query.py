@@ -43,10 +43,24 @@ class ListDevices:
     resolving a device is about to write to whatever comes back.
 
     `status` narrows to one disposition, which is the operator's
-    question rather than the adapter's. The two filters combine.
+    question rather than the adapter's.
+
+    `beamline` narrows to one beamline, which is the question an
+    installation serving several of them cannot otherwise be asked.
+    Matched as written, because that is how the keeper stores a
+    beamline everywhere else and a listing that normalised would
+    disagree with a dispatch that did not.
+
+    There is no filter on the group. Every row carries its group, so
+    grouping one beamline's listing is something the caller already
+    has what it needs to do, and a parameter nothing calls is the
+    thing the summary page declines by name.
+
+    The three filters combine.
     """
 
     external_ref: Identifier | None = None
+    beamline: str | None = None
     status: DeviceStatus | None = None
     limit: int = DEFAULT_PAGE_SIZE
     cursor: str | None = None
@@ -57,6 +71,7 @@ class ListDevices:
         *,
         scheme: str | None,
         value: str | None,
+        beamline: str | None = None,
         status: DeviceStatus | None = None,
         limit: int = DEFAULT_PAGE_SIZE,
         cursor: str | None = None,
@@ -82,7 +97,13 @@ class ListDevices:
             if scheme is not None and value is not None
             else None
         )
-        return cls(external_ref=external_ref, status=status, limit=limit, cursor=cursor)
+        return cls(
+            external_ref=external_ref,
+            beamline=beamline,
+            status=status,
+            limit=limit,
+            cursor=cursor,
+        )
 
 
 __all__ = ["DEFAULT_PAGE_SIZE", "MAX_PAGE_SIZE", "ListDevices"]

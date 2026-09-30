@@ -14,6 +14,8 @@ import pytest
 from keeper.equipment.aggregates.device import (
     Device,
     DeviceAlreadyExistsError,
+    DeviceBeamline,
+    DeviceGroup,
     DeviceName,
     DeviceRegistered,
     DeviceStatus,
@@ -31,6 +33,8 @@ def _command(**overrides: object) -> RegisterDevice:
     fields: dict[str, object] = {
         "external_ref": _REF,
         "name": DeviceName("sample x translation"),
+        "beamline": DeviceBeamline("2-bm"),
+        "group": DeviceGroup("sample-stack"),
     }
     fields.update(overrides)
     return RegisterDevice(**fields)  # pyright: ignore[reportArgumentType]
@@ -47,6 +51,8 @@ def test_registering_produces_one_event_carrying_the_address_and_the_label() -> 
             external_ref_scheme="epics-prefix",
             external_ref_value="2bmb:m1",
             device_name="sample x translation",
+            beamline="2-bm",
+            group="sample-stack",
             occurred_at=_NOW,
         )
     ]
@@ -84,6 +90,8 @@ def test_registering_onto_a_live_stream_is_refused() -> None:
         id=uuid4(),
         external_ref=_REF,
         name=DeviceName("already here"),
+        beamline=DeviceBeamline("2-bm"),
+        group=None,
         status=DeviceStatus.AVAILABLE,
     )
 

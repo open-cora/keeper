@@ -47,15 +47,16 @@ from keeper.infrastructure.projection.cursor import decode_cursor, encode_cursor
 from keeper.shared.identifier import Identifier
 
 _SELECT_SQL = f"""
-SELECT device_id, external_ref_scheme, external_ref_value, name,
-       status, registered_at, updated_at
+SELECT device_id, external_ref_scheme, external_ref_value, name, beamline,
+       "group", status, registered_at, updated_at
 FROM {PROJECTION_NAME}
 WHERE ($1::text IS NULL OR external_ref_scheme = $1)
   AND ($2::text IS NULL OR external_ref_value = $2)
-  AND ($3::text IS NULL OR status = $3)
-  AND ($4::timestamptz IS NULL OR (registered_at, device_id) < ($4, $5))
+  AND ($3::text IS NULL OR beamline = $3)
+  AND ($4::text IS NULL OR status = $4)
+  AND ($5::timestamptz IS NULL OR (registered_at, device_id) < ($5, $6))
 ORDER BY registered_at DESC, device_id DESC
-LIMIT $6
+LIMIT $7
 """
 
 
@@ -69,6 +70,7 @@ class PostgresDeviceSummaryLookup:
         self,
         *,
         external_ref: Identifier | None,
+        beamline: str | None,
         status: DeviceStatus | None,
         limit: int,
         cursor: str | None,
@@ -79,6 +81,7 @@ class PostgresDeviceSummaryLookup:
             _SELECT_SQL,
             external_ref.scheme if external_ref is not None else None,
             external_ref.value if external_ref is not None else None,
+            beamline,
             status.value if status is not None else None,
             after[0] if after is not None else None,
             after[1] if after is not None else None,
@@ -103,6 +106,8 @@ def _to_summary(row: Any) -> DeviceSummary:
             value=row["external_ref_value"],
         ),
         name=row["name"],
+        beamline=row["beamline"],
+        group=row["group"],
         status=DeviceStatus(row["status"]),
         registered_at=row["registered_at"],
         updated_at=row["updated_at"],

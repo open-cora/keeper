@@ -20,7 +20,7 @@ from uuid import UUID
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel
 
-from keeper.equipment.aggregates.device import DeviceName
+from keeper.equipment.aggregates.device import DeviceBeamline, DeviceGroup, DeviceName
 from keeper.equipment.features.register_device.command import RegisterDevice
 from keeper.equipment.features.register_device.handler import IdempotentHandler
 from keeper.infrastructure.observability import current_correlation_id
@@ -51,12 +51,16 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
         external_ref_scheme: str,
         external_ref_value: str,
         name: str,
+        beamline: str,
+        group: str | None = None,
     ) -> RegisterDeviceOutput:
         handler = get_handler()
         device_id = await handler(
             RegisterDevice(
                 external_ref=Identifier(scheme=external_ref_scheme, value=external_ref_value),
                 name=DeviceName(name),
+                beamline=DeviceBeamline(beamline),
+                group=DeviceGroup(group) if group is not None else None,
             ),
             principal_id=get_mcp_principal_id(ctx),
             # The tool runs inside the instrumented request that carried

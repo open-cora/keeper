@@ -69,11 +69,13 @@ Default to **flat fields** until three members of a group exist. Then hoist into
 class Thing:
     required_part_ids: frozenset[UUID]
 
+
 # 2 members: still flat
 @dataclass(frozen=True)
 class Thing:
     required_part_ids: frozenset[UUID]
     required_inputs: frozenset[str]
+
 
 # 3+ members: hoist
 @dataclass(frozen=True)
@@ -81,6 +83,7 @@ class Needs:
     part_ids: frozenset[UUID]
     inputs: frozenset[str]
     fixture_ids: frozenset[UUID]
+
 
 @dataclass(frozen=True)
 class Thing:

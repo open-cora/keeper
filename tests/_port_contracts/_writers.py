@@ -377,6 +377,8 @@ class EventStoreDeviceWriter:
         external_ref: Identifier,
         device_name: str,
         at: datetime,
+        beamline: str = "2-bm",
+        group: str | None = None,
     ) -> None:
         await self._append(
             device_id,
@@ -385,6 +387,8 @@ class EventStoreDeviceWriter:
                 external_ref_scheme=external_ref.scheme,
                 external_ref_value=external_ref.value,
                 device_name=device_name,
+                beamline=beamline,
+                group=group,
                 occurred_at=at,
             ),
             "RegisterDevice",

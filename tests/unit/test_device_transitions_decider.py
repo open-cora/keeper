@@ -19,10 +19,12 @@ import pytest
 
 from keeper.equipment.aggregates.device import (
     Device,
+    DeviceBeamline,
     DeviceCannotBeFaultedError,
     DeviceCannotBeRecoveredError,
     DeviceCannotBeRetiredError,
     DeviceFaulted,
+    DeviceGroup,
     DeviceName,
     DeviceNotFoundError,
     DeviceRecovered,
@@ -49,6 +51,8 @@ def _device(status: DeviceStatus, device_id: UUID | None = None) -> Device:
         id=device_id or uuid4(),
         external_ref=_REF,
         name=DeviceName("sample x translation"),
+        beamline=DeviceBeamline("2-bm"),
+        group=DeviceGroup("sample-stack"),
         status=status,
     )
 

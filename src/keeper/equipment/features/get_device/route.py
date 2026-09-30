@@ -43,6 +43,8 @@ class DeviceResponse(BaseModel):
     device_id: UUID
     external_ref: ExternalRefResponse
     name: str
+    beamline: str
+    group: str | None
     status: DeviceStatus = Field(
         description=(
             "What this system has been told. Available means no fault has been "
@@ -93,5 +95,7 @@ async def get_device(
             scheme=device.external_ref.scheme, value=device.external_ref.value
         ),
         name=device.name.value,
+        beamline=device.beamline.value,
+        group=device.group.value if device.group is not None else None,
         status=device.status,
     )
