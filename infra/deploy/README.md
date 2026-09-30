@@ -50,23 +50,55 @@ The failure is worth recognising because it looks like a podman problem and
 is a kernel one. Check with `stat -fc %T /sys/fs/cgroup`, and prefer a
 `.container` file on any host that reports `cgroup2fs`.
 
+## Who a caller is
+
+`issue_tokens.py` mints an EC signing key, writes the public half as a JWKS,
+and signs one long-lived bearer token per caller. `install.sh` runs it, sets
+`REQUIRE_AUTHENTICATED_PRINCIPAL`, and serves the JWKS on loopback for the
+keeper's own verifier to fetch. The `X-Principal-Id` header stops being
+believed at that point.
+
+This is not an identity provider. There is no discovery document, no token
+endpoint, no refresh and no revocation. It is enough because the roster is
+four beamlines and a thinker, known in advance, and because the verifier
+asks only for a JWKS and a signature. Revoking means re-minting the key and
+reissuing five files.
+
+**Each token goes to exactly one caller**, into that account's own home at
+mode 600, and nothing here should ever be copied to more than one beamline.
+The private key never leaves the keeper's host.
+
+Verify both directions after installing, because a check that only tries the
+valid case cannot tell an enforcing deployment from an open one:
+
+```bash
+curl -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/devices
+curl -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(cat "$CORA_ROOT/etc/tokens/2-bm.token")" \
+  http://127.0.0.1:8000/devices
+```
+
+401 then 200. `/health` answers without a token on purpose, so a liveness
+check needs no credential.
+
 ## What it is not
 
-**No TLS and no authentication.** `APP_ENV` is set to a value that is not a
-production tier, which is accurate rather than a placeholder: a production
-tier refuses to boot without configured authentication and an authorization
-policy, and neither exists yet. The principal arrives in a request header
-that anyone could send.
+**No TLS, and no authorization policy.** `APP_ENV` is set to a value that is
+not a production tier, which is accurate rather than a placeholder: a
+production tier refuses to boot without an authorization policy, and the
+first policy has to be authored through the API before anything can be
+authorized against it. Authentication does not wait for that, which is why
+it is on here and the tier is not.
 
-That is the whole reason both services bind `127.0.0.1`. Reach the API
-through a tunnel:
+That missing TLS is the whole reason everything binds `127.0.0.1`. Reach the
+API through a tunnel:
 
 ```bash
 ssh -N -L 8000:127.0.0.1:8000 <host>
 ```
 
-**Widening the bind address and configuring authentication are one change,
-never two.** A loopback bind is the only thing standing in for auth today.
+**Widening the bind address and terminating TLS are one change, never two.**
+A token over plain HTTP off this host is a token anyone on the path can
+lift and replay.
 
 **No backups.** The database is a bind mount at `$CORA_ROOT/pgdata`, so
 `pg_dump` through the container is the whole story for now.
@@ -80,7 +112,10 @@ tail -f "$CORA_ROOT/log/keeper.log"
 podman logs -f keeper-postgres
 ```
 
-Deploy a revision by updating the source and running `install.sh` again.
+Deploy a revision by updating the source and running `install.sh` again. It
+restarts each service rather than relying on `enable --now`, which is a no-op
+against something already running and would otherwise write a new
+configuration to disk that never reaches the process.
 
 Starting the database over needs podman, because `:U` chowned the directory
 to a subordinate uid the account cannot remove directly:
@@ -95,8 +130,10 @@ podman unshare rm -rf "$CORA_ROOT/pgdata"
 
 | | |
 | --- | --- |
-| `install.sh` | preflight, secrets, virtualenv, units, migrations, start |
+| `install.sh` | preflight, secrets, virtualenv, tokens, units, migrations, start |
+| `issue_tokens.py` | the signing key, the JWKS, one token per caller |
 | `keeper-postgres.service.in` | the database, a rootless container |
+| `keeper-jwks.service.in` | the public key, served for the verifier |
 | `keeper.service.in` | the HTTP surface |
 
 The templates carry `@NAME@` placeholders and name no host, so the tracked

@@ -27,6 +27,12 @@ set -euo pipefail
 CORA_ROOT="${CORA_ROOT:-/local/cora}"
 PG_PORT="${PG_PORT:-5433}"
 API_PORT="${API_PORT:-8000}"
+JWKS_PORT="${JWKS_PORT:-8081}"
+
+# One token per caller. The four beamlines run a conductor and a reporter
+# under one account each, so they are one subject each; the thinker runs
+# centrally under its own.
+SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker}"
 
 # Not a production-tier value, and that is the honest setting rather than a
 # placeholder. A production tier refuses to boot without configured
@@ -111,19 +117,36 @@ DATABASE_URL="postgresql://keeper:${PG_PASSWORD}@127.0.0.1:${PG_PORT}/keeper"
 # demand and is handed the plain URL. The Makefile draws the same distinction
 # for local development.
 ATLAS_DB_URL="postgres://keeper:${PG_PASSWORD}@127.0.0.1:${PG_PORT}/keeper?sslmode=disable"
-umask 077
-cat > "${KEEPER_ENV}" <<ENV
-APP_ENV=${APP_ENV}
-DATABASE_URL=${DATABASE_URL}
-LOG_LEVEL=INFO
-ENV
-chmod 600 "${KEEPER_ENV}"
-say "wrote ${KEEPER_ENV}"
 echo
 
 echo "Virtual environment"
 (cd "${APP_DIR}" && uv sync --locked --no-dev)
 say "ok"
+echo
+
+echo "Tokens"
+# The venv's python, because signing needs pyjwt and cryptography and this
+# host has no reason to carry them outside it.
+"${APP_DIR}/.venv/bin/python3" "${SCRIPT_DIR}/issue_tokens.py" \
+  --root "${CORA_ROOT}" --jwks-url "http://127.0.0.1:${JWKS_PORT}/jwks.json" \
+  ${SUBJECTS} | sed 's/^/  /'
+echo
+
+echo "Environment"
+# Read as one line: systemd's EnvironmentFile has no line continuation, and
+# pydantic-settings parses this field as JSON.
+IDENTITY_PROVIDERS="$(tr -d '\n' < "${CORA_ROOT}/etc/identity-providers.json" | tr -s ' ')"
+
+umask 077
+cat > "${KEEPER_ENV}" <<ENV
+APP_ENV=${APP_ENV}
+DATABASE_URL=${DATABASE_URL}
+LOG_LEVEL=INFO
+REQUIRE_AUTHENTICATED_PRINCIPAL=true
+IDENTITY_PROVIDERS=${IDENTITY_PROVIDERS}
+ENV
+chmod 600 "${KEEPER_ENV}"
+say "wrote ${KEEPER_ENV}"
 echo
 
 echo "Units"
@@ -133,16 +156,24 @@ render() {
       -e "s|@APP_DIR@|${APP_DIR}|g" \
       -e "s|@PG_PORT@|${PG_PORT}|g" \
       -e "s|@API_PORT@|${API_PORT}|g" \
+      -e "s|@JWKS_PORT@|${JWKS_PORT}|g" \
       "$1" > "$2"
 }
 render "${SCRIPT_DIR}/keeper-postgres.service.in" "${UNIT_DIR}/keeper-postgres.service"
+render "${SCRIPT_DIR}/keeper-jwks.service.in" "${UNIT_DIR}/keeper-jwks.service"
 render "${SCRIPT_DIR}/keeper.service.in" "${UNIT_DIR}/keeper.service"
 systemctl --user daemon-reload
 say "ok"
 echo
 
 echo "Database"
-systemctl --user enable --now keeper-postgres.service
+# enable and restart, never `enable --now`. On a re-run `--now` is a no-op
+# against a service that is already up, so a changed unit or a changed
+# environment file is written to disk and never reaches the process. A deploy
+# script that reports success while running the previous revision is worse
+# than one that fails.
+systemctl --user enable keeper-postgres.service
+systemctl --user restart keeper-postgres.service
 for _ in $(seq 1 60); do
   if podman exec keeper-postgres pg_isready -U keeper -d keeper >/dev/null 2>&1; then
     say "accepting connections"
@@ -158,8 +189,18 @@ echo "Migrations"
 (cd "${ATLAS_DIR}" && DATABASE_URL="${ATLAS_DB_URL}" atlas migrate apply --env local)
 echo
 
+echo "JWKS"
+systemctl --user enable keeper-jwks.service
+systemctl --user restart keeper-jwks.service
+sleep 2
+curl -fsS --max-time 5 "http://127.0.0.1:${JWKS_PORT}/jwks.json" >/dev/null \
+  || die "the JWKS is not being served; the keeper could not verify a token"
+say "served on 127.0.0.1:${JWKS_PORT}"
+echo
+
 echo "API"
-systemctl --user enable --now keeper.service
+systemctl --user enable keeper.service
+systemctl --user restart keeper.service
 sleep 3
 systemctl --user is-active --quiet keeper.service \
   || die "keeper.service did not stay up; see: journalctl --user -u keeper.service or ${CORA_ROOT}/log/keeper.log"

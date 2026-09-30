@@ -1,0 +1,34 @@
+# Serves the public half of the token signing key, so the keeper's verifier
+# has a JWKS URL to fetch. See keeper-postgres.service.in for why every unit
+# here carries ConditionHost.
+#
+# A whole service for one static file looks like too much, and the
+# alternative is worse. The verifier is PyJWT's `PyJWKClient`, which takes a
+# URL and caches what it finds, refetching when it meets an unknown key id.
+# Nothing in it reads a file, so the choice is this or a fork of the
+# verifier, and rotating a key with this in place is replacing the file.
+#
+# Loopback, and the JWKS is public anyway. Binding it here is not protecting
+# the key material, which is a public key; it is keeping the surface of this
+# deployment to exactly the ports it means to serve.
+#
+# `http.server` is the standard library's, single-threaded and never
+# addressed by anything but one in-process client on the same machine. It
+# would be the wrong choice for anything else.
+
+[Unit]
+Description=Keeper JWKS
+ConditionHost=@DEPLOY_HOST@
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@APP_DIR@/.venv/bin/python3 -m http.server @JWKS_PORT@ --bind 127.0.0.1 --directory @CORA_ROOT@/jwks
+Restart=always
+RestartSec=10
+StandardOutput=append:@CORA_ROOT@/log/jwks.log
+StandardError=append:@CORA_ROOT@/log/jwks.log
+
+[Install]
+WantedBy=default.target
