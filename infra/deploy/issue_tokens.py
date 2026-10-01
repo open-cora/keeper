@@ -1,6 +1,12 @@
-"""Mint the signing key, the JWKS and one bearer token per beamline.
+"""Mint the signing key, the JWKS and one bearer token per caller.
 
-    ./issue_tokens.py --root /local/cora 2-bm 7-bm 19-bm 32-id
+    ./issue_tokens.py --root /local/cora conductor-19-bm reporter-19-bm thinker
+
+A subject is `<role>-<beamline>` for anything running at a beamline and
+the bare role for anything central, which is the convention the deploy
+README sets out and the reason this takes callers rather than beamlines.
+The same string names the configuration, the log and, through
+`{subject}.token`, the credential.
 
 Run it on the host the keeper runs on. It is idempotent in the part that
 matters: an existing signing key is reused, never replaced, because
@@ -13,10 +19,10 @@ not an identity provider. There is no discovery document, no token endpoint,
 no refresh and no revocation: a token is minted here, copied to a beamline
 once, and verified against a public key the keeper reads over loopback.
 
-That is enough because the roster is four beamlines and a thinker, all
-known in advance, and because the keeper's verifier asks only for a JWKS
-and a signature. Revocation, if it is ever needed, is re-minting the key
-and reissuing four files.
+That is enough because the roster is a handful of callers known in
+advance, and because the keeper's verifier asks only for a JWKS and a
+signature. Revocation, if it is ever needed, is re-minting the key and
+reissuing every file.
 
 ## Why the token is long-lived
 
@@ -30,8 +36,9 @@ password, and re-running this is what rotates it.
 
 The private key never leaves this host. The JWKS is public by design and is
 served on loopback only because that is the only reader. Each token goes to
-exactly one beamline, into that account's own home, and a beamline can read
-no other beamline's.
+exactly one caller, into that account's own home. Two callers at one
+beamline share an account and so share a home, which is why splitting them
+is attribution rather than isolation.
 """
 
 from __future__ import annotations
@@ -162,7 +169,9 @@ def provider_settings(subjects: list[str], jwks_url: str) -> list[dict[str, obje
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("subjects", nargs="+", help="one per caller, e.g. 2-bm")
+    parser.add_argument(
+        "subjects", nargs="+", help="one per caller, e.g. conductor-19-bm or thinker"
+    )
     parser.add_argument("--root", type=Path, default=Path("/local/cora"))
     parser.add_argument("--jwks-url", default="http://127.0.0.1:8081/jwks.json")
     args = parser.parse_args(argv)
@@ -195,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"providers    {settings_path}")
     print()
-    print("Each token goes to its own beamline, into that account's home at mode 600.")
+    print("Each token goes to its own caller, into that account's home at mode 600.")
     print("Nothing here should ever be copied to more than one beamline.")
     return 0
 

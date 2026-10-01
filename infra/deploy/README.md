@@ -68,6 +68,42 @@ reissuing five files.
 mode 600, and nothing here should ever be copied to more than one beamline.
 The private key never leaves the keeper's host.
 
+### What a subject is called
+
+A subject is `<role>-<beamline>` for anything that runs at a beamline, and
+the bare role for anything central. So `conductor-19-bm` and
+`reporter-19-bm`, and `thinker` with no suffix. The beamline half is spelled
+the way `beamlines/` spells it: `2-bm`, `7-bm`, `19-bm`, `32-id`.
+
+The order is not a preference. That string already names the configuration,
+the log and, through `{subject}.token`, the credential itself, so a subject
+in the other order would be the one artifact of four spelled differently
+from the rest, and an operator holding `reporter-2-bm.toml` would have to
+transpose it to find the token.
+
+Splitting a beamline into two subjects buys attribution and nothing else.
+It is not a security boundary: both processes run in the same account from
+the same home, so whoever can read one token can read the other. There is
+no revocation to be granular about either.
+
+**Renaming a subject mints a different principal.** `actor_id` is a `uuid5`
+of the subject, so `19-bm` and `conductor-19-bm` are two principals and
+everything already recorded stays attributed to the first. Provenance
+splits at the rename, which is why it is worth doing once rather than
+drifting into it.
+
+`subject_bindings` is a list, so both can be bound at once. The migration
+is to add the new subjects, swap each configuration in its own time, and
+drop the old ones at a later restart. Nothing is down and there is no flag
+day.
+
+**The running keeper predates this.** It binds `2-bm`, `7-bm`, `19-bm`,
+`32-id` and `thinker`, one per beamline with no role in the name, so a
+beamline's conductor and its reporter share a subject today. That is why
+the examples elsewhere in this file still name `2-bm.token`. Changing it
+needs a keeper restart, which every beamline feels, so it waits for a
+restart that was going to happen anyway.
+
 `install.sh` verifies both directions itself and refuses to finish if an
 anonymous request is answered, because a check that only tries the valid
 case cannot tell an enforcing deployment from an open one. That exact
