@@ -58,6 +58,7 @@ Installed and running on a central host: the schema applied against a real Postg
 | Page | What it answers |
 | --- | --- |
 | [Running one](running.md) | What it needs, the order the authorization bootstrap has to happen in, and what refuses to boot |
+| [Keeping](keeping.md) | The path every written fact takes, what the record guarantees, and what it refuses to decide |
 | [The surface](surface.md) | Every route and MCP tool in one list. Generated, so it cannot be out of date |
 | [Contract](reference/client-contract.md) | What a caller may rely on, and what it may not |
 | [Glossary](reference/glossary.md) | Terms used the same way in code and prose |
