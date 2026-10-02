@@ -42,7 +42,17 @@ JWKS_PORT="${JWKS_PORT:-8081}"
 # One token per caller. The four beamlines run a conductor and a reporter
 # under one account each, so they are one subject each; the thinker runs
 # centrally under its own.
-SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker}"
+#
+# `admin` runs nothing. It exists because a policy that nobody may change
+# is refused at birth, so somebody has to hold GrantPolicyPermission, and
+# putting that on a beamline would let that beamline grant itself anything.
+# Its token is minted here and belongs with an operator rather than on the
+# floor.
+#
+# The list is a default rather than something a caller passes, because a
+# deploy that forgot a subject would drop that subject's binding from the
+# identity provider and lock it out at the next restart.
+SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker admin}"
 
 # Not a production-tier value, and that is the honest setting rather than a
 # placeholder. A production tier refuses to boot without configured
