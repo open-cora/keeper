@@ -259,10 +259,24 @@ def sorted_permissions(permissions: Iterable["Permission"]) -> list["Permission"
     tell that from a change.
 
     One function because three orderings that agree by coincidence stop
-    agreeing without anything failing. The key is the pair itself, which
-    is the whole of a permission, so the order is total.
+    agreeing without anything failing. The key is every field a
+    permission has, so the order is total: leaving the beamline out left
+    two grants differing only in where they apply sorting equal, and a
+    payload built from them reproducible only by luck.
+
+    The beamline sorts in two parts because `None` and a string are not
+    comparable. Absent comes first, which puts a principal's grant for
+    nowhere above its grants for somewhere.
     """
-    return sorted(permissions, key=lambda p: (str(p.principal_id), p.command_name))
+    return sorted(
+        permissions,
+        key=lambda p: (
+            str(p.principal_id),
+            p.command_name,
+            p.beamline is not None,
+            p.beamline or "",
+        ),
+    )
 
 
 def reject_the_system_principal(permissions: Iterable["Permission"]) -> None:

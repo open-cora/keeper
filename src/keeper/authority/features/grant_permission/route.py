@@ -1,6 +1,6 @@
 """HTTP door for granting a permission.
 
-`POST /policies/{policy_id}/permissions`, with the one pair being added.
+`POST /policies/{policy_id}/permissions`, with the one permission being added.
 
 The path nests the sub-resource under its parent, and the verb is left
 off because the method already carries it: posting to a collection adds

@@ -3,7 +3,7 @@
 A policy is authored rather than enrolled, so its genesis is
 `PolicyDefined`: nothing exists anywhere until it is written, which is
 the distinction the glossary draws between Defined and Registered. The
-two that follow it each carry one pair.
+two that follow it each carry one permission.
 
 `to_payload` and `from_stored` are the single home for turning an event
 into stored primitives and back. The granted and revoked arms render
@@ -15,7 +15,7 @@ to one of them later would be dropped with nothing to say so.
 
 In state a permission set is a `frozenset[Permission]`: deduplicated,
 hashable, and O(1) to test membership, which is what the authorization
-decision wants. In a payload it is a sorted list of two-element lists,
+decision wants. In a payload it is a sorted list of three-element lists,
 which is what JSON has and what makes two equal sets serialize
 identically. Sorted, because a set has no order and an unsorted dump
 would give the same policy a different payload on different runs, which
@@ -94,28 +94,53 @@ evolver about it is a type error, because the wildcard arm there calls
 """
 
 
-def _permissions_to_payload(permissions: frozenset[Permission]) -> list[list[str]]:
-    """Render a permission set as sorted pairs. See the module docstring.
+def _permissions_to_payload(permissions: frozenset[Permission]) -> list[list[str | None]]:
+    """Render a permission set as sorted triples. See the module docstring.
 
     The order comes from `sorted_permissions` rather than from sorting
-    the rendered pairs, so a payload and a read surface cannot disagree
-    about what order a policy is in.
+    the rendered triples, so a payload and a read surface cannot
+    disagree about what order a policy is in.
+
+    Three values and not two, because a permission says where as well as
+    what. Writing the pair was how a policy authored with beamline-scoped
+    grants came back from the log holding none of them: every grant
+    folded as the permission for nowhere, which both refuses the caller
+    that names a beamline and admits the one that names none.
     """
-    return [[str(p.principal_id), p.command_name] for p in sorted_permissions(permissions)]
+    return [
+        [str(p.principal_id), p.command_name, p.beamline] for p in sorted_permissions(permissions)
+    ]
 
 
 def _permissions_from_payload(raw: Any) -> frozenset[Permission]:
-    """Rebuild a permission set from stored pairs.
+    """Rebuild a permission set from stored entries.
 
     Takes `Any` because it is reading a payload, which is whatever the
-    row holds rather than whatever this build expects. A malformed pair
-    raises `ValueError` from the unpack or from `UUID`, and the caller
+    row holds rather than whatever this build expects. A malformed entry
+    raises `ValueError` from the match or from `UUID`, and the caller
     wraps that into an error naming the event.
+
+    A two-value entry is read as the permission for nowhere, because
+    rows written before a permission could say where are pairs and are
+    still in the log. That is the same tolerance the two singular arms
+    get from reading `beamline` with `get`.
     """
     permissions: set[Permission] = set()
-    for pair in raw:
-        principal_id, command_name = pair
-        permissions.add(Permission(principal_id=UUID(principal_id), command_name=command_name))
+    for entry in raw:
+        match list(entry):
+            case [principal_id, command_name]:
+                beamline = None
+            case [principal_id, command_name, beamline]:
+                pass
+            case _:
+                raise ValueError(f"a permission is two or three values, not {len(list(entry))}")
+        permissions.add(
+            Permission(
+                principal_id=UUID(principal_id),
+                command_name=command_name,
+                beamline=beamline,
+            )
+        )
     return frozenset(permissions)
 
 
@@ -153,10 +178,10 @@ def from_stored(stored: StoredEvent) -> PolicyEvent:
 
     `extra` carries `ValueError` because every constructor below raises
     it on malformed input: a string that is not a UUID, a string that is
-    not a timestamp, and a permission pair that does not unpack into
-    two. `TypeError` joins it because a payload whose `permissions` is
-    not iterable, or holds something that is not a pair, fails that way
-    rather than with a `ValueError`. Without both, either escapes as
+    not a timestamp, and a permission entry that is neither two
+    values nor three. `TypeError` joins it because a payload whose
+    `permissions` is not iterable, or holds something that cannot be
+    listed, fails that way rather than with a `ValueError`. Without both, either escapes as
     itself, naming the field rather than the event.
     """
     payload = stored.payload
