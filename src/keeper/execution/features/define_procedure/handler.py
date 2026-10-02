@@ -88,6 +88,7 @@ def bind(deps: Kernel) -> Handler:
             principal_id=principal_id,
             command_name=_COMMAND_NAME,
             surface_id=surface_id,
+            beamline=command.beamline,
         )
         if isinstance(decision, Deny):
             _log.info(

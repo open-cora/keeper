@@ -29,6 +29,13 @@ class GrantPolicyPermissionRequest(BaseModel):
 
     principal_id: UUID
     command_name: str = Field(min_length=1, max_length=200)
+    beamline: str | None = Field(default=None, min_length=1, max_length=200)
+    """The place this grant covers, or absent for a command that names none.
+
+    There is no value meaning everywhere. A principal that may act at
+    four beamlines holds four grants, which is a reach a reader of the
+    rulebook can see rather than one hidden behind a star.
+    """
 
 
 def _get_handler(request: Request) -> Handler:
@@ -73,7 +80,11 @@ async def post_policy_permissions(
     await handler(
         GrantPolicyPermission(
             policy_id=policy_id,
-            permission=Permission(principal_id=body.principal_id, command_name=body.command_name),
+            permission=Permission(
+                principal_id=body.principal_id,
+                command_name=body.command_name,
+                beamline=body.beamline,
+            ),
         ),
         principal_id=principal_id,
         correlation_id=cid,

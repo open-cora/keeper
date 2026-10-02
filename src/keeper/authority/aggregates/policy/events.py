@@ -133,6 +133,7 @@ def to_payload(event: PolicyEvent) -> dict[str, Any]:
                 "policy_id": str(event.policy_id),
                 "principal_id": str(event.permission.principal_id),
                 "command_name": event.permission.command_name,
+                "beamline": event.permission.beamline,
                 "occurred_at": event.occurred_at.isoformat(),
             }
         case PolicyPermissionRevoked():
@@ -140,6 +141,7 @@ def to_payload(event: PolicyEvent) -> dict[str, Any]:
                 "policy_id": str(event.policy_id),
                 "principal_id": str(event.permission.principal_id),
                 "command_name": event.permission.command_name,
+                "beamline": event.permission.beamline,
                 "occurred_at": event.occurred_at.isoformat(),
             }
         case _:
@@ -177,6 +179,7 @@ def from_stored(stored: StoredEvent) -> PolicyEvent:
                     permission=Permission(
                         principal_id=UUID(payload["principal_id"]),
                         command_name=payload["command_name"],
+                        beamline=payload.get("beamline"),
                     ),
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
@@ -190,6 +193,7 @@ def from_stored(stored: StoredEvent) -> PolicyEvent:
                     permission=Permission(
                         principal_id=UUID(payload["principal_id"]),
                         command_name=payload["command_name"],
+                        beamline=payload.get("beamline"),
                     ),
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),

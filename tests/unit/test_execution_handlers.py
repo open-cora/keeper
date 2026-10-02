@@ -72,6 +72,7 @@ class _DenyAllAuthorize:
         principal_id: UUID,
         command_name: str,
         surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
     ) -> AuthzResult:
         _ = (principal_id, surface_id)
         self.asked.append(command_name)

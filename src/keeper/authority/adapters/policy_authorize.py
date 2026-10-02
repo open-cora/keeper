@@ -109,7 +109,14 @@ _log = get_logger(__name__)
 
 
 class PolicyAuthorize:
-    """Allow a command when the configured policy holds the exact pair."""
+    """Allow a command when the configured policy holds the exact grant.
+
+    Exact on all three values, with no wildcard and no fallback from a
+    beamline to the permission for nowhere. A grant for 19-bm does not
+    cover 2-bm and does not cover a command that names no beamline,
+    which is what makes a facility-wide reach several visible rows
+    rather than one invisible one.
+    """
 
     def __init__(self, event_store: EventStore, policy_id: UUID) -> None:
         self._event_store = event_store
@@ -120,6 +127,7 @@ class PolicyAuthorize:
         principal_id: UUID,
         command_name: str,
         surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
     ) -> AuthzResult:
         """Decide one command.
 
@@ -128,6 +136,12 @@ class PolicyAuthorize:
         command, but only over HTTP". Taking the argument and ignoring it
         is what lets that arrive as a change to this adapter rather than
         as a change to every call site.
+
+        `beamline` is consulted, and is part of the match rather than a
+        filter applied after one. A caller naming a beamline is asking a
+        different question from a caller naming none, and the policy
+        answers the question it was asked: there is no fallback from one
+        to the other in either direction.
 
         The denial reason names the command and never the policy. A
         caller already knows which command they sent, and the policy id
@@ -144,9 +158,9 @@ class PolicyAuthorize:
             )
             return Deny(reason="no policy is configured for this deployment")
 
-        if Permission(principal_id=principal_id, command_name=command_name) not in (
-            policy.permissions
-        ):
+        if Permission(
+            principal_id=principal_id, command_name=command_name, beamline=beamline
+        ) not in (policy.permissions):
             _log.info(
                 "authz.denied",
                 policy_id=str(self._policy_id),
@@ -154,7 +168,8 @@ class PolicyAuthorize:
                 principal_id=str(principal_id),
                 surface_id=str(surface_id),
             )
-            return Deny(reason=f"not permitted to issue {command_name}")
+            where = "" if beamline is None else f" at {beamline}"
+            return Deny(reason=f"not permitted to issue {command_name}{where}")
 
         actor = await load_actor(self._event_store, principal_id)
         if actor is None:

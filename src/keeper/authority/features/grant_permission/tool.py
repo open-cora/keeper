@@ -31,6 +31,7 @@ class GrantPolicyPermissionOutput(BaseModel):
     policy_id: UUID
     principal_id: UUID
     command_name: str
+    beamline: str | None
 
 
 def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
@@ -45,17 +46,25 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
         policy_id: UUID,
         principal_id: UUID,
         command_name: str,
+        beamline: str | None = None,
     ) -> GrantPolicyPermissionOutput:
         handler = get_handler()
         await handler(
             GrantPolicyPermission(
                 policy_id=policy_id,
-                permission=Permission(principal_id=principal_id, command_name=command_name),
+                permission=Permission(
+                    principal_id=principal_id,
+                    command_name=command_name,
+                    beamline=beamline,
+                ),
             ),
             principal_id=get_mcp_principal_id(ctx),
             correlation_id=current_correlation_id(),
             surface_id=get_mcp_surface_id(),
         )
         return GrantPolicyPermissionOutput(
-            policy_id=policy_id, principal_id=principal_id, command_name=command_name
+            policy_id=policy_id,
+            principal_id=principal_id,
+            command_name=command_name,
+            beamline=beamline,
         )

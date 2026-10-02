@@ -57,6 +57,7 @@ class _DenyAllAuthorize:
         principal_id: UUID,
         command_name: str,
         surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
     ) -> AuthzResult:
         _ = (principal_id, command_name, surface_id)
         return Deny(reason="not granted in this test")

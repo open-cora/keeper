@@ -197,10 +197,33 @@ class Permission:
 
     Frozen, so it is hashable and can live in the `frozenset` that makes
     the cross-product bug from the module docstring impossible.
+
+    ## Where, as well as what
+
+    `beamline` is the place the command acts, or None for a command that
+    names none. It is a third value in the same pair-matching, not a
+    hierarchy: matching is exact on all three, and there is no wildcard.
+    Permitting a principal everywhere is several grants, written out,
+    which is deliberate. A facility-wide reach that has to be spelled
+    beamline by beamline is one a reader can see in the policy, where
+    one spelled with a star is a reach nobody notices.
+
+    Named for the dimension rather than held as an open scheme-and-value
+    pair, which was the alternative. One named dimension cannot pose the
+    question an open one does, of whether a command resolving to two
+    resources needs a grant for each or either, and it does not double
+    the strings a typo can land in. The cost is that a second dimension
+    means widening this class and defaulting the read in `from_stored`,
+    which is a few lines in one function rather than a log migration.
+
+    What this does not reach: which operation a principal may run, or
+    which device it may touch. Both are a second dimension, not a
+    different spelling of this one.
     """
 
     principal_id: UUID
     command_name: str
+    beamline: str | None = None
 
 
 @dataclass(frozen=True)
