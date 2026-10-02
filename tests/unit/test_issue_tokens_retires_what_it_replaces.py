@@ -63,7 +63,7 @@ def _run(
     return tokens, bindings
 
 
-def test_a_freshly_minted_token_is_not_retired_by_the_binding_written_with_it(
+def test_a_freshly_rotated_token_is_not_retired_by_the_binding_written_with_it(
     tmp_path: Path,
 ) -> None:
     """The lockout trap, and the reason the mint instant is passed in.
@@ -71,8 +71,12 @@ def test_a_freshly_minted_token_is_not_retired_by_the_binding_written_with_it(
     Reading the clock once for the claim and again for the binding puts
     the retirement microseconds after the token it was meant to spare,
     and every rotation then 401s the caller it just issued to.
+
+    Rotating rather than first-issuing, because a rotation is the only
+    thing that publishes a retirement for the trap to live in.
     """
-    tokens, bindings = _run(tmp_path, "19-bm")
+    _first, _ = _run(tmp_path, "19-bm")
+    tokens, bindings = _run(tmp_path, "19-bm", rotate=("19-bm",))
 
     issued = datetime.fromtimestamp(tokens["19-bm"]["iat"], UTC)
     retired = datetime.fromisoformat(bindings["19-bm"]["not_before"])
@@ -108,15 +112,84 @@ def test_rotating_one_subject_retires_its_own_token_and_nobody_elses(tmp_path: P
 
     assert after["2-bm"] == before["2-bm"]
     assert after["thinker"] == before["thinker"]
-    spared = datetime.fromisoformat(bindings["2-bm"]["not_before"])
-    assert datetime.fromtimestamp(before["2-bm"]["iat"], UTC) >= spared, (
-        "rotating 19-bm retired 2-bm's credential, which is the coupling this removes"
+    assert bindings["2-bm"].get("not_before") is None, (
+        "rotating 19-bm published a retirement for 2-bm, which is the coupling "
+        "this removes. It would refuse every copy of 2-bm's token older than "
+        "the one on this disk, and nobody asked for 2-bm to be rotated."
     )
 
 
-def test_every_issued_subject_gets_a_retirement_of_its_own(tmp_path: Path) -> None:
-    """Per subject, because retiring one caller must not touch another."""
+def test_a_first_issue_retires_nothing_because_there_is_nothing_to_retire(
+    tmp_path: Path,
+) -> None:
+    """Every subject gets a binding; none of them gets a retirement.
+
+    A subject being issued its first token has no older ones, so there
+    is nothing a retirement could refuse except a copy somebody carries
+    out later and a subsequent mint then invalidates.
+    """
     _tokens, bindings = _run(tmp_path, "19-bm", "7-bm", "thinker")
 
     assert {"19-bm", "7-bm", "thinker"} == set(bindings)
-    assert all(row.get("not_before") for row in bindings.values())
+    assert not [s for s, row in bindings.items() if row.get("not_before") is not None], (
+        "a first issue published a retirement, which retires nothing today and "
+        "refuses a distributed copy the first time this subject is re-minted."
+    )
+
+
+def test_a_run_that_keeps_a_token_does_not_retire_the_copy_a_caller_is_holding(
+    tmp_path: Path,
+) -> None:
+    """The failure this cost four beamlines at once.
+
+    The token in this directory is the source. A caller holds a copy,
+    carried there by hand, and the two diverge the moment a mint here
+    is not followed by a distribution there. A later run that keeps the
+    token and publishes its mint instant anyway retires every copy
+    older than this disk's, which is precisely the copy still in use.
+
+    Measured as the caller sees it: an older token, against the binding
+    a keeping run publishes.
+    """
+    script = _issuer_script()
+    held = datetime.now(UTC).replace(microsecond=0)
+
+    _tokens, _bindings = _run(tmp_path, "19-bm")
+    # Backdate the caller's copy, which is what a distribution that
+    # happened before the last mint looks like from here.
+    older = held.timestamp() - 3600
+
+    _again, bindings = _run(tmp_path, "19-bm")
+    retired = bindings["19-bm"].get("not_before")
+
+    assert retired is None or datetime.fromisoformat(retired).timestamp() <= older, (
+        "a run that minted nothing published a retirement, so every copy of "
+        "this caller's token older than the one on this disk is now refused. "
+        "Nothing was rotated and nothing was distributed, so that is every "
+        "caller that was working a moment ago."
+    )
+    assert script is not None
+
+
+def test_a_rotation_stays_retired_through_a_later_run_that_keeps_the_token(
+    tmp_path: Path,
+) -> None:
+    """A retirement has to outlive the run that declared it.
+
+    It is published in the settings file and nowhere else, so a later
+    run that rewrote the file without it would accept the very tokens
+    the rotation was performed to kill.
+    """
+    _first, _ = _run(tmp_path, "19-bm")
+    time.sleep(1.1)
+    _rotated, after_rotation = _run(tmp_path, "19-bm", rotate=("19-bm",))
+    _kept, after_keeping = _run(tmp_path, "19-bm")
+
+    assert after_rotation["19-bm"].get("not_before") is not None, (
+        "a rotation published no retirement, so the token it replaced is "
+        "still accepted and rotating bought nothing."
+    )
+    assert after_keeping["19-bm"].get("not_before") == after_rotation["19-bm"]["not_before"], (
+        "a run that kept the token dropped the retirement a rotation had "
+        "declared, so the credential that rotation killed works again."
+    )

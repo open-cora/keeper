@@ -205,15 +205,62 @@ def minted_at(token: str) -> datetime | None:
     return datetime.fromtimestamp(int(issued), UTC)
 
 
+def published_retirements(settings_path: Path) -> dict[str, datetime]:
+    """The retirement times already published, by subject.
+
+    Read back and carried forward, because a retirement has to outlive
+    the run that declared it. It is published in this file and nowhere
+    else, so a later run that rewrote the file without it would accept
+    the very tokens a rotation was performed to kill.
+
+    A file that is absent or will not parse yields nothing. This runs
+    before the keeper is started and its output is about to be
+    overwritten, so refusing here would block an install over a file
+    that is being replaced anyway.
+    """
+    try:
+        published = json.loads(settings_path.read_text())
+    except (OSError, ValueError):
+        return {}
+
+    retirements: dict[str, datetime] = {}
+    for provider in published:
+        for binding in provider.get("subject_bindings", []):
+            retired = binding.get("not_before")
+            if retired is None:
+                continue
+            try:
+                retirements[str(binding["subject"])] = datetime.fromisoformat(str(retired))
+            except ValueError:
+                continue
+    return retirements
+
+
 def provider_settings(
     subjects: list[str], jwks_url: str, issued_at: dict[str, datetime]
 ) -> list[dict[str, object]]:
     """The value `IDENTITY_PROVIDERS` carries, ready to be written as JSON.
 
-    Each binding carries the instant that subject's token was minted,
-    which the verifier reads as the point its older tokens stop being
-    accepted. That is what makes issuing a token to one caller retire
-    that caller's previous ones, and only that caller's.
+    A binding carries a retirement time only for a subject whose token
+    this run replaced, which the verifier reads as the point that
+    caller's older tokens stop being accepted.
+
+    ## Why a token that was kept publishes nothing
+
+    Because the token in this directory is not the token the caller
+    holds. It is the source, copied by hand into one account's home,
+    and the two diverge the moment a mint here is not followed by a
+    distribution there.
+
+    Publishing the kept token's own mint time looks harmless and is
+    not: it retires every copy older than the one on this disk, which
+    is exactly the copy a caller is still using when a previous run
+    minted and nobody carried the result out. That was measured, on a
+    deployment, against four beamlines at once.
+
+    So a retirement is tied to the deliberate act of rotating rather
+    than to what happens to be on disk, and a rotation's retirement is
+    carried forward by reading it back rather than recomputed.
 
     This provider publishes keys and answers no questions about a
     token, so there is nothing to introspect and the retirement has to
@@ -287,13 +334,11 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         parser.error(f"--rotate names {unknown}, which is not among the subjects given")
 
-    issued_at: dict[str, datetime] = {}
+    settings_path = etc / "identity-providers.json"
+    issued_at: dict[str, datetime] = dict(published_retirements(settings_path))
     for subject in args.subjects:
         token_path = tokens_dir / f"{subject}.token"
         if token_path.exists() and subject not in rotating:
-            kept = minted_at(token_path.read_text())
-            if kept is not None:
-                issued_at[subject] = kept
             print(f"token        {token_path}  actor {actor_id(subject)}  (kept)")
             continue
 
@@ -302,12 +347,17 @@ def main(argv: list[str] | None = None) -> int:
         # minted at. A retirement a fraction later than its own token
         # refuses it.
         at = datetime.now(UTC).replace(microsecond=0)
-        issued_at[subject] = at
+        # Only a rotation retires anything. A first issue has nothing to
+        # retire, and saying otherwise publishes a watermark that kills
+        # whatever copy is distributed before the next mint.
+        replaced = subject in rotating
+        if replaced:
+            issued_at[subject] = at
         token_path.write_text(mint(key, subject, at) + "\n")
         token_path.chmod(0o600)
-        print(f"token        {token_path}  actor {actor_id(subject)}  (new, retires earlier ones)")
+        note = "new, retires earlier ones" if replaced else "new"
+        print(f"token        {token_path}  actor {actor_id(subject)}  ({note})")
 
-    settings_path = etc / "identity-providers.json"
     settings_path.write_text(
         json.dumps(provider_settings(args.subjects, args.jwks_url, issued_at), indent=2) + "\n"
     )
