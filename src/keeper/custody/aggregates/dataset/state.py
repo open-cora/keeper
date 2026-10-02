@@ -27,17 +27,29 @@ one address in two spellings is a real thing rather than a hypothetical.
 Settling on one spelling belongs to whatever writes the record, before it
 writes it, and `Identifier` does no more than trim and bound what arrives.
 
-## Why no status
+## Why addresses are plural, and why that is not a status
 
-Nothing withdraws, moves or supersedes a dataset yet, so a status would
-have one reachable value, and a one-valued field says less than no field
-while inviting a reader to believe a lifecycle is being enforced. It
-arrives with the command that flips it, the way an operation's would.
+One body of data is commonly at two addresses at once. A copy to central
+storage leaves the beamline copy in place until something purges it, and
+that window is days to weeks, which is exactly the window in which
+anything would want to read it. A single field would have to be swapped
+at the moment of the copy, and that swap is a lie for as long as both
+exist: it says the data left a disk it is still on.
 
-That is also the answer to the obvious question about a moved node. A
-record saying where data was at a moment stays true when the data moves;
-what changes is that there is a later fact, and a later fact is an event
-rather than an edit.
+So the record gains and loses addresses, and holds however many are
+true at once. A reader asking where the data is gets every answer,
+and picks the one it can reach.
+
+What this is still not is a status. There is no withdrawn flag and no
+superseded flag, because nothing here would read one: an address this
+system can no longer point at is an address that is gone from the tuple,
+and a dataset that has run out of them says that by being empty. A field
+restating what the tuple already shows would be the one-valued field
+this aggregate kept out, with a lifecycle implied on top.
+
+A record saying where data was at a moment stays true when the data
+moves. What changes is that there is a later fact, and a later fact is
+an event rather than an edit.
 """
 
 from dataclasses import dataclass
@@ -52,6 +64,40 @@ class DatasetNotFoundError(Exception):
     def __init__(self, dataset_id: UUID) -> None:
         super().__init__(f"Dataset {dataset_id} not found")
         self.dataset_id = dataset_id
+
+
+class DatasetAddressKnownError(Exception):
+    """A copy was reported at an address this dataset already carries.
+
+    A conflict rather than a silent no-op, because the two callers who
+    reach it mean different things. A producer retrying one report is
+    covered before this by the idempotency key, so a caller arriving
+    here with the same address is a second producer saying something
+    this system was already told, and answering "done" to that would
+    hide a store being reported twice under one spelling.
+    """
+
+    def __init__(self, dataset_id: UUID, scheme: str, value: str) -> None:
+        super().__init__(f"Dataset {dataset_id} is already recorded at {scheme}:{value}")
+        self.dataset_id = dataset_id
+        self.scheme = scheme
+        self.value = value
+
+
+class DatasetAddressUnknownError(Exception):
+    """A copy was withdrawn from an address this dataset does not carry.
+
+    Refused rather than treated as already done. A caller withdrawing an
+    address nobody recorded is working from a different idea of where
+    the data is than this record holds, and the useful answer tells it
+    so rather than confirming a removal that removed nothing.
+    """
+
+    def __init__(self, dataset_id: UUID, scheme: str, value: str) -> None:
+        super().__init__(f"Dataset {dataset_id} is not recorded at {scheme}:{value}")
+        self.dataset_id = dataset_id
+        self.scheme = scheme
+        self.value = value
 
 
 class DatasetAlreadyExistsError(Exception):
@@ -95,19 +141,35 @@ class Dataset:
     order every other cross-aggregate reference here reads in: the thing
     with a stream, then the part of it.
 
-    `external_ref` is what the store holding the data calls it. That
-    stays a reference outward, unresolved on purpose, for the reason a
+    `external_refs` is what each store holding the data calls it. They
+    stay references outward, unresolved on purpose, for the reason a
     run's did.
+
+    ## Why a tuple, and what an empty one means
+
+    Ordered by when this system learned of each, because that is the one
+    ordering it can honestly supply: it knows nothing about which copy is
+    faster, nearer or more durable, and sorting would invent a ranking
+    out of a scheme name. A reader wanting a particular store looks for
+    its scheme rather than taking the first.
+
+    Empty is reachable and is not a broken record. It says this system
+    knew where data was, every copy it knew of is gone, and the run that
+    produced it is still named here. That is a more useful thing to hold
+    than a deleted row, which would answer the question "what did this
+    run produce" with silence.
     """
 
     id: UUID
     execution_id: UUID
     step_id: UUID
-    external_ref: Identifier
+    external_refs: tuple[Identifier, ...]
 
 
 __all__ = [
     "Dataset",
+    "DatasetAddressKnownError",
+    "DatasetAddressUnknownError",
     "DatasetAlreadyExistsError",
     "DatasetNotFoundError",
 ]

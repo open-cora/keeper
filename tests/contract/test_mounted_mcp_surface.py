@@ -979,8 +979,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "dataset_id": dataset_id,
         "execution_id": held_execution,
         "step_id": produced_by,
-        "external_ref_scheme": "tiled-node-path",
-        "external_ref_value": "raw/uid-completing",
+        "external_refs": [{"scheme": "tiled-node-path", "value": "raw/uid-completing"}],
     }
 
 

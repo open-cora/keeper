@@ -126,7 +126,7 @@ async def test_a_registered_dataset_reads_back_through_a_real_round_trip(
         correlation_id=uuid4(),
     )
     assert (dataset.execution_id, dataset.step_id) == (execution_id, step_id)
-    assert dataset.external_ref == _REF
+    assert dataset.external_refs == (_REF,)
 
 
 async def test_the_reference_survives_the_jsonb_round_trip_as_two_strings(

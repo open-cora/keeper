@@ -45,7 +45,7 @@ class GetDatasetResponse(BaseModel):
     dataset_id: UUID
     execution_id: UUID
     step_id: UUID
-    external_ref: ExternalRefResponse
+    external_refs: list[ExternalRefResponse]
 
 
 def _get_handler(request: Request) -> Handler:
@@ -88,8 +88,7 @@ async def get_dataset(
         dataset_id=dataset.id,
         execution_id=dataset.execution_id,
         step_id=dataset.step_id,
-        external_ref=ExternalRefResponse(
-            scheme=dataset.external_ref.scheme,
-            value=dataset.external_ref.value,
-        ),
+        external_refs=[
+            ExternalRefResponse(scheme=ref.scheme, value=ref.value) for ref in dataset.external_refs
+        ],
     )

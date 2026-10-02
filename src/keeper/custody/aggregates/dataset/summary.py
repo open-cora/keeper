@@ -51,16 +51,22 @@ class DatasetSummary:
     the import.
 
     There is no `updated_at`, and the absence is the aggregate's rather
-    than this row's. Nothing changes a dataset yet, so a second timestamp
-    would always equal the first, and a column that can only ever agree
-    with its neighbour says nothing while implying a lifecycle nobody
-    wrote. It arrives with the first event that moves one.
+    than this row's. A dataset's own fields never change: what changes
+    is which addresses it is reachable at, and the moment a copy
+    appeared is a fact about that copy rather than about the dataset.
+    Hanging one timestamp off the row would date the newest copy and
+    read as though the record had been edited.
+
+    `external_refs` carries every address at once, which is the point of
+    the listing being plural: the caller asking what a run produced is
+    usually asking so that it can go and read it, and an answer naming
+    one store it cannot reach is no answer.
     """
 
     dataset_id: UUID
     execution_id: UUID
     step_id: UUID
-    external_ref: Identifier
+    external_refs: tuple[Identifier, ...]
     created_at: datetime
 
 

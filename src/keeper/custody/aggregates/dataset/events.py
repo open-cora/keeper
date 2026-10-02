@@ -4,12 +4,15 @@ Events live with the aggregate rather than with the slice that emits
 them, because they are facts about the aggregate's history. A slice
 decides when one happens; the history is not the slice's to own.
 
-One member today. The alias below is still written out, and the evolver
-still closes over it with `assert_never`, because the second member is
-what those two guards exist for and adding them later means adding them
-under pressure. The second member is already foreseeable: data that moves
+Three members. The first is the genesis and the other two are what the
+alias and the evolver's `assert_never` were written for: data that moves
 or is withdrawn is a later fact on this stream, never an edit to the row
-below.
+that came before.
+
+Replicated and withdrawn rather than moved, because a copy and a purge
+are two events separated by days and both are true in between. One moved
+event would have to be written at a moment nothing distinguishes, and
+would say the data left a disk it is still on.
 
 The external reference travels as two flat strings and is rebuilt into a
 pair by the fold, because events carry primitives and that pair is a
@@ -52,7 +55,58 @@ class DatasetRegistered:
     occurred_at: datetime
 
 
-DatasetEvent = DatasetRegistered
+@dataclass(frozen=True)
+class DatasetReplicated:
+    """A copy of this data was reported at another address.
+
+    Carries no execution and step of its own in the way the genesis
+    event does, because those name the run that PRODUCED the data and
+    copying it does not produce anything. What it carries instead is an
+    optional citation of the work that made the copy, and the optionality
+    is the point.
+
+    A copy this system dispatched is a report it is owed, attributable
+    to the step that did it. A copy somebody else made is something this
+    system was told, attributable to nothing here, and most copies are
+    that: facility data movement runs on its own and will never be a
+    principal in this record. Absent has to mean absent. A citation
+    naming an execution that did not do the copying is worse than none,
+    because it reads as a report this system went and asked for.
+
+    The two travel together or not at all, which the decider enforces,
+    so a reader never has half a citation to interpret.
+    """
+
+    dataset_id: UUID
+    external_ref_scheme: str
+    external_ref_value: str
+    copied_by_execution_id: UUID | None
+    copied_by_step_id: UUID | None
+    occurred_at: datetime
+
+
+@dataclass(frozen=True)
+class DatasetWithdrawn:
+    """A copy of this data is no longer at an address it was at.
+
+    Withdrawn rather than deleted, and the distinction is whose act it
+    was. This system did not remove anything and could not. Something
+    purged a disk or expired a cache, and this is the hearing, which is
+    the same posture the genesis event takes toward data being written.
+
+    No citation, where the sibling has one. A purge is housekeeping that
+    no execution is dispatched to perform, so a field for the work that
+    did it would be empty on every row anybody could write today. It
+    arrives with the first thing that withdraws a copy on purpose.
+    """
+
+    dataset_id: UUID
+    external_ref_scheme: str
+    external_ref_value: str
+    occurred_at: datetime
+
+
+DatasetEvent = DatasetRegistered | DatasetReplicated | DatasetWithdrawn
 """Every event that can appear on a Dataset stream.
 
 A new member is a new class added here and to this alias, never a field
@@ -74,8 +128,33 @@ def to_payload(event: DatasetEvent) -> dict[str, Any]:
                 "external_ref_value": event.external_ref_value,
                 "occurred_at": event.occurred_at.isoformat(),
             }
+        case DatasetReplicated():
+            return {
+                "dataset_id": str(event.dataset_id),
+                "external_ref_scheme": event.external_ref_scheme,
+                "external_ref_value": event.external_ref_value,
+                "copied_by_execution_id": _optional_id(event.copied_by_execution_id),
+                "copied_by_step_id": _optional_id(event.copied_by_step_id),
+                "occurred_at": event.occurred_at.isoformat(),
+            }
+        case DatasetWithdrawn():
+            return {
+                "dataset_id": str(event.dataset_id),
+                "external_ref_scheme": event.external_ref_scheme,
+                "external_ref_value": event.external_ref_value,
+                "occurred_at": event.occurred_at.isoformat(),
+            }
         case _:
             assert_never(event)
+
+
+def _optional_id(value: UUID | None) -> str | None:
+    """A uuid as a string, or None kept as None.
+
+    Kept rather than rendered as an empty string, so a payload says
+    nothing cited it instead of citing something with no name.
+    """
+    return None if value is None else str(value)
 
 
 def from_stored(stored: StoredEvent) -> DatasetEvent:
@@ -101,9 +180,49 @@ def from_stored(stored: StoredEvent) -> DatasetEvent:
                 ),
                 extra=(ValueError,),
             )
+        case "DatasetReplicated":
+            return deserialize_or_raise(
+                "DatasetReplicated",
+                lambda: DatasetReplicated(
+                    dataset_id=UUID(payload["dataset_id"]),
+                    external_ref_scheme=payload["external_ref_scheme"],
+                    external_ref_value=payload["external_ref_value"],
+                    copied_by_execution_id=_from_optional_id(payload["copied_by_execution_id"]),
+                    copied_by_step_id=_from_optional_id(payload["copied_by_step_id"]),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
+        case "DatasetWithdrawn":
+            return deserialize_or_raise(
+                "DatasetWithdrawn",
+                lambda: DatasetWithdrawn(
+                    dataset_id=UUID(payload["dataset_id"]),
+                    external_ref_scheme=payload["external_ref_scheme"],
+                    external_ref_value=payload["external_ref_value"],
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
         case unknown:
             msg = f"Unknown Dataset event_type: {unknown!r}"
             raise ValueError(msg)
 
 
-__all__ = ["DatasetEvent", "DatasetRegistered", "from_stored", "to_payload"]
+def _from_optional_id(raw: Any) -> UUID | None:
+    """A stored id back to a uuid, with absence preserved.
+
+    A row written before anything cited a copy has the key present and
+    null rather than missing, because `to_payload` always writes it.
+    """
+    return None if raw is None else UUID(str(raw))
+
+
+__all__ = [
+    "DatasetEvent",
+    "DatasetRegistered",
+    "DatasetReplicated",
+    "DatasetWithdrawn",
+    "from_stored",
+    "to_payload",
+]

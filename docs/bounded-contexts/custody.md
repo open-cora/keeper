@@ -13,10 +13,12 @@ A dataset is one body of data one run produced, as this system came to know abou
      id            a UUID minted when the record is written
      execution_id  the traversal it came out of
      step_id       the run within it that produced it
-     external_ref  what the store holding it calls it
+     external_refs every address a store holding it answers to
 ```
 
 Three fields. Two of them are references to things this system does not hold, which is the shape of the whole context.
+
+`external_refs` is plural because one body of data is commonly at two addresses at once. A copy to central storage leaves the beamline copy in place until something purges it, and that window is days to weeks, which is also the window in which anything would want to read it. A single address would have to be swapped at the moment of the copy, and the swap is wrong for the whole of the window: it says the data left a disk it is still on.
 
 ## Why it holds so little
 
@@ -67,15 +69,23 @@ There is no datasets table. Current state is recomputed by replaying a stream on
 ```
    DatasetRegistered   dataset_id, execution_id, step_id,
                        external_ref_scheme, external_ref_value, occurred_at
+   DatasetReplicated   dataset_id, external_ref_scheme, external_ref_value,
+                       copied_by_execution_id, copied_by_step_id, occurred_at
+   DatasetWithdrawn    dataset_id, external_ref_scheme, external_ref_value,
+                       occurred_at
 ```
 
-One event, because nothing changes a dataset yet. The external reference travels as two flat strings and is rebuilt into a pair by the fold, because events carry primitives and that pair is a value object.
+Each reference travels as two flat strings and is rebuilt into a pair by the fold, because events carry primitives and that pair is a value object.
 
-Data that moves or is withdrawn arrives as a new class on this stream when the command that does lands, never as a field edited onto `DatasetRegistered`. That is also the answer to the obvious worry about a store reorganising itself: a record saying where data was at a moment stays true when the data moves, and what changes is that there is a later fact.
+Three events, and the two later ones add and remove an address rather than editing the row before them. A record saying where data was at a moment stays true when the data moves, and what changes is that there is a later fact. Replicated and withdrawn rather than one moved event, because a copy and a purge are separated by days and both are true in between.
+
+`copied_by_execution_id` and `copied_by_step_id` are optional together, and the optionality carries a meaning worth stating. A copy this system dispatched is a report it is owed and names the step that made it. A copy somebody else made is something this system was told, and most copies are that: facility data movement runs on its own and will never be a principal in this record. Absent has to mean absent, because a citation naming an execution that did not do the copying reads as a report this system went and asked for.
+
+A dataset can run out of addresses, and the empty tuple is not a broken record. It says this system knew where data was, every copy it knew of is gone, and the run that produced it is still named. That is more useful than a deleted row, which would answer "what did this run produce" with silence.
 
 ## Who owns the shape of the reference
 
-`external_ref` is the same open-scheme pair an execution's engine reference is drawn from. The scheme names the vocabulary and the value is opaque to this system, which is not laziness about validation but the layering: how a particular store spells an address is that store's fact, and a rule stated for one store reads as a rule derived from one.
+Each entry in `external_refs` is the same open-scheme pair an execution's engine reference is drawn from. The scheme names the vocabulary and the value is opaque to this system, which is not laziness about validation but the layering: how a particular store spells an address is that store's fact, and a rule stated for one store reads as a rule derived from one.
 
 It has a consequence worth stating plainly, because it is the failure mode rather than a hypothetical. **A producer that reports the same body of data two ways makes two records of it, and nothing here can tell.** A store whose client reports one address in two spellings is a real thing; settling on one belongs to whatever writes the record, before it writes it. `Identifier` does no more than trim and bound what arrives.
 
@@ -169,7 +179,9 @@ Two things are this context's own.
 
 ## What is not here yet
 
-Anything that changes a dataset. Withdrawn, moved, and superseded are three plausible second events and none is designed. Each arrives as a class on the stream rather than as a field, and the first one to land turns the single-event aggregate into a real one.
+The commands that emit the two later events. The aggregate folds a replication and a withdrawal, the projection applies both, and nothing writes either, so today every dataset still has exactly the one address its registration gave it. The slices that put them there are the next thing, and they are where an address already held gets refused out loud rather than silently ignored.
+
+Superseded, which is the third plausible event and is not designed. A reprocessed dataset standing in for an earlier one is a relationship between two records rather than another address on one, and nothing has asked for it.
 
 Anything about what the data is. No structure, no size, no format, no count. The store answers all of those and this context points at the store. A typed marker saying which kind of thing a node is would be the first field worth adding, and it should not be added before something asks.
 

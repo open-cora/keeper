@@ -122,7 +122,7 @@ async def test_reading_a_registered_dataset_gives_its_step_and_reference() -> No
 
     assert dataset.id == dataset_id
     assert dataset.step_id == step_id
-    assert dataset.external_ref == _REF
+    assert dataset.external_refs == (_REF,)
 
 
 async def test_reading_an_unknown_id_is_not_found() -> None:

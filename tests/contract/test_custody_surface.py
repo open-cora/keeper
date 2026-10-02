@@ -99,7 +99,7 @@ def test_a_registered_dataset_reads_back_with_its_step_and_reference(
         "dataset_id": dataset_id,
         "execution_id": execution_id,
         "step_id": step_id,
-        "external_ref": _REF,
+        "external_refs": [_REF],
     }
 
 
@@ -198,7 +198,7 @@ def test_listing_by_step_returns_what_that_acquisition_produced(client: TestClie
     assert response.status_code == 200, response.text
     body = response.json()
     assert [item["dataset_id"] for item in body["items"]] == [wanted]
-    assert body["items"][0]["external_ref"] == _REF
+    assert body["items"][0]["external_refs"] == [_REF]
     assert body["next_cursor"] is None
 
 

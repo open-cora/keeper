@@ -120,7 +120,7 @@ async def test_registering_returns_the_id_the_dataset_can_be_loaded_by() -> None
     dataset = await load_dataset(deps.event_store, dataset_id)
     assert dataset is not None
     assert (dataset.execution_id, dataset.step_id) == (execution_id, step_id)
-    assert dataset.external_ref == _REF
+    assert dataset.external_refs == (_REF,)
 
 
 async def test_naming_an_execution_that_does_not_exist_is_not_found() -> None:

@@ -40,7 +40,7 @@ from keeper.infrastructure.projection.cursor import decode_cursor, encode_cursor
 from keeper.shared.identifier import Identifier
 
 _SELECT_SQL = f"""
-SELECT dataset_id, execution_id, step_id, external_ref_scheme, external_ref_value, created_at
+SELECT dataset_id, execution_id, step_id, external_refs, created_at
 FROM {PROJECTION_NAME}
 WHERE ($1::uuid IS NULL OR step_id = $1)
   AND ($2::timestamptz IS NULL OR (created_at, dataset_id) < ($2, $3))
@@ -83,14 +83,21 @@ class PostgresDatasetSummaryLookup:
 
 
 def _to_summary(row: Any) -> DatasetSummary:
+    """One row as a summary, with its addresses back through `Identifier`.
+
+    The column arrives already decoded, because the pool registers a
+    jsonb codec, so what comes back is a list of two-key objects in the
+    order the worker appended them. Each goes through the value object
+    rather than straight into the summary, which is the same round trip
+    the fold makes: a row whose scheme or value no longer passes the
+    bounds fails here instead of reaching a caller.
+    """
+    held: list[dict[str, str]] = row["external_refs"] or []
     return DatasetSummary(
         dataset_id=row["dataset_id"],
         execution_id=row["execution_id"],
         step_id=row["step_id"],
-        external_ref=Identifier(
-            scheme=row["external_ref_scheme"],
-            value=row["external_ref_value"],
-        ),
+        external_refs=tuple(Identifier(scheme=ref["scheme"], value=ref["value"]) for ref in held),
         created_at=row["created_at"],
     )
 
