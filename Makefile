@@ -8,7 +8,14 @@
 # than looping over a tree, which is the difference between this Makefile and
 # the one it was split out of. The root Makefile now calls these targets
 # rather than repeating them, so a lane has one spelling wherever it runs.
-STYLED := src tests scripts
+# Every tracked Python file in the project, not a list of the directories
+# somebody remembered. Each of these was a hand-written list once, and
+# each had Python outside it: the conductor's simulator, the keeper's two
+# deploy scripts, the reporter's two collectors. A simulator shipped a
+# docstring citing a test file that has never existed in any branch, and
+# no lane here was looking at it. ruff honours the ignore rules, so the
+# virtualenv and the built site stay out without being named.
+STYLED := .
 
 COMPOSE := docker compose -f infra/docker-compose.yml
 ATLAS_DIR := infra/atlas

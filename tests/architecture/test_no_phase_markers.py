@@ -27,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from tests.architecture.conftest import (
+    tracked_other_python_files,
     tracked_prose_files,
     tracked_python_files,
     tracked_test_files,
@@ -89,7 +90,12 @@ def test_the_tag_scan_reaches_source_tests_and_documentation() -> None:
 
 
 def test_tracked_files_carry_no_phase_markers() -> None:
-    hits = _offenders(tracked_python_files() | tracked_test_files() | tracked_prose_files())
+    hits = _offenders(
+        tracked_python_files()
+        | tracked_test_files()
+        | tracked_other_python_files()
+        | tracked_prose_files()
+    )
     assert not hits, (
         "Phase / iteration / audit tag in source, tests or documentation. "
         "Git log is the right home:\n" + "\n".join(hits)
