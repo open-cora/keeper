@@ -8,21 +8,50 @@ README sets out and the reason this takes callers rather than beamlines.
 The same string names the configuration, the log and, through
 `{subject}.token`, the credential.
 
-Run it on the host the keeper runs on. It is idempotent in the part that
-matters: an existing signing key is reused, never replaced, because
-replacing it invalidates every token already handed out.
+Run it on the host the keeper runs on. It is idempotent: an existing
+signing key is reused, never replaced, because replacing it invalidates
+every token already handed out, and an existing token is kept for the
+same reason one scale down. `--rotate <subject>` is how a caller gets a
+new one, and only that caller.
+
+The keeping matters more than it looks. The installer runs this on every
+deploy, and while a re-run merely added a credential that was harmless.
+Now that a new token retires the subject's older ones, a re-run that
+minted unconditionally would refuse every beamline at once on an
+unrelated deploy, which is the facility-wide outage this whole mechanism
+exists to avoid.
 
 ## What this is and is not
 
 This is the smallest thing that answers "which beamline is calling". It is
-not an identity provider. There is no discovery document, no token endpoint,
-no refresh and no revocation: a token is minted here, copied to a beamline
-once, and verified against a public key the keeper reads over loopback.
+not an identity provider. There is no discovery document, no token endpoint
+and no refresh: a token is minted here, copied to a beamline once, and
+verified against a public key the keeper reads over loopback.
 
 That is enough because the roster is a handful of callers known in
 advance, and because the keeper's verifier asks only for a JWKS and a
-signature. Revocation, if it is ever needed, is re-minting the key and
-reissuing every file.
+signature.
+
+## Revocation, which costs one line here because nothing can be asked
+
+A provider that can be asked about a token answers revocation by being
+asked, which is what RFC 7662 introspection is for and what the keeper
+already has a verifier for. This one publishes keys and answers nothing,
+so there is no question to put to it.
+
+What it can do instead is say, in the configuration it writes, that a
+subject's tokens issued before some instant no longer count. Each
+binding carries the mint time of the token issued with it, so handing a
+caller a new credential retires its old ones and nobody else's. Without
+that the only lever is re-minting the signing key, which retires every
+caller at every beamline to retire one.
+
+Its resolution is a second, because that is what `iat` is defined in.
+Two tokens minted for one subject inside the same second cannot be told
+apart, so the earlier one survives. That bounds what this is for: it
+retires a credential issued at some earlier time, which is the case
+that arises, and it is not a way to pick between two tokens minted
+together.
 
 ## Why the token is long-lived
 
@@ -30,7 +59,7 @@ A short expiry needs something to refresh it, and the thing that would do
 the refreshing is the machinery this deliberately does not build. A year is
 honest for a service account whose credential already sits in a home
 directory at mode 600. The expiry is what makes it a token rather than a
-password, and re-running this is what rotates it.
+password, and `--rotate` is what replaces one before it runs out.
 
 ## Where each half goes
 
@@ -48,6 +77,7 @@ import base64
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import jwt
@@ -130,16 +160,22 @@ def jwks_document(key: ec.EllipticCurvePrivateKey) -> dict[str, object]:
     }
 
 
-def mint(key: ec.EllipticCurvePrivateKey, subject: str) -> str:
-    """One bearer token for one subject."""
-    now = datetime.now(UTC)
+def mint(key: ec.EllipticCurvePrivateKey, subject: str, issued_at: datetime) -> str:
+    """One bearer token for one subject, minted at a caller-chosen instant.
+
+    The instant is passed rather than read here so that the same value
+    can be written into this subject's binding as the point its older
+    credentials stop being accepted. Reading the clock twice would put
+    the retirement a moment after the token it was meant to spare, and
+    the new token would refuse itself.
+    """
     return jwt.encode(
         {
             "iss": ISSUER,
             "sub": subject,
             "aud": AUDIENCE,
-            "iat": int(now.timestamp()),
-            "exp": int((now + TOKEN_LIFETIME).timestamp()),
+            "iat": int(issued_at.timestamp()),
+            "exp": int((issued_at + TOKEN_LIFETIME).timestamp()),
         },
         key,
         algorithm=ALGORITHM,
@@ -147,8 +183,43 @@ def mint(key: ec.EllipticCurvePrivateKey, subject: str) -> str:
     )
 
 
-def provider_settings(subjects: list[str], jwks_url: str) -> list[dict[str, object]]:
-    """The value `IDENTITY_PROVIDERS` carries, ready to be written as JSON."""
+def minted_at(token: str) -> datetime | None:
+    """When an existing token on this host says it was issued.
+
+    Read without verifying, which is sound only because of where it is
+    read from: this script's own output, on the keeper's own disk, at
+    mode 600. It is not a trust decision, it is recovering a value this
+    script wrote.
+
+    None for a token minted before tokens carried the claim. Such a
+    subject gets no retirement time rather than being locked out of a
+    credential it is currently using, which leaves it exactly as it was
+    until somebody rotates it on purpose.
+    """
+    body = token.strip().split(".")[1]
+    body += "=" * (-len(body) % 4)
+    claims: dict[str, Any] = json.loads(base64.urlsafe_b64decode(body))
+    issued = claims.get("iat")
+    if not isinstance(issued, int | float):
+        return None
+    return datetime.fromtimestamp(int(issued), UTC)
+
+
+def provider_settings(
+    subjects: list[str], jwks_url: str, issued_at: dict[str, datetime]
+) -> list[dict[str, object]]:
+    """The value `IDENTITY_PROVIDERS` carries, ready to be written as JSON.
+
+    Each binding carries the instant that subject's token was minted,
+    which the verifier reads as the point its older tokens stop being
+    accepted. That is what makes issuing a token to one caller retire
+    that caller's previous ones, and only that caller's.
+
+    This provider publishes keys and answers no questions about a
+    token, so there is nothing to introspect and the retirement has to
+    travel in the configuration. A provider that can be asked leaves
+    this unset and is asked instead.
+    """
     return [
         {
             "issuer": ISSUER,
@@ -161,7 +232,16 @@ def provider_settings(subjects: list[str], jwks_url: str) -> list[dict[str, obje
             # disk. Anything reachable off this host must be HTTPS instead.
             "allow_insecure_jwks_url": jwks_url.startswith("http://"),
             "subject_bindings": [
-                {"subject": subject, "actor_id": str(actor_id(subject))} for subject in subjects
+                {
+                    "subject": subject,
+                    "actor_id": str(actor_id(subject)),
+                    **(
+                        {"not_before": issued_at[subject].isoformat()}
+                        if subject in issued_at
+                        else {}
+                    ),
+                }
+                for subject in subjects
             ],
         }
     ]
@@ -173,6 +253,16 @@ def main(argv: list[str] | None = None) -> int:
         "subjects", nargs="+", help="one per caller, e.g. conductor-19-bm or thinker"
     )
     parser.add_argument("--root", type=Path, default=Path("/local/cora"))
+    parser.add_argument(
+        "--rotate",
+        action="append",
+        metavar="SUBJECT",
+        help=(
+            "mint this subject a new token and retire its old ones. Repeatable. "
+            "Every subject is still listed so the provider file stays complete; "
+            "this only says which of them get a new credential"
+        ),
+    )
     parser.add_argument("--jwks-url", default="http://127.0.0.1:8081/jwks.json")
     args = parser.parse_args(argv)
 
@@ -192,15 +282,34 @@ def main(argv: list[str] | None = None) -> int:
     jwks_path.write_text(json.dumps(jwks_document(key), indent=2) + "\n")
     print(f"jwks         {jwks_path}")
 
+    rotating = set(args.rotate or [])
+    unknown = sorted(rotating - set(args.subjects))
+    if unknown:
+        parser.error(f"--rotate names {unknown}, which is not among the subjects given")
+
+    issued_at: dict[str, datetime] = {}
     for subject in args.subjects:
         token_path = tokens_dir / f"{subject}.token"
-        token_path.write_text(mint(key, subject) + "\n")
+        if token_path.exists() and subject not in rotating:
+            kept = minted_at(token_path.read_text())
+            if kept is not None:
+                issued_at[subject] = kept
+            print(f"token        {token_path}  actor {actor_id(subject)}  (kept)")
+            continue
+
+        # Whole seconds, because the claim is written as an integer and
+        # the binding has to hold the same instant the token says it was
+        # minted at. A retirement a fraction later than its own token
+        # refuses it.
+        at = datetime.now(UTC).replace(microsecond=0)
+        issued_at[subject] = at
+        token_path.write_text(mint(key, subject, at) + "\n")
         token_path.chmod(0o600)
-        print(f"token        {token_path}  actor {actor_id(subject)}")
+        print(f"token        {token_path}  actor {actor_id(subject)}  (new, retires earlier ones)")
 
     settings_path = etc / "identity-providers.json"
     settings_path.write_text(
-        json.dumps(provider_settings(args.subjects, args.jwks_url), indent=2) + "\n"
+        json.dumps(provider_settings(args.subjects, args.jwks_url, issued_at), indent=2) + "\n"
     )
     print(f"providers    {settings_path}")
     print()

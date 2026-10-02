@@ -80,6 +80,11 @@ def build_idp_registry(
                     allowed_algorithms=config.allowed_algorithms,
                     principal_kind=config.principal_kind,
                     allow_insecure_jwks_url=config.allow_insecure_jwks_url,
+                    retired_before={
+                        binding.subject: binding.not_before
+                        for binding in config.subject_bindings
+                        if binding.not_before is not None
+                    },
                 )
             )
         if config.introspection_url is not None:

@@ -59,6 +59,8 @@ wrong_audience).
   for future use.
 """
 
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import get_args
 from uuid import UUID
 
@@ -94,6 +96,7 @@ class JwtTokenVerifier:
         allowed_algorithms: list[str],
         principal_kind: PrincipalKind = "human",
         allow_insecure_jwks_url: bool = False,
+        retired_before: Mapping[str, datetime] | None = None,
     ) -> None:
         """Construct a verifier bound to one IdP issuer.
 
@@ -110,6 +113,13 @@ class JwtTokenVerifier:
         `["RS256", "ES256"]`. Pinning the list per-issuer matches
         the IdP's actual capabilities + locks out algorithm-
         confusion attacks at the verifier layer.
+        `retired_before`: per subject, the instant its older credentials
+        stop being accepted. Empty for an issuer that can be asked about
+        a token directly, which is what introspection is for and is the
+        better answer wherever it is available. It is not available from
+        a provider that only publishes keys, and there the alternative
+        to this is rolling the signing key, which retires every caller
+        at every beamline to retire one.
         `principal_kind`: defaults `"human"`. Per-IdP override for
         deployments where the entire IdP issues only service-account
         tokens (for example a CI-only IdP).
@@ -148,6 +158,7 @@ class JwtTokenVerifier:
         self._subject_mapper = subject_mapper
         self._algorithms = list(allowed_algorithms)
         self._principal_kind = principal_kind
+        self._retired_before: dict[str, datetime] = dict(retired_before or {})
         self._jwks_client = PyJWKClient(jwks_url)
 
     @property
@@ -201,6 +212,7 @@ class JwtTokenVerifier:
             raise InvalidTokenError("malformed", str(exc)) from exc
 
         subject = str(claims["sub"])
+        self._refuse_if_retired(subject, claims)
         principal_id, kind = await safe_map_subject(self._subject_mapper, self._issuer, subject)
         scopes = _parse_scopes_claim(claims.get("scope") or claims.get("scp"))
         return VerifiedPrincipal(
@@ -210,6 +222,53 @@ class JwtTokenVerifier:
             kind=kind or self._principal_kind,
             scopes=scopes,
         )
+
+    def _refuse_if_retired(self, subject: str, claims: dict[str, object]) -> None:
+        """Refuse a token minted before this subject's credentials were retired.
+
+        The one check here that is about the caller rather than the
+        token's own structure, and the only one that can take a live
+        token back. Everything above it reads the signature, the clock
+        and the claims, which is what makes verification fast and is
+        also why nothing above it can be revoked: the inputs are the
+        token and a public key, and neither changes when a credential
+        leaks.
+
+        A subject with no retirement time is the ordinary case and
+        costs a dict miss.
+
+        A subject that has one and a token that carries no `iat` is
+        refused rather than allowed. The comparison cannot be made, and
+        the safe direction for a caller whose credentials were
+        deliberately retired is to refuse: the alternative accepts
+        exactly the token the retirement was declared about, as long as
+        it omits the claim.
+        """
+        retired = self._retired_before.get(subject)
+        if retired is None:
+            return
+        issued = _issued_at(claims)
+        if issued is None:
+            raise InvalidTokenError(
+                "revoked", "no iat to compare against this subject's retirement time"
+            )
+        if issued < retired:
+            raise InvalidTokenError(
+                "revoked", "issued before this subject's credentials were retired"
+            )
+
+
+def _issued_at(claims: dict[str, object]) -> datetime | None:
+    """When the token says it was minted, or None if it does not say.
+
+    `iat` is not in the required-claims list and is not made one here.
+    Requiring it of every issuer would refuse tokens this keeper has no
+    quarrel with, from providers that simply do not set it.
+    """
+    raw = claims.get("iat")
+    if not isinstance(raw, int | float):
+        return None
+    return datetime.fromtimestamp(int(raw), UTC)
 
 
 def _parse_scopes_claim(raw: object) -> frozenset[str]:

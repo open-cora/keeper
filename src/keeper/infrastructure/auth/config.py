@@ -33,6 +33,7 @@ this tree started recording which store holds what. See
 """
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -93,6 +94,18 @@ class IdpSubjectBinding(BaseModel):
             "(default), the binding inherits the enclosing IdP's "
             "`principal_kind`. Set explicitly only to override that "
             "default for an individual subject."
+        ),
+    )
+    not_before: datetime | None = Field(
+        default=None,
+        description=(
+            "Retirement time for this subject's older credentials: a token "
+            "whose `iat` precedes it is refused. Left unset for an IdP that "
+            "can be asked about a token directly, which is the general "
+            "answer and the one RFC 7662 introspection gives. Set for a "
+            "self-issued provider that serves keys and answers no questions, "
+            "where the only other way to retire one caller's token is to "
+            "roll the signing key and so retire everybody's."
         ),
     )
 

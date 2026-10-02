@@ -156,6 +156,7 @@ class InvalidTokenError(Exception):
       - "wrong_issuer"       : `iss` not in registered IdPs
       - "malformed"          : token structure unparseable
       - "unknown_subject"    : `sub` claim doesn't map to a known Actor
+      - "revoked"            : `iat` precedes this subject's retirement time
       - "introspection_inactive" : RFC 7662 returned `active=false`
       - "unsupported_algorithm"  : JWT `alg` not in whitelist
     """
