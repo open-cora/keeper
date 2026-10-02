@@ -162,6 +162,21 @@ echo "Environment"
 # pydantic-settings parses this field as JSON.
 IDENTITY_PROVIDERS="$(tr -d '\n' < "${CORA_ROOT}/etc/identity-providers.json" | tr -s ' ')"
 
+# Carried across the rewrite rather than dropped. This file is regenerated on
+# every deploy, so a value set by hand after the last one is gone unless it is
+# read back first, and this is the one setting whose absence fails open: with
+# no policy configured the keeper builds AllowAllAuthorize and permits every
+# authenticated caller everything. A deploy that quietly turned authorization
+# off would look exactly like a deploy that worked.
+#
+# Passing AUTHZ_POLICY_ID to this script overrides what is on disk, and
+# AUTHZ_POLICY_ID= with nothing after it is how a deployment is deliberately
+# put back to permissive.
+if [ -z "${AUTHZ_POLICY_ID+set}" ] && [ -f "${KEEPER_ENV}" ]; then
+  AUTHZ_POLICY_ID="$(sed -n 's/^AUTHZ_POLICY_ID=//p' "${KEEPER_ENV}")"
+fi
+AUTHZ_POLICY_ID="${AUTHZ_POLICY_ID:-}"
+
 umask 077
 cat > "${KEEPER_ENV}" <<ENV
 APP_ENV=${APP_ENV}
@@ -170,6 +185,12 @@ LOG_LEVEL=INFO
 REQUIRE_AUTHENTICATED_PRINCIPAL=true
 IDENTITY_PROVIDERS=${IDENTITY_PROVIDERS}
 ENV
+if [ -n "${AUTHZ_POLICY_ID}" ]; then
+  echo "AUTHZ_POLICY_ID=${AUTHZ_POLICY_ID}" >> "${KEEPER_ENV}"
+  say "authorization is enforced against policy ${AUTHZ_POLICY_ID}"
+else
+  say "no policy configured, so every authenticated caller is permitted everything"
+fi
 chmod 600 "${KEEPER_ENV}"
 say "wrote ${KEEPER_ENV}"
 echo
