@@ -73,6 +73,7 @@ reads the bookmark, and the adapter that queries the rows.
 
 _GENESIS_EVENT_TYPE = "ExecutionDispatched"
 _FILED_EVENT_TYPE = "DatasetRegistered"
+_RUN_OPENED_EVENT_TYPE = "ExecutionStepEngineStarted"
 
 OUTCOME_EVENT_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -112,8 +113,36 @@ ON CONFLICT (step_id) DO NOTHING
 
 _OUTCOME_SQL = f"""
 UPDATE {PROJECTION_NAME}
-SET outcome = $3, engine_reference = $4, reported_at = $5
+SET outcome = $3, reported_at = $4
 WHERE execution_id = $1 AND step_index = $2
+"""
+"""Fills the driver's half: how the step ended, and when it said so.
+
+It used to set `engine_reference` too, and that column has moved to the
+arm below. A driver reports a step by driving it, which says how the
+call went and nothing about what the engine called the run: the same
+value is readable by anything watching, and only the watcher can say
+which run it belongs to. Leaving it here also made the ordering decide
+the answer, because this event arrives after the watcher's and would
+overwrite a true reference with a stale one, or with nothing.
+"""
+
+_RUN_OPENED_SQL = f"""
+UPDATE {PROJECTION_NAME}
+SET engine_reference = $2, run_opened_at = $3
+WHERE step_id = $1
+"""
+"""Fills the watcher's half: that a run opened, and what it is called.
+
+Keyed on the step id, because that is what a watcher reports against.
+It has no index to use: the index names a slot in a list the driver is
+walking, and nothing watching an engine sees that list.
+
+Two columns rather than one, and keeping them apart is the point. A run
+that opened is the fact the gap listing turns on; a name for it is a
+convenience not every engine offers. They were one column while the
+only writer was a driver holding a path, and a station whose engine
+publishes no identifier would have read as a station where nothing ran.
 """
 
 _FILED_SQL = f"""
@@ -143,7 +172,7 @@ class StepSummaryProjection:
 
     name = PROJECTION_NAME
     subscribed_event_types = frozenset(
-        {_GENESIS_EVENT_TYPE, _FILED_EVENT_TYPE, *OUTCOME_EVENT_TYPES}
+        {_GENESIS_EVENT_TYPE, _FILED_EVENT_TYPE, _RUN_OPENED_EVENT_TYPE, *OUTCOME_EVENT_TYPES}
     )
 
     async def apply(self, event: StoredEvent, conn: ConnectionLike) -> None:
@@ -159,6 +188,9 @@ class StepSummaryProjection:
             return
         if event.event_type == _FILED_EVENT_TYPE:
             await self._file(event, conn)
+            return
+        if event.event_type == _RUN_OPENED_EVENT_TYPE:
+            await self._run_opened(event, conn)
             return
         await self._report(event, conn)
 
@@ -187,13 +219,12 @@ class StepSummaryProjection:
             )
 
     async def _report(self, event: StoredEvent, conn: ConnectionLike) -> None:
-        """Record how one step ended, and what its run was called.
+        """Record how one step ended, and when the driver said so.
 
-        Only a completion carries a reference, and the others write null
-        into that column rather than leaving it alone. They are writing
-        what is true: a step that was refused or broken or never reached
-        opened no run and named nothing, and a column left alone would
-        keep whatever a replay of an earlier event had put there.
+        A reference the driver may still be sending is read off neither
+        the payload nor written here. A driver that has not been updated
+        carries one, and taking it would let the later of two events
+        decide what the run was called.
         """
         await self._update(
             event,
@@ -202,6 +233,22 @@ class StepSummaryProjection:
             event.stream_id,
             int(event.payload["index"]),
             _OUTCOME_BY_EVENT[event.event_type],
+            event.occurred_at,
+        )
+
+    async def _run_opened(self, event: StoredEvent, conn: ConnectionLike) -> None:
+        """Record what the engine calls the run one step opened.
+
+        The reference may be absent and absent is written, which costs
+        nothing now that it is not the column the listing reads. An
+        engine that publishes no identifier still opened a run, and the
+        row says so.
+        """
+        await self._update(
+            event,
+            conn,
+            _RUN_OPENED_SQL,
+            UUID(str(event.payload["step_id"])),
             event.payload.get("engine_reference"),
             event.occurred_at,
         )

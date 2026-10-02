@@ -28,6 +28,7 @@ from keeper.execution.aggregates.execution import (
     ExecutionStatus,
     ExecutionStepBroken,
     ExecutionStepDone,
+    ExecutionStepEngineStarted,
     ExecutionStepRefused,
     ExecutionStepSkipped,
     InvalidExecutionProcedureNameError,
@@ -132,11 +133,10 @@ def test_a_walk_with_no_events_folds_to_none() -> None:
 def test_reporting_a_step_done_leaves_every_other_step_alone() -> None:
     state = _walk(
         ExecutionStepDone(
-            execution_id=UUID(int=1), index=1, engine_reference="uid-7", occurred_at=_WHEN
+            execution_id=UUID(int=1), index=1, engine_reference=None, occurred_at=_WHEN
         )
     )
     assert state.steps[1].outcome is StepOutcome.DONE
-    assert state.steps[1].engine_reference == "uid-7"
     assert [step.outcome for step in state.steps] == [None, StepOutcome.DONE, None]
     assert state.reported_count == 1
 
@@ -150,6 +150,43 @@ def test_a_done_step_that_opened_no_run_carries_no_reference() -> None:
     )
     assert state.steps[0].outcome is StepOutcome.DONE
     assert state.steps[0].engine_reference is None
+
+
+def test_a_driver_naming_a_run_is_ignored_in_favour_of_what_watched_it() -> None:
+    """Driving a step cannot tell you what the engine called the run.
+
+    A driver holds whatever its own call returned at the moment it
+    returned, which is proximity rather than knowledge: the same value
+    is readable by anything watching the engine, and the watcher is the
+    one that can say which run it belongs to. A driver that still sends
+    one is a driver that has not been updated, and its value is dropped
+    rather than allowed to overwrite the account of the run.
+
+    Load bearing in one direction specifically. The driver reports a
+    step after the watcher reports the run opening, so a driver whose
+    value were taken would replace a true reference with a stale one,
+    and a driver that sends none would replace it with nothing.
+    """
+    genesis = _dispatched(execution_id=UUID(int=1))
+    state = fold(
+        [
+            genesis,
+            ExecutionStepEngineStarted(
+                execution_id=UUID(int=1),
+                step_id=genesis.steps[1].id,
+                engine_reference="what-the-engine-called-it",
+                occurred_at=_WHEN,
+            ),
+            ExecutionStepDone(
+                execution_id=UUID(int=1),
+                index=1,
+                engine_reference="what-the-driver-happened-to-hold",
+                occurred_at=_WHEN,
+            ),
+        ]
+    )
+    assert state is not None
+    assert state.steps[1].engine_reference == "what-the-engine-called-it"
 
 
 def test_a_refused_step_records_the_outcome_and_no_detail() -> None:

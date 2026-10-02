@@ -1,4 +1,4 @@
-h1:aaHNQHTHoHV0TOnQMce0I3/iLvRYwFC6/kpkl1xbh+E=
+h1:ZaHXO2bDoI7l/3Uo8hOTzI/EgvKK2HPIzTTLLMByahU=
 20260915120000_init_baseline.sql h1:U/KeoVEsf6ojwo/9l35o+UllxBsxJ1zDHFvc/qxPJSw=
 20260919143000_execution_run_summary.sql h1:1TRPXnX0QbpV+EJz2QysmnHT3M+1OLoH3GaGB2FAGpA=
 20260919170000_execution_plan_summary.sql h1:4pdwiw2/J/OXsFGxCobyJAYtBJxcqv0TGRBgfQBkb/8=
@@ -23,3 +23,4 @@ h1:aaHNQHTHoHV0TOnQMce0I3/iLvRYwFC6/kpkl1xbh+E=
 20260929031032_counsel_inquiry_summary_announces_a_question.sql h1:WgLTu9FNqxGjN2UcZt4TizmGjLTaJASmDokNPT0lAbI=
 20260929182409_equipment_device_carries_a_beamline_and_a_group.sql h1:TufPGrkNGWPXqtdWq6XBjnoSuWTmmQZyJEcTgd5vWlk=
 20260930160000_execution_tracks_what_each_step_produced.sql h1:OuOD4eT4hwQX7XTfuyxJSoGXQf8wfX/17VdLiA+5Yfg=
+20261001200000_a_step_says_whether_a_run_opened_rather_than_implying_it.sql h1:+BH8t9nGOiTetZZW3l4FHXOjeuGsclEiUB9avjf3yts=

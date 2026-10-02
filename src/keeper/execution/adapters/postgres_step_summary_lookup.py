@@ -6,16 +6,24 @@ with the execution streams and with Custody's dataset streams.
 
 ## The filter is in the WHERE and not in the caller
 
-`engine_reference IS NOT NULL AND dataset_id IS NULL` is the question
-rather than a narrowing of it, so it is fixed here rather than passed
-in. The table holds every step of every execution and the overwhelming
+`run_opened_at IS NOT NULL AND reported_at IS NOT NULL AND dataset_id
+IS NULL` is the question rather than a narrowing of it, so it is fixed
+here rather than passed in.
+
+Three clauses where there were two, and the third is not a refinement.
+A run used to reach this table already finished, because the event that
+filled the column the first clause reads was the step's ending. It now
+reaches it when the run begins, so without `reported_at` every scan
+currently running would come back as a run whose data nobody recorded.
+
+The table holds every step of every execution and the overwhelming
 majority of those rows are moves, which produced nothing and are
 missing nothing. A port that let a caller drop the filter would offer a
 listing of an entire facility's steps as a page of fifty, and nothing
 asks for that.
 
-The partial index in the migration matches these two predicates, so the
-scan is over the gaps rather than over the table.
+The partial index in the migration matches these three predicates, so
+the scan is over the gaps rather than over the table.
 
 ## Why the ordering is a pair and not a timestamp
 
@@ -46,7 +54,8 @@ _SELECT_SQL = f"""
 SELECT step_id, execution_id, step_index, describes, beamline,
        outcome, engine_reference, reported_at, dataset_id, filed_at
 FROM {PROJECTION_NAME}
-WHERE engine_reference IS NOT NULL
+WHERE run_opened_at IS NOT NULL
+  AND reported_at IS NOT NULL
   AND dataset_id IS NULL
   AND ($1::text IS NULL OR beamline = $1)
   AND ($2::timestamptz IS NULL OR (reported_at, step_id) < ($2, $3))

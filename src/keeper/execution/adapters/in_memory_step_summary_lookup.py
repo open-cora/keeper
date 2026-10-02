@@ -124,6 +124,16 @@ class InMemoryStepSummaryLookup:
         is deliberate. It was in both this and the caller, and a filter
         stated twice is one that can be deleted from either place
         without a test noticing.
+
+        The filter is the engine state rather than the reference, which
+        is the fold's way of spelling the sibling's `run_opened_at`: a
+        step whose engine state is set is a step something watched a run
+        open on. The reference cannot stand in for it, because an engine
+        that publishes no identifier opens runs this would then drop.
+
+        Being reported is required too, and for the sibling's reason. A
+        run reaches this list when it begins, so without that a scan
+        still running reads as a run whose data nobody recorded.
         """
         summaries: list[StepSummary] = []
         for execution_id in self._event_store.stream_ids(EXECUTION_STREAM_TYPE):
@@ -150,7 +160,7 @@ class InMemoryStepSummaryLookup:
                     filed_at=None,
                 )
                 for index, step in enumerate(execution.steps)
-                if step.engine_reference is not None
+                if step.engine_state is not None and reported.get(index) is not None
             )
         return summaries
 

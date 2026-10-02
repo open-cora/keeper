@@ -75,9 +75,30 @@ class _DrainingStepWriter:
         index: int,
         at: datetime,
         engine_reference: str | None = None,
+        step_id: UUID | None = None,
     ) -> None:
         await self._executions.step(
-            execution_id=execution_id, index=index, at=at, engine_reference=engine_reference
+            execution_id=execution_id,
+            index=index,
+            at=at,
+            engine_reference=engine_reference,
+            step_id=step_id,
+        )
+        await self._drain()
+
+    async def run_opened(
+        self,
+        *,
+        execution_id: UUID,
+        step_id: UUID,
+        at: datetime,
+        engine_reference: str | None = None,
+    ) -> None:
+        await self._executions.run_opened(
+            execution_id=execution_id,
+            step_id=step_id,
+            at=at,
+            engine_reference=engine_reference,
         )
         await self._drain()
 
@@ -165,7 +186,13 @@ async def test_a_dataset_that_arrives_before_the_step_report_still_fills_the_row
         external_ref=Identifier(scheme="posix-file", value="/data/early.h5"),
         at=at,
     )
-    await writer.step(execution_id=execution_id, index=0, at=at, engine_reference="/data/early.h5")
+    await writer.step(
+        execution_id=execution_id,
+        index=0,
+        step_id=step_ids[0],
+        at=at,
+        engine_reference="/data/early.h5",
+    )
 
     page = await lookup.list_steps_without_datasets(beamline=None, limit=10, cursor=None)
 
@@ -194,7 +221,11 @@ async def test_replaying_the_whole_log_leaves_the_table_where_it_was(
     )
     await writer.step(execution_id=execution_id, index=0, at=at)
     await writer.step(
-        execution_id=execution_id, index=1, at=at, engine_reference="/data/replayed.h5"
+        execution_id=execution_id,
+        index=1,
+        step_id=step_ids[1],
+        at=at,
+        engine_reference="/data/replayed.h5",
     )
 
     before = await lookup.list_steps_without_datasets(beamline=None, limit=10, cursor=None)

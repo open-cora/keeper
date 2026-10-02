@@ -46,6 +46,7 @@ from keeper.execution.aggregates.execution.events import (
     ExecutionEnded,
     ExecutionEvent,
     ExecutionStepDone,
+    ExecutionStepEngineStarted,
 )
 from keeper.execution.aggregates.execution.events import to_payload as walk_payload
 from keeper.execution.aggregates.execution.read import EXECUTION_STREAM_TYPE
@@ -567,22 +568,72 @@ class EventStoreExecutionWriter:
         index: int,
         at: datetime,
         engine_reference: str | None = None,
+        step_id: UUID | None = None,
     ) -> None:
-        """Report one step done, naming the run it opened when it opened one.
+        """Report one step, and the run it opened when it opened one.
 
         `engine_reference` defaults to nothing, which is a step that
         opened no run. The summary contract does not care either way;
         the step contract is entirely about which steps named one.
+
+        A reference arrives as a separate event from a separate client,
+        and that is the point rather than an inconvenience. Driving a
+        step says how it ended; only watching the engine says what it
+        called the run. So a fixture that names a run writes the
+        watcher's event too, which is the shape a beamline produces.
         """
+        if engine_reference is not None:
+            if step_id is None:
+                raise ValueError(
+                    "naming a run needs the step id, because a watcher reports "
+                    "against the id and only a driver knows the index"
+                )
+            await self._append(
+                execution_id,
+                event=ExecutionStepEngineStarted(
+                    execution_id=execution_id,
+                    step_id=step_id,
+                    engine_reference=engine_reference,
+                    occurred_at=at,
+                ),
+                command_name="ReportStepRun",
+            )
         await self._append(
             execution_id,
             event=ExecutionStepDone(
                 execution_id=execution_id,
                 index=index,
-                engine_reference=engine_reference,
+                engine_reference=None,
                 occurred_at=at,
             ),
             command_name="ReportExecutionStep",
+        )
+
+    async def run_opened(
+        self,
+        *,
+        execution_id: UUID,
+        step_id: UUID,
+        at: datetime,
+        engine_reference: str | None = None,
+    ) -> None:
+        """Say a watcher saw a run open on one step, named or not.
+
+        `step` emits this for itself when it is given a reference, which
+        is the common case and keeps those fixtures short. This exists
+        for the case that has no reference to give: an engine that
+        publishes no identifier still opens runs, and a listing that
+        inferred the run from the name would never see them.
+        """
+        await self._append(
+            execution_id,
+            event=ExecutionStepEngineStarted(
+                execution_id=execution_id,
+                step_id=step_id,
+                engine_reference=engine_reference,
+                occurred_at=at,
+            ),
+            command_name="ReportStepRun",
         )
 
     async def end(self, *, execution_id: UUID, at: datetime) -> None:

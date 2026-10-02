@@ -129,6 +129,7 @@ There are three derived tables, one per aggregate, and none holds state the fold
                         beamline, steps, occurred_at
    ExecutionClaimed     execution_id, occurred_at
    ExecutionStepDone    execution_id, index, engine_reference, occurred_at
+                        (the reference is carried and no longer read)
    ExecutionStepRefused execution_id, index, occurred_at
    ExecutionStepBroken  execution_id, index, cause, occurred_at
    ExecutionStepSkipped execution_id, index, occurred_at
@@ -468,7 +469,9 @@ The answer is a page and not a single execution, and nothing reserves a row for 
 
 A procedure's genesis checks that every operation it cites exists, and that check is real. The equivalent one scale down is unavailable, and the reason is worth stating rather than discovering.
 
-A driver reports a run step the moment its engine returns, and carries the engine's own name for the run it opened. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
+Whatever watches an engine reports the name it gave a run, on a start. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
+
+A driver used to report it too, on a `Done`, and the field is still on that event because drivers still send it. It is no longer folded into the step. Driving a step says how the call went and nothing about what the engine called the run: the value a driver holds is whatever its own call returned, which is proximity rather than knowledge, and the same value is readable by anything watching. Reading both also let arrival order decide the answer, because the driver's report lands after the watcher's and would replace a true reference with a stale one, or with nothing at all. The field comes off the event once no deployed driver sends one.
 
 That is weaker than an operation reference and it is the honest shape. An engine's names are the engine's, and a system that claimed to have checked one would be claiming to have asked.
 

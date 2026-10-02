@@ -149,16 +149,12 @@ def evolve(state: Execution | None, event: ExecutionEvent) -> Execution:
             )
         case ExecutionClaimed():
             return replace(require_state(state, "ExecutionClaimed"), status=ExecutionStatus.CLAIMED)
-        case ExecutionStepDone(index=index, engine_reference=engine_reference):
+        case ExecutionStepDone(index=index):
             live = require_state(state, "ExecutionStepDone")
             return _with_outcome(
                 live,
                 index,
-                replace(
-                    live.steps[index],
-                    outcome=StepOutcome.DONE,
-                    engine_reference=engine_reference,
-                ),
+                replace(live.steps[index], outcome=StepOutcome.DONE),
             )
         case ExecutionStepRefused(index=index):
             live = require_state(state, "ExecutionStepRefused")

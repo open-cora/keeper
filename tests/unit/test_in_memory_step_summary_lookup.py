@@ -48,6 +48,7 @@ class _BothWriter:
         executions = EventStoreExecutionWriter(event_store)
         self.dispatch = executions.dispatch
         self.step = executions.step
+        self.run_opened = executions.run_opened
         self.register = EventStoreDatasetWriter(event_store).register
 
 
@@ -91,7 +92,13 @@ async def test_a_dataset_naming_a_step_of_another_execution_still_fills_that_ste
         at=at,
         step_ids=step_ids,
     )
-    await writer.step(execution_id=execution_id, index=0, at=at, engine_reference="/data/a.h5")
+    await writer.step(
+        execution_id=execution_id,
+        index=0,
+        step_id=step_ids[0],
+        at=at,
+        engine_reference="/data/a.h5",
+    )
     await writer.register(
         dataset_id=uuid4(),
         execution_id=uuid4(),

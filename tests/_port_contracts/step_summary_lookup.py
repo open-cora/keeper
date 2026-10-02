@@ -55,8 +55,20 @@ class StepWriter(Protocol):
         index: int,
         at: datetime,
         engine_reference: str | None = None,
+        step_id: UUID | None = None,
     ) -> None:
         """Report one step done, naming the run it opened when it opened one."""
+        ...
+
+    async def run_opened(
+        self,
+        *,
+        execution_id: UUID,
+        step_id: UUID,
+        at: datetime,
+        engine_reference: str | None = None,
+    ) -> None:
+        """Say a watcher saw a run open on one step, named or not."""
         ...
 
     async def register(
@@ -116,6 +128,7 @@ async def _an_execution(
         await writer.step(
             execution_id=execution_id,
             index=index,
+            step_id=step_ids[index],
             at=_EPOCH + timedelta(minutes=minute, seconds=index + 1),
             engine_reference=reference,
         )
@@ -173,6 +186,69 @@ async def check_a_run_nothing_filed_comes_back_with_what_it_produced(
     assert only.index == 0
     assert only.outcome == "Done"
     assert only.reported_at is not None
+
+
+async def check_a_run_the_engine_never_named_is_still_a_gap(
+    lookup: StepSummaryLookup, writer: StepWriter
+) -> None:
+    """A run is a run whether or not the engine publishes an identifier.
+
+    Of the stations this serves, two publish one and the rest do not.
+    While the listing read a missing reference as "no run opened", every
+    run at the rest of them was invisible to the one question this table
+    exists to answer, and invisible in the direction that looks like
+    good news.
+    """
+    execution_id, step_ids = uuid4(), [uuid4()]
+    await writer.dispatch(
+        execution_id=execution_id,
+        procedure_id=uuid4(),
+        steps=[_RUN],
+        at=_EPOCH + timedelta(minutes=1),
+        step_ids=step_ids,
+    )
+    await writer.run_opened(
+        execution_id=execution_id,
+        step_id=step_ids[0],
+        at=_EPOCH + timedelta(minutes=1, seconds=1),
+    )
+    await writer.step(
+        execution_id=execution_id, index=0, at=_EPOCH + timedelta(minutes=1, seconds=2)
+    )
+
+    page = await lookup.list_steps_without_datasets(beamline=None, limit=_PAGE, cursor=None)
+
+    (only,) = page.items
+    assert only.step_id == step_ids[0]
+    assert only.engine_reference is None
+
+
+async def check_a_run_still_going_is_not_yet_a_gap(
+    lookup: StepSummaryLookup, writer: StepWriter
+) -> None:
+    """A scan that has not finished has not failed to produce anything.
+
+    A run used to reach this listing already over, because the event
+    that put it there was the step's ending. It now arrives when the run
+    opens, so without the driver's report in the filter every scan
+    running anywhere would read as a run whose data nobody recorded.
+    """
+    execution_id, step_ids = uuid4(), [uuid4()]
+    await writer.dispatch(
+        execution_id=execution_id,
+        procedure_id=uuid4(),
+        steps=[_RUN],
+        at=_EPOCH + timedelta(minutes=1),
+        step_ids=step_ids,
+    )
+    await writer.run_opened(
+        execution_id=execution_id,
+        step_id=step_ids[0],
+        at=_EPOCH + timedelta(minutes=1, seconds=1),
+        engine_reference="a-run-that-is-still-going",
+    )
+
+    assert await _listed(lookup) == []
 
 
 async def check_a_run_whose_data_was_filed_is_gone_from_the_listing(
@@ -337,6 +413,8 @@ async def check_a_cursor_past_the_end_returns_an_empty_page(
 
 
 CHECKS: tuple[Check, ...] = (
+    check_a_run_the_engine_never_named_is_still_a_gap,
+    check_a_run_still_going_is_not_yet_a_gap,
     check_an_empty_read_model_returns_an_empty_page,
     check_a_run_nothing_filed_comes_back_with_what_it_produced,
     check_a_run_whose_data_was_filed_is_gone_from_the_listing,
