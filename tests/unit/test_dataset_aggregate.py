@@ -16,9 +16,9 @@ import pytest
 
 from keeper.custody.aggregates.dataset import (
     Dataset,
+    DatasetAddressRegistered,
+    DatasetAddressWithdrawn,
     DatasetRegistered,
-    DatasetReplicated,
-    DatasetWithdrawn,
     evolve,
     fold,
     from_stored,
@@ -132,9 +132,9 @@ _CENTRAL = Identifier(scheme="gpfs-file", value="/central/raw/636de04a.h5")
 _BEAMLINE = Identifier(scheme="tiled-node-path", value="raw/636de04a-2e43-4c1b-8f99-2f0af326cb66")
 
 
-def _replicated(
+def _address_registered(
     event: DatasetRegistered, ref: Identifier = _CENTRAL, **overrides: object
-) -> DatasetReplicated:
+) -> DatasetAddressRegistered:
     fields: dict[str, object] = {
         "dataset_id": event.dataset_id,
         "external_ref_scheme": ref.scheme,
@@ -144,11 +144,11 @@ def _replicated(
         "occurred_at": _WHEN,
     }
     fields.update(overrides)
-    return DatasetReplicated(**fields)  # pyright: ignore[reportArgumentType]
+    return DatasetAddressRegistered(**fields)  # pyright: ignore[reportArgumentType]
 
 
-def _withdrawn(event: DatasetRegistered, ref: Identifier) -> DatasetWithdrawn:
-    return DatasetWithdrawn(
+def _withdrawn(event: DatasetRegistered, ref: Identifier) -> DatasetAddressWithdrawn:
+    return DatasetAddressWithdrawn(
         dataset_id=event.dataset_id,
         external_ref_scheme=ref.scheme,
         external_ref_value=ref.value,
@@ -165,7 +165,7 @@ def test_a_copy_reported_elsewhere_is_held_beside_the_address_it_was_written_to(
     """
     registered = _registered()
 
-    dataset = fold([registered, _replicated(registered)])
+    dataset = fold([registered, _address_registered(registered)])
 
     assert dataset is not None
     assert dataset.external_refs == (_BEAMLINE, _CENTRAL)
@@ -174,7 +174,7 @@ def test_a_copy_reported_elsewhere_is_held_beside_the_address_it_was_written_to(
 def test_withdrawing_one_copy_leaves_the_others_and_the_run_that_made_them() -> None:
     registered = _registered()
 
-    dataset = fold([registered, _replicated(registered), _withdrawn(registered, _BEAMLINE)])
+    dataset = fold([registered, _address_registered(registered), _withdrawn(registered, _BEAMLINE)])
 
     assert dataset is not None
     assert dataset.external_refs == (_CENTRAL,)
@@ -207,7 +207,7 @@ def test_a_copy_reported_twice_at_one_address_folds_to_one_entry() -> None:
     """
     registered = _registered()
 
-    dataset = fold([registered, _replicated(registered), _replicated(registered)])
+    dataset = fold([registered, _address_registered(registered), _address_registered(registered)])
 
     assert dataset is not None
     assert dataset.external_refs == (_BEAMLINE, _CENTRAL)
@@ -226,29 +226,33 @@ def test_withdrawing_an_address_the_dataset_never_had_changes_nothing() -> None:
 def test_a_stream_whose_first_event_is_not_its_registration_refuses_to_fold() -> None:
     """Unreachable through any command, and loud rather than invented.
 
-    Building a dataset out of a replication would mint an execution and
+    Building a dataset out of that row would mint an execution and
     a step nothing recorded, and the record would then be
     indistinguishable from one somebody meant.
     """
     registered = _registered()
 
     with pytest.raises(DatasetStreamOutOfOrderError):
-        fold([_replicated(registered)])
+        fold([_address_registered(registered)])
 
 
-def test_a_replication_survives_the_round_trip_through_a_stored_row() -> None:
+def test_a_registered_address_survives_the_round_trip_through_a_stored_row() -> None:
     registered = _registered()
-    event = _replicated(registered)
+    event = _address_registered(registered)
 
     assert (
         from_stored(
-            replace(_stored(registered), event_type="DatasetReplicated", payload=to_payload(event))
+            replace(
+                _stored(registered),
+                event_type="DatasetAddressRegistered",
+                payload=to_payload(event),
+            )
         )
         == event
     )
 
 
-def test_a_replication_that_cites_the_work_that_made_it_keeps_both_ids() -> None:
+def test_an_address_that_cites_the_work_that_copied_it_keeps_both_ids() -> None:
     """Absent has to mean absent, so present has to survive the log.
 
     Most copies are made by facility movement that is not a principal
@@ -257,25 +261,31 @@ def test_a_replication_that_cites_the_work_that_made_it_keeps_both_ids() -> None
     """
     registered = _registered()
     by_execution, by_step = uuid4(), uuid4()
-    event = _replicated(registered, copied_by_execution_id=by_execution, copied_by_step_id=by_step)
+    event = _address_registered(
+        registered, copied_by_execution_id=by_execution, copied_by_step_id=by_step
+    )
 
     came_back = from_stored(
-        replace(_stored(registered), event_type="DatasetReplicated", payload=to_payload(event))
+        replace(
+            _stored(registered), event_type="DatasetAddressRegistered", payload=to_payload(event)
+        )
     )
 
     assert came_back == event
-    assert isinstance(came_back, DatasetReplicated)
+    assert isinstance(came_back, DatasetAddressRegistered)
     assert came_back.copied_by_execution_id == by_execution
 
 
-def test_a_replication_that_cites_nothing_comes_back_citing_nothing() -> None:
+def test_an_address_that_cites_nothing_comes_back_citing_nothing() -> None:
     registered = _registered()
-    event = _replicated(registered)
+    event = _address_registered(registered)
 
     came_back = from_stored(
-        replace(_stored(registered), event_type="DatasetReplicated", payload=to_payload(event))
+        replace(
+            _stored(registered), event_type="DatasetAddressRegistered", payload=to_payload(event)
+        )
     )
 
-    assert isinstance(came_back, DatasetReplicated)
+    assert isinstance(came_back, DatasetAddressRegistered)
     assert came_back.copied_by_execution_id is None
     assert came_back.copied_by_step_id is None

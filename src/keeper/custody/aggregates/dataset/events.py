@@ -9,10 +9,16 @@ alias and the evolver's `assert_never` were written for: data that moves
 or is withdrawn is a later fact on this stream, never an edit to the row
 that came before.
 
-Replicated and withdrawn rather than moved, because a copy and a purge
+Registered and withdrawn rather than moved, because a copy and a purge
 are two events separated by days and both are true in between. One moved
 event would have to be written at a moment nothing distinguishes, and
 would say the data left a disk it is still on.
+
+An address rather than a copy, because the two come apart: the same
+bytes answer to a local path, an NFS path and a server URI at once, and
+the question anything reads this to ask is which of them it can reach
+from where it is standing. Counting copies would need this system to
+know when two paths are one file, which it cannot.
 
 The external reference travels as two flat strings and is rebuilt into a
 pair by the fold, because events carry primitives and that pair is a
@@ -56,7 +62,7 @@ class DatasetRegistered:
 
 
 @dataclass(frozen=True)
-class DatasetReplicated:
+class DatasetAddressRegistered:
     """A copy of this data was reported at another address.
 
     Carries no execution and step of its own in the way the genesis
@@ -86,7 +92,7 @@ class DatasetReplicated:
 
 
 @dataclass(frozen=True)
-class DatasetWithdrawn:
+class DatasetAddressWithdrawn:
     """A copy of this data is no longer at an address it was at.
 
     Withdrawn rather than deleted, and the distinction is whose act it
@@ -106,7 +112,7 @@ class DatasetWithdrawn:
     occurred_at: datetime
 
 
-DatasetEvent = DatasetRegistered | DatasetReplicated | DatasetWithdrawn
+DatasetEvent = DatasetRegistered | DatasetAddressRegistered | DatasetAddressWithdrawn
 """Every event that can appear on a Dataset stream.
 
 A new member is a new class added here and to this alias, never a field
@@ -128,7 +134,7 @@ def to_payload(event: DatasetEvent) -> dict[str, Any]:
                 "external_ref_value": event.external_ref_value,
                 "occurred_at": event.occurred_at.isoformat(),
             }
-        case DatasetReplicated():
+        case DatasetAddressRegistered():
             return {
                 "dataset_id": str(event.dataset_id),
                 "external_ref_scheme": event.external_ref_scheme,
@@ -137,7 +143,7 @@ def to_payload(event: DatasetEvent) -> dict[str, Any]:
                 "copied_by_step_id": _optional_id(event.copied_by_step_id),
                 "occurred_at": event.occurred_at.isoformat(),
             }
-        case DatasetWithdrawn():
+        case DatasetAddressWithdrawn():
             return {
                 "dataset_id": str(event.dataset_id),
                 "external_ref_scheme": event.external_ref_scheme,
@@ -180,10 +186,10 @@ def from_stored(stored: StoredEvent) -> DatasetEvent:
                 ),
                 extra=(ValueError,),
             )
-        case "DatasetReplicated":
+        case "DatasetAddressRegistered":
             return deserialize_or_raise(
-                "DatasetReplicated",
-                lambda: DatasetReplicated(
+                "DatasetAddressRegistered",
+                lambda: DatasetAddressRegistered(
                     dataset_id=UUID(payload["dataset_id"]),
                     external_ref_scheme=payload["external_ref_scheme"],
                     external_ref_value=payload["external_ref_value"],
@@ -193,10 +199,10 @@ def from_stored(stored: StoredEvent) -> DatasetEvent:
                 ),
                 extra=(ValueError,),
             )
-        case "DatasetWithdrawn":
+        case "DatasetAddressWithdrawn":
             return deserialize_or_raise(
-                "DatasetWithdrawn",
-                lambda: DatasetWithdrawn(
+                "DatasetAddressWithdrawn",
+                lambda: DatasetAddressWithdrawn(
                     dataset_id=UUID(payload["dataset_id"]),
                     external_ref_scheme=payload["external_ref_scheme"],
                     external_ref_value=payload["external_ref_value"],
@@ -219,10 +225,10 @@ def _from_optional_id(raw: Any) -> UUID | None:
 
 
 __all__ = [
+    "DatasetAddressRegistered",
+    "DatasetAddressWithdrawn",
     "DatasetEvent",
     "DatasetRegistered",
-    "DatasetReplicated",
-    "DatasetWithdrawn",
     "from_stored",
     "to_payload",
 ]

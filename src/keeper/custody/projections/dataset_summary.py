@@ -29,7 +29,7 @@ That is why addresses are kept as a set in a column rather than as
 rows counted somewhere. A counter would have to be exactly right about
 delivery; a set only has to be right about membership.
 
-An update that matches no row raises, because a replication arriving
+An update that matches no row raises, because an address arriving
 before the registration it belongs to means the worker read the log out
 of order, and that is a real fault rather than a row to skip. Letting
 it pass would leave a dataset listed at an address the log says it also
@@ -66,8 +66,8 @@ reads the bookmark, and the adapter that queries the rows.
 """
 
 _GENESIS_EVENT_TYPE = "DatasetRegistered"
-_REPLICATED_EVENT_TYPE = "DatasetReplicated"
-_WITHDRAWN_EVENT_TYPE = "DatasetWithdrawn"
+_ADDRESS_REGISTERED_EVENT_TYPE = "DatasetAddressRegistered"
+_ADDRESS_WITHDRAWN_EVENT_TYPE = "DatasetAddressWithdrawn"
 
 _INSERT_SQL = f"""
 INSERT INTO {PROJECTION_NAME} (
@@ -116,7 +116,7 @@ class DatasetSummaryProjection:
 
     name = PROJECTION_NAME
     subscribed_event_types = frozenset(
-        {_GENESIS_EVENT_TYPE, _REPLICATED_EVENT_TYPE, _WITHDRAWN_EVENT_TYPE}
+        {_GENESIS_EVENT_TYPE, _ADDRESS_REGISTERED_EVENT_TYPE, _ADDRESS_WITHDRAWN_EVENT_TYPE}
     )
 
     async def apply(self, event: StoredEvent, conn: ConnectionLike) -> None:
@@ -147,7 +147,9 @@ class DatasetSummaryProjection:
                 event.occurred_at,
             )
             return
-        statement = _ADD_REF_SQL if event.event_type == _REPLICATED_EVENT_TYPE else _DROP_REF_SQL
+        statement = (
+            _ADD_REF_SQL if event.event_type == _ADDRESS_REGISTERED_EVENT_TYPE else _DROP_REF_SQL
+        )
         changed = await conn.execute(statement, event.stream_id, reference)
         _refuse_a_row_that_was_not_there(changed, event.stream_id, event.event_type)
 

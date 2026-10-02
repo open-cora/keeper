@@ -21,6 +21,14 @@ failing is as much a fact about the system as a write that is, and the
 one read that goes to a table rather than to a stream is the one most
 likely to become the slow one.
 
+The two address slices go without the middle layer as well, and for a
+different reason than the reads: the server mints nothing for them, so
+a retry names the same dataset and the same address, and the decider
+refuses it as a duplicate before any second row exists. The wrapper
+would be buying a nicer status code for a retry rather than preventing
+one. That is the same call the sibling context makes for a device
+transition.
+
 Registering a dataset takes the idempotency wrapper for the same reason
 reporting a run does: the server mints the id, so a retry with no key
 would leave a second record of one thing. That matters more here than it
@@ -45,7 +53,13 @@ from keeper.custody.adapters import (
     PostgresDatasetSummaryLookup,
 )
 from keeper.custody.aggregates.dataset.summary import DatasetSummaryLookup
-from keeper.custody.features import get_dataset, list_datasets, register_dataset
+from keeper.custody.features import (
+    get_dataset,
+    list_datasets,
+    register_dataset,
+    register_dataset_address,
+    withdraw_dataset_address,
+)
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.kernel import Kernel, UnreadableSummariesError
 from keeper.infrastructure.observability import with_tracing
@@ -61,6 +75,8 @@ class CustodyHandlers:
     register_dataset: register_dataset.IdempotentHandler
     get_dataset: get_dataset.Handler
     list_datasets: list_datasets.Handler
+    register_dataset_address: register_dataset_address.Handler
+    withdraw_dataset_address: withdraw_dataset_address.Handler
 
 
 def _dataset_summary_lookup(deps: Kernel) -> DatasetSummaryLookup:
@@ -101,6 +117,16 @@ def wire_custody(deps: Kernel) -> CustodyHandlers:
         list_datasets=with_tracing(
             list_datasets.bind(deps, _dataset_summary_lookup(deps)),
             command_name="ListDatasets",
+            bc=_BC,
+        ),
+        register_dataset_address=with_tracing(
+            register_dataset_address.bind(deps),
+            command_name="RegisterDatasetAddress",
+            bc=_BC,
+        ),
+        withdraw_dataset_address=with_tracing(
+            withdraw_dataset_address.bind(deps),
+            command_name="WithdrawDatasetAddress",
             bc=_BC,
         ),
     )

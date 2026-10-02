@@ -31,6 +31,8 @@ EXPECTED_OPENAPI_PATHS = frozenset(
         "/actors/{actor_id}/deactivate",
         "/actors/{actor_id}/reactivate",
         "/datasets",
+        "/datasets/{dataset_id}/addresses",
+        "/datasets/{dataset_id}/addresses/withdraw",
         "/datasets/{dataset_id}",
         "/proposals",
         "/proposals/{proposal_id}",

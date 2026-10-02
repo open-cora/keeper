@@ -2,7 +2,7 @@
 
 Custody is the bounded context that answers one question: where is the data one run produced, and who is keeping it?
 
-It holds one aggregate, the Dataset, and three things you can do to it. The record is deliberately small, and most of this page is about what is not on it.
+It holds one aggregate, the Dataset, and five things you can do to it. The record is deliberately small, and most of this page is about what is not on it.
 
 ## What a Dataset is
 
@@ -49,10 +49,16 @@ Custody says what this one can back: where the thing is, and on whose word. It i
 | Register a dataset | `POST /datasets` | `register_dataset` | `201` with the new id |
 | Read one back | `GET /datasets/{dataset_id}` | `get_dataset` | `200` with the dataset |
 | Find what one run produced | `GET /datasets` | `list_datasets` | `200` with a page of datasets |
+| Record another address for it | `POST /datasets/{dataset_id}/addresses` | `register_dataset_address` | `204` |
+| Record that an address stopped answering | `POST /datasets/{dataset_id}/addresses/withdraw` | `withdraw_dataset_address` | `204` |
 
 Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/custody/routes.py`.
 
 `POST /datasets` creates a record of something that already exists elsewhere, not the data. Nothing here reaches the store and nothing here could: a caller that can see the data is the one that knows its address.
+
+The two address operations hold the same posture one level down. Neither moves or deletes anything. Something else copied the data or purged it, and these record that it happened, which is why both accept an `occurred_at` the caller supplies. Both answer `204`: an address has no id of its own, it is named by the scheme and value the caller already holds.
+
+Withdrawal is a `POST` carrying a body where the nearest sibling in this tree revokes a permission with a `DELETE` on a path. The difference is what names the thing being removed. A permission is named by two safe identifiers; an address is named by a store's own spelling, which routinely carries slashes. A body also keeps the reference nested, which is what stops a caller expressing half of one.
 
 ## Registered, and why that verb takes a timestamp
 
@@ -69,15 +75,16 @@ There is no datasets table. Current state is recomputed by replaying a stream on
 ```
    DatasetRegistered   dataset_id, execution_id, step_id,
                        external_ref_scheme, external_ref_value, occurred_at
-   DatasetReplicated   dataset_id, external_ref_scheme, external_ref_value,
-                       copied_by_execution_id, copied_by_step_id, occurred_at
-   DatasetWithdrawn    dataset_id, external_ref_scheme, external_ref_value,
-                       occurred_at
+   DatasetAddressRegistered   dataset_id, external_ref_scheme,
+                              external_ref_value, copied_by_execution_id,
+                              copied_by_step_id, occurred_at
+   DatasetAddressWithdrawn    dataset_id, external_ref_scheme,
+                              external_ref_value, occurred_at
 ```
 
 Each reference travels as two flat strings and is rebuilt into a pair by the fold, because events carry primitives and that pair is a value object.
 
-Three events, and the two later ones add and remove an address rather than editing the row before them. A record saying where data was at a moment stays true when the data moves, and what changes is that there is a later fact. Replicated and withdrawn rather than one moved event, because a copy and a purge are separated by days and both are true in between.
+Three events, and the two later ones add and remove an address rather than editing the row before them. A record saying where data was at a moment stays true when the data moves, and what changes is that there is a later fact. Registered and withdrawn rather than one moved event, because a copy and a purge are separated by days and both are true in between. An address rather than a copy, because the same bytes answer to a local path, an NFS path and a server URI at once, and what a reader needs to know is which of them it can reach.
 
 `copied_by_execution_id` and `copied_by_step_id` are optional together, and the optionality carries a meaning worth stating. A copy this system dispatched is a report it is owed and names the step that made it. A copy somebody else made is something this system was told, and most copies are that: facility data movement runs on its own and will never be a principal in this record. Absent has to mean absent, because a citation naming an execution that did not do the copying reads as a report this system went and asked for.
 
@@ -179,7 +186,7 @@ Two things are this context's own.
 
 ## What is not here yet
 
-The commands that emit the two later events. The aggregate folds a replication and a withdrawal, the projection applies both, and nothing writes either, so today every dataset still has exactly the one address its registration gave it. The slices that put them there are the next thing, and they are where an address already held gets refused out loud rather than silently ignored.
+A caller for the two address operations. The doors are open on both surfaces and nothing at a beamline calls them yet, because nothing there moves data off local disk today. The first caller is whatever does.
 
 Superseded, which is the third plausible event and is not designed. A reprocessed dataset standing in for an earlier one is a relationship between two records rather than another address on one, and nothing has asked for it.
 

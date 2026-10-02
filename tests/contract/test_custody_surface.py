@@ -103,6 +103,109 @@ def test_a_registered_dataset_reads_back_with_its_step_and_reference(
     }
 
 
+_CENTRAL = {"scheme": "gpfs-file", "value": "/central/raw/636de04a.h5"}
+
+
+def test_a_second_address_reads_back_beside_the_one_the_run_wrote(
+    client: TestClient,
+) -> None:
+    """Both at once is the state a copy spends days in, not a transition."""
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+        added = client.post(f"/datasets/{dataset_id}/addresses", json={"external_ref": _CENTRAL})
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert added.status_code == 204, added.text
+    assert read.json()["external_refs"] == [_REF, _CENTRAL]
+
+
+def test_an_address_the_dataset_already_holds_is_409(client: TestClient) -> None:
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+        again = client.post(f"/datasets/{dataset_id}/addresses", json={"external_ref": _REF})
+
+    assert again.status_code == 409, again.text
+
+
+def test_registering_an_address_on_a_dataset_that_does_not_exist_is_404(
+    client: TestClient,
+) -> None:
+    with client:
+        response = client.post(f"/datasets/{uuid4()}/addresses", json={"external_ref": _CENTRAL})
+
+    assert response.status_code == 404, response.text
+
+
+def test_a_withdrawn_address_leaves_the_others_and_the_run_that_made_them(
+    client: TestClient,
+) -> None:
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        client.post(f"/datasets/{dataset_id}/addresses", json={"external_ref": _CENTRAL})
+        gone = client.post(
+            f"/datasets/{dataset_id}/addresses/withdraw", json={"external_ref": _REF}
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert gone.status_code == 204, gone.text
+    assert read.json() == {
+        "dataset_id": dataset_id,
+        "execution_id": execution_id,
+        "step_id": step_id,
+        "external_refs": [_CENTRAL],
+    }
+
+
+def test_a_dataset_whose_last_address_is_withdrawn_still_names_its_run(
+    client: TestClient,
+) -> None:
+    """The empty list is reachable over HTTP, and it is not an error."""
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        gone = client.post(
+            f"/datasets/{dataset_id}/addresses/withdraw", json={"external_ref": _REF}
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert gone.status_code == 204, gone.text
+    assert read.json()["external_refs"] == []
+    assert read.json()["step_id"] == step_id
+
+
+def test_withdrawing_an_address_the_dataset_does_not_hold_is_409(client: TestClient) -> None:
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+        response = client.post(
+            f"/datasets/{dataset_id}/addresses/withdraw", json={"external_ref": _CENTRAL}
+        )
+
+    assert response.status_code == 409, response.text
+
+
+def test_an_address_whose_value_carries_slashes_needs_no_encoding_to_withdraw(
+    client: TestClient,
+) -> None:
+    """The reason withdrawal is a POST with a body rather than a DELETE.
+
+    A store's own spelling routinely carries path separators, and an
+    encoded slash is the one piece of URL handling that differs between
+    every proxy this will sit behind.
+    """
+    deep = {"scheme": "gpfs-file", "value": "/central/19bm/2026-10/a b/scan 034.h5"}
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+        client.post(f"/datasets/{dataset_id}/addresses", json={"external_ref": deep})
+        gone = client.post(
+            f"/datasets/{dataset_id}/addresses/withdraw", json={"external_ref": deep}
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert gone.status_code == 204, gone.text
+    assert read.json()["external_refs"] == [_REF]
+
+
 def test_reading_an_unregistered_dataset_is_404(client: TestClient) -> None:
     with client:
         response = client.get(f"/datasets/{uuid4()}")

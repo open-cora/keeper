@@ -15,9 +15,9 @@ silently comes back as None.
 ## Why the later arms raise on an empty stream
 
 Genesis ignores the state before it. The other two require one, and a
-stream whose first row is a replication is a stream no command in this
+stream whose first row registers an address is one no command in this
 system could have written. Raising says the log is wrong, where building
-a dataset out of the replication would invent an execution and a step
+a dataset out of that row would invent an execution and a step
 that nothing recorded, and that record would then be indistinguishable
 from one somebody meant.
 """
@@ -28,10 +28,10 @@ from typing import assert_never
 from uuid import UUID
 
 from keeper.custody.aggregates.dataset.events import (
+    DatasetAddressRegistered,
+    DatasetAddressWithdrawn,
     DatasetEvent,
     DatasetRegistered,
-    DatasetReplicated,
-    DatasetWithdrawn,
 )
 from keeper.custody.aggregates.dataset.state import Dataset
 from keeper.shared.identifier import Identifier
@@ -49,7 +49,7 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
     an execution step's reference makes, and it is why events carry the two halves flat
     rather than carrying the pair.
 
-    Replication is written to tolerate an address already held, where
+    Registering is written to tolerate an address already held, where
     the decider refuses one. The two are not in disagreement: the
     decider is what a caller meets, and this is what a log meets. A fold
     that doubled an entry on a row some future repair wrote by hand
@@ -71,7 +71,7 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
                 step_id=step_id,
                 external_refs=(Identifier(scheme=scheme, value=value),),
             )
-        case DatasetReplicated(
+        case DatasetAddressRegistered(
             dataset_id=dataset_id,
             external_ref_scheme=scheme,
             external_ref_value=value,
@@ -81,7 +81,7 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
             if added in held.external_refs:
                 return held
             return replace(held, external_refs=(*held.external_refs, added))
-        case DatasetWithdrawn(
+        case DatasetAddressWithdrawn(
             dataset_id=dataset_id,
             external_ref_scheme=scheme,
             external_ref_value=value,

@@ -52,9 +52,9 @@ here.
                              Equipment, Pursuit
    aggregates         10     Actor, Policy, Operation, Procedure, Execution,
                              Dataset, Proposal, Inquiry, Device, Pursuit
-   slices             49     four on Actor, four on Policy,
+   slices             51     four on Actor, four on Policy,
                              three on Operation, three on Procedure,
-                             eight on Execution, three on Dataset,
+                             eight on Execution, five on Dataset,
                              five on Proposal, five on Inquiry,
                              six on Device, eight on Pursuit
 ```

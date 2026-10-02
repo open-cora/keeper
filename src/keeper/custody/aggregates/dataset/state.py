@@ -116,6 +116,28 @@ class DatasetAlreadyExistsError(Exception):
 
 
 @dataclass(frozen=True)
+class CopiedBy:
+    """The work that made a copy, when this system is what asked for it.
+
+    One object rather than two optional ids beside each other, so that
+    half a citation is not a thing a caller or a decider can hold. That
+    is the same move the external reference makes, for the same reason:
+    a pair whose halves can be set independently will eventually be set
+    one at a time.
+
+    Absent is the common case and has to stay meaningful. Facility data
+    movement runs on its own and will never be a principal here, so most
+    copies are reported by something this system did not dispatch. A
+    citation naming an execution that did not do the copying reads as a
+    report this system went and asked for, which is worse than no
+    citation at all.
+    """
+
+    execution_id: UUID
+    step_id: UUID
+
+
+@dataclass(frozen=True)
 class Dataset:
     """A body of data one run produced, as the fold leaves it.
 
@@ -167,6 +189,7 @@ class Dataset:
 
 
 __all__ = [
+    "CopiedBy",
     "Dataset",
     "DatasetAddressKnownError",
     "DatasetAddressUnknownError",

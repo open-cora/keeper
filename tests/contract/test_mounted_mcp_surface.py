@@ -85,6 +85,8 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "register_dataset",
         "get_dataset",
         "list_datasets",
+        "register_dataset_address",
+        "withdraw_dataset_address",
         "make_proposal",
         "get_proposal",
         "take_proposal",
@@ -475,6 +477,27 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             external_ref_value="raw/uid-completing",
         )
         dataset_id = registered["dataset_id"]
+
+        # A second address on the same data, then its removal, so the
+        # read below sees the genesis address alone and the two writing
+        # tools have each run their body rather than only been listed.
+        _call(
+            client,
+            live,
+            "register_dataset_address",
+            dataset_id=dataset_id,
+            external_ref_scheme="gpfs-file",
+            external_ref_value="/central/raw/uid-completing.h5",
+        )
+        _call(
+            client,
+            live,
+            "withdraw_dataset_address",
+            dataset_id=dataset_id,
+            external_ref_scheme="gpfs-file",
+            external_ref_value="/central/raw/uid-completing.h5",
+        )
+
         held = _call(client, live, "get_dataset", dataset_id=dataset_id)
         produced = _call(client, live, "list_datasets", step_id=produced_by)
 
