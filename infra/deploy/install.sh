@@ -202,6 +202,22 @@ podman exec keeper-postgres pg_isready -U keeper -d keeper >/dev/null 2>&1 \
 echo
 
 echo "Migrations"
+# The API is stopped first, and for a specific reason rather than general
+# caution. A migration may reset a projection bookmark so that a read model
+# is rebuilt against the new code. A worker belonging to the revision being
+# replaced will happily take that reset and rebuild with its own arms, and
+# the bookmark then sits at the end of the log with nothing left to replay.
+#
+# Measured here. A migration added a column and reset the bookmark; the
+# outgoing revision rebuilt the whole table before the restart, leaving the
+# new column null on every row, the old column full of values no current arm
+# writes, and the rebuild already marked done. Nothing failed, which is what
+# made it worth a comment: the deploy reported success and the read model
+# was quietly a revision behind.
+#
+# Ignoring the failure covers the first install, where the unit does not
+# exist yet.
+systemctl --user stop keeper.service 2>/dev/null || true
 (cd "${ATLAS_DIR}" && DATABASE_URL="${ATLAS_DB_URL}" atlas migrate apply --env local)
 echo
 
