@@ -54,6 +54,12 @@ EXTERNAL_NAMES: frozenset[str] = frozenset(
     {
         # Postgres
         "AccessExclusiveLock",
+        # A column of proj_execution_step_summary and of the kinds table
+        # beside it, created in SQL by a migration and never bound in
+        # Python. Named in prose because the gap filter turns on it, and
+        # because saying which column replaced `run_opened_at` as the
+        # gate is the whole of what that prose is for.
+        "opens_a_run",
         # The environment variable the installer writes into the unit's
         # environment file, which pydantic reads back as the settings
         # field of the same name in lower case. Real, and outside Python

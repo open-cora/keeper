@@ -27,12 +27,19 @@ write side stays unable to see a dataset at all.
 
 ## Why a row exists for every step
 
-A dispatched step carries its sentence and the operation it cites, and
-nothing that says whether driving it will open a run. So the genesis arm
-cannot write only the steps that will produce data, and it writes them
-all. A step that produced nothing is a row whose `engine_reference`
-stays null for the life of the record, which is the same shape the
-sibling uses for an execution nothing ever claimed.
+The genesis arm writes every step and not only the ones that will
+produce data, because the row is how a later arm finds the step at all:
+a dataset names a step id and a report names an index, and neither
+would have anywhere to land. A step that produced nothing is a row
+whose `engine_reference` stays null for the life of the record, which
+is the same shape the sibling uses for an execution nothing ever
+claimed.
+
+Which of them should produce data is a separate question, and it is
+answered on the row rather than by leaving the row out. See the kinds
+table below: it is a property of the procedure, known before any client
+is involved, and reading it off a watcher instead is what made a run
+nobody watched invisible to the listing built to find lost data.
 
 The alternative was an arm that deletes rows once a step turns out to
 have produced nothing. That needs an arm per outcome, plus one on the
@@ -74,6 +81,31 @@ reads the bookmark, and the adapter that queries the rows.
 _GENESIS_EVENT_TYPE = "ExecutionDispatched"
 _FILED_EVENT_TYPE = "DatasetRegistered"
 _RUN_OPENED_EVENT_TYPE = "ExecutionStepEngineStarted"
+_DEFINED_EVENT_TYPE = "ProcedureDefined"
+
+KINDS_TABLE = f"{PROJECTION_NAME}_kinds"
+"""The second table this projection owns, under the first one's name.
+
+One composed procedure step per row, and whether driving it opens a
+run. It exists because a projection folds a stream and cannot follow a
+pointer: the dispatched step names the definition it came from, which
+is the right shape for a reader that can fetch one, and no shape at all
+for an arm that has only the event in front of it.
+
+Under one bookmark with the table beside it, so the two cannot be
+rebuilt to different positions. A procedure is defined before anything
+can dispatch it, so a replay fills this row first and the genesis arm
+below always finds it.
+"""
+
+RUN_KIND = "run"
+"""What `ProcedureDefined` calls the step class that asks an engine to run.
+
+Spelled here rather than imported, the way every event type above is.
+Pinned against the aggregate's own literal by a test, because a string
+nothing compares is a rename that makes this projection quietly answer
+that no step in the facility was ever a run.
+"""
 
 OUTCOME_EVENT_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -104,11 +136,36 @@ sliced so that the difference is visible instead of encoded in an
 offset.
 """
 
+_KIND_SQL = f"""
+INSERT INTO {KINDS_TABLE} (procedure_step_id, opens_a_run)
+VALUES ($1, $2)
+ON CONFLICT (procedure_step_id) DO NOTHING
+"""
+"""Remembers what one composed step is, for the dispatches still to come."""
+
 _INSERT_SQL = f"""
 INSERT INTO {PROJECTION_NAME} (
-    step_id, execution_id, step_index, describes, beamline, created_at
-) VALUES ($1, $2, $3, $4, $5, $6)
+    step_id, execution_id, step_index, describes, beamline, opens_a_run, created_at
+) VALUES (
+    $1, $2, $3, $4, $5,
+    (SELECT opens_a_run FROM {KINDS_TABLE} WHERE procedure_step_id = $6),
+    $7
+)
 ON CONFLICT (step_id) DO NOTHING
+"""
+
+_UNRESOLVED_SQL = f"""
+SELECT count(*) FROM {PROJECTION_NAME}
+WHERE execution_id = $1 AND opens_a_run IS NULL
+"""
+"""How many of an execution's steps could not be told run from set.
+
+Asked once per dispatch rather than per step, and the answer should
+always be zero: the procedure is defined earlier in the log than any
+execution citing it, so the replay has already written its kinds. It is
+asked at all because the alternative to noticing is a step that quietly
+never qualifies for the gap listing, which is the exact failure this
+column was added to end.
 """
 
 _OUTCOME_SQL = f"""
@@ -172,7 +229,13 @@ class StepSummaryProjection:
 
     name = PROJECTION_NAME
     subscribed_event_types = frozenset(
-        {_GENESIS_EVENT_TYPE, _FILED_EVENT_TYPE, _RUN_OPENED_EVENT_TYPE, *OUTCOME_EVENT_TYPES}
+        {
+            _DEFINED_EVENT_TYPE,
+            _GENESIS_EVENT_TYPE,
+            _FILED_EVENT_TYPE,
+            _RUN_OPENED_EVENT_TYPE,
+            *OUTCOME_EVENT_TYPES,
+        }
     )
 
     async def apply(self, event: StoredEvent, conn: ConnectionLike) -> None:
@@ -183,6 +246,9 @@ class StepSummaryProjection:
         than skipped. That is the right failure for a read model: stale
         and loud beats wrong and quiet.
         """
+        if event.event_type == _DEFINED_EVENT_TYPE:
+            await self._define(event, conn)
+            return
         if event.event_type == _GENESIS_EVENT_TYPE:
             await self._insert(event, conn)
             return
@@ -193,6 +259,20 @@ class StepSummaryProjection:
             await self._run_opened(event, conn)
             return
         await self._report(event, conn)
+
+    async def _define(self, event: StoredEvent, conn: ConnectionLike) -> None:
+        """Remember which of a procedure's steps ask an engine to run.
+
+        The whole step list rides the genesis of a procedure and nothing
+        edits it afterwards, so one pass over this event is the whole of
+        what there is to know and no later arm can change it.
+
+        The kind is read off the payload's own discriminator rather than
+        inferred from which other keys are present. A step class that
+        gained a field would otherwise change what this arm believes.
+        """
+        for step in event.payload["steps"]:
+            await conn.execute(_KIND_SQL, UUID(step["id"]), step["kind"] == RUN_KIND)
 
     async def _insert(self, event: StoredEvent, conn: ConnectionLike) -> None:
         """Write one row per dispatched step, with nothing reported yet.
@@ -205,6 +285,13 @@ class StepSummaryProjection:
         report names itself by. It is assigned here rather than carried,
         because a dispatched step's payload holds its id and its sentence
         and nothing about where in the list it sits.
+
+        `opens_a_run` is read across from the kinds table by the step's
+        own `procedure_step_id`, which is the pointer the dispatched step
+        carries for exactly this purpose. Resolved here rather than at
+        query time so the partial index can cover the gap predicate, and
+        resolved once rather than per reader because a definition does
+        not change after it is composed.
         """
         payload: dict[str, Any] = event.payload
         for index, step in enumerate(payload["steps"]):
@@ -215,7 +302,27 @@ class StepSummaryProjection:
                 index,
                 step["describes"],
                 payload["beamline"],
+                UUID(step["procedure_step_id"]),
                 event.occurred_at,
+            )
+        await self._warn_if_unresolved(event, conn)
+
+    async def _warn_if_unresolved(self, event: StoredEvent, conn: ConnectionLike) -> None:
+        """Say so if a dispatched step could not be told run from set.
+
+        Logged rather than raised, for the reason the other arms give:
+        raising wedges every execution behind one bad row and the
+        bookmark never moves again. A warning here means the gap listing
+        is blind to that execution, which is quieter than a stall and
+        louder than the nothing this used to be.
+        """
+        unresolved = await conn.fetchval(_UNRESOLVED_SQL, event.stream_id)
+        if unresolved:
+            _log.warning(
+                "step_summary.step_kind_unresolved",
+                projection=PROJECTION_NAME,
+                stream_id=str(event.stream_id),
+                steps=int(unresolved),
             )
 
     async def _report(self, event: StoredEvent, conn: ConnectionLike) -> None:
@@ -300,4 +407,10 @@ class StepSummaryProjection:
             )
 
 
-__all__ = ["OUTCOME_EVENT_TYPES", "PROJECTION_NAME", "StepSummaryProjection"]
+__all__ = [
+    "KINDS_TABLE",
+    "OUTCOME_EVENT_TYPES",
+    "PROJECTION_NAME",
+    "RUN_KIND",
+    "StepSummaryProjection",
+]

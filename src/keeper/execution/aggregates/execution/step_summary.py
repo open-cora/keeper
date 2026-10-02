@@ -62,6 +62,16 @@ class StepSummary:
     step that was refused or broken, one never reached, and a run whose
     engine had no name to give.
 
+    `run_opened_at` is when something watching the engine saw the run
+    begin, and None means nothing was watching. It reads like a detail
+    and is the difference between the two failures this listing
+    returns. A run with a time behind it ran under observation and its
+    data went unrecorded, which is a filing or engine fault. A run with
+    none ran at a beamline where nobody was reporting, which is a
+    deployment fault, loses every run rather than one, and is the case
+    this listing could not see at all while it gated on this column
+    instead of returning it.
+
     `dataset_id` is the record of where that run's output is being kept,
     and None means nothing holds it. A reference with no dataset is the
     gap this row exists to make findable: the work ran, the data was
@@ -80,6 +90,7 @@ class StepSummary:
     outcome: str | None
     engine_reference: str | None
     reported_at: datetime | None
+    run_opened_at: datetime | None
     dataset_id: UUID | None
     filed_at: datetime | None
 

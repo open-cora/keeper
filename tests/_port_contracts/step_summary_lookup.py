@@ -44,8 +44,15 @@ class StepWriter(Protocol):
         at: datetime,
         beamline: str = "2-bm",
         step_ids: list[UUID] | None = None,
+        runs: list[bool] | None = None,
     ) -> None:
-        """Write an execution down, with step ids the caller can name later."""
+        """Write an execution down, with step ids the caller can name later.
+
+        `runs` says which steps were composed to ask an engine to run,
+        and they all are unless a caller says otherwise. A move is the
+        case this listing must never return, so the contract needs a
+        way to compose one.
+        """
         ...
 
     async def step(
@@ -56,8 +63,13 @@ class StepWriter(Protocol):
         at: datetime,
         engine_reference: str | None = None,
         step_id: UUID | None = None,
+        skipped: bool = False,
     ) -> None:
-        """Report one step done, naming the run it opened when it opened one."""
+        """Report one step, naming the run it opened when it opened one.
+
+        `skipped` reports it passed over rather than done, which is how
+        a contract says a run step never reached an engine.
+        """
         ...
 
     async def run_opened(
@@ -107,22 +119,33 @@ async def _an_execution(
     minute: int,
     references: list[str | None],
     beamline: str = "2-bm",
+    runs: list[bool] | None = None,
+    skipped: bool = False,
 ) -> tuple[UUID, list[UUID]]:
     """One execution whose steps report in order, and its step ids.
 
-    `references` is one entry per step: a string for a step that opened
-    a run the engine named, None for one that opened none. That is the
-    only axis these checks vary, because it is the only one the
-    question turns on.
+    Two axes, and keeping them apart is the point. `runs` says what
+    each step was composed to do, which the procedure fixes before
+    anything is driven. `references` says what a watcher saw, which is
+    a string for a run the engine named and None for a step nothing
+    watched or nothing named.
+
+    They were one axis while a step counted as a run by having been
+    watched, and that is precisely the conflation that let a beamline
+    with no reporter look like a beamline with no runs. The default
+    keeps the old pairing so every check written under it still says
+    what it said; a check about the difference passes both.
     """
+    composed = runs if runs is not None else [reference is not None for reference in references]
     execution_id, step_ids = uuid4(), [uuid4() for _ in references]
     await writer.dispatch(
         execution_id=execution_id,
         procedure_id=uuid4(),
-        steps=[_RUN if reference else _SET for reference in references],
+        steps=[_RUN if opens else _SET for opens in composed],
         at=_EPOCH + timedelta(minutes=minute),
         beamline=beamline,
         step_ids=step_ids,
+        runs=composed,
     )
     for index, reference in enumerate(references):
         await writer.step(
@@ -131,6 +154,7 @@ async def _an_execution(
             step_id=step_ids[index],
             at=_EPOCH + timedelta(minutes=minute, seconds=index + 1),
             engine_reference=reference,
+            skipped=skipped,
         )
     return execution_id, step_ids
 
@@ -263,15 +287,51 @@ async def check_a_run_whose_data_was_filed_is_gone_from_the_listing(
     assert await _listed(lookup) == []
 
 
-async def check_a_step_that_opened_no_run_is_never_a_gap(
-    lookup: StepSummaryLookup, writer: StepWriter
-) -> None:
+async def check_a_move_is_never_a_gap(lookup: StepSummaryLookup, writer: StepWriter) -> None:
     """A move produced nothing, so it is not missing anything.
 
     The check that stops this listing from growing with the size of
-    every procedure rather than with the number of runs.
+    every procedure rather than with the number of runs. It reads on
+    the composition and not on whether a run was seen, because the two
+    stopped being the same question.
     """
-    await _an_execution(writer, minute=1, references=[None, None, None])
+    await _an_execution(writer, minute=1, references=[None, None, None], runs=[False, False, False])
+
+    assert await _listed(lookup) == []
+
+
+async def check_a_run_nobody_watched_is_still_a_gap(
+    lookup: StepSummaryLookup, writer: StepWriter
+) -> None:
+    """The worst case, and the one this listing could not see at all.
+
+    A run composed, driven and reported, with nothing watching the
+    engine: no run opened, no name, and no dataset. It is a gap because
+    the procedure says the step asks an engine to run, which is known
+    without anybody watching.
+
+    Measured before it was written. At a commissioned beamline with its
+    reporter stopped, a scan walked to Done, wrote a file and
+    registered nothing, and this listing returned the one unrelated row
+    it already held. A view that finds lost data has to find the case
+    where none of it was recorded, which is the case where nothing was
+    there to record it.
+    """
+    _, (unwatched,) = await _an_execution(writer, minute=1, references=[None], runs=[True])
+
+    assert await _listed(lookup) == [unwatched]
+
+
+async def check_a_run_that_was_skipped_is_not_a_gap(
+    lookup: StepSummaryLookup, writer: StepWriter
+) -> None:
+    """Composed to run, never reached, so nothing is missing.
+
+    Excluded for free while a gap meant a run somebody watched open,
+    because nothing opens on a step that is passed over. Reading the
+    composition instead admits it, so the outcome puts it back out.
+    """
+    await _an_execution(writer, minute=1, references=[None], runs=[True], skipped=True)
 
     assert await _listed(lookup) == []
 
@@ -418,7 +478,9 @@ CHECKS: tuple[Check, ...] = (
     check_an_empty_read_model_returns_an_empty_page,
     check_a_run_nothing_filed_comes_back_with_what_it_produced,
     check_a_run_whose_data_was_filed_is_gone_from_the_listing,
-    check_a_step_that_opened_no_run_is_never_a_gap,
+    check_a_move_is_never_a_gap,
+    check_a_run_nobody_watched_is_still_a_gap,
+    check_a_run_that_was_skipped_is_not_a_gap,
     check_only_the_unfiled_runs_of_a_mixed_execution_come_back,
     check_a_beamline_filter_returns_only_that_stations_gaps,
     check_a_beamline_with_no_gaps_returns_an_empty_page,

@@ -47,6 +47,7 @@ from keeper.execution.aggregates.execution.events import (
     ExecutionEvent,
     ExecutionStepDone,
     ExecutionStepEngineStarted,
+    ExecutionStepSkipped,
 )
 from keeper.execution.aggregates.execution.events import to_payload as walk_payload
 from keeper.execution.aggregates.execution.read import EXECUTION_STREAM_TYPE
@@ -62,6 +63,7 @@ from keeper.execution.aggregates.procedure.state import (
     ComposedStep,
     ProcedureBeamline,
     ProcedureName,
+    RunStep,
     SetStep,
 )
 from keeper.infrastructure.ports.event_store import EventStore
@@ -530,14 +532,27 @@ class EventStoreExecutionWriter:
         at: datetime,
         beamline: str = "2-bm",
         step_ids: list[UUID] | None = None,
+        runs: list[bool] | None = None,
     ) -> None:
         """Dispatch an execution, optionally with step ids the caller knows.
 
         `step_ids` exists for the contracts that go on to name a step
         from outside, which a dataset does. Minted here when it is not
         given, because most callers only care that the steps exist.
+
+        `runs` says which of the steps ask an engine to run, and they
+        all do unless a caller says otherwise. It is here because what a
+        step was composed to do is what decides whether missing data is
+        a gap, and a contract that cannot compose a move cannot check
+        that a move is never one.
         """
         chosen = step_ids if step_ids is not None else [uuid4() for _ in steps]
+        composed = await self._composed_steps(
+            procedure_id,
+            runs if runs is not None else [True] * len(steps),
+            at,
+            beamline,
+        )
         await self._append(
             execution_id,
             event=ExecutionDispatched(
@@ -546,13 +561,78 @@ class EventStoreExecutionWriter:
                 procedure_name="align_then_scan",
                 beamline=beamline,
                 steps=[
-                    DispatchedStep(id=step_id, describes=text, procedure_step_id=uuid4())
-                    for step_id, text in zip(chosen, steps, strict=True)
+                    DispatchedStep(id=step_id, describes=text, procedure_step_id=definition)
+                    for step_id, text, definition in zip(chosen, steps, composed, strict=True)
                 ],
                 occurred_at=at,
             ),
             command_name="DispatchExecution",
         )
+
+    async def _composed_steps(
+        self, procedure_id: UUID, runs: list[bool], at: datetime, beamline: str
+    ) -> list[UUID]:
+        """The composed steps of the cited procedure, defining it if nothing has.
+
+        A dispatched step points at the step it was composed from, and
+        that pointer is how a reader tells a run from a move. This used
+        to mint one per step and define nothing, so the pointer led
+        nowhere: anything following it saw a facility whose steps were
+        all of no kind at all, and the gap listing read it as a facility
+        with no runs in it to miss.
+
+        Defined once per procedure and loaded afterwards, because
+        several executions of one procedure is the ordinary case and a
+        second append at version zero would be refused. A later dispatch
+        of a different length is refused loudly here rather than padded,
+        since a procedure does not change shape between its executions
+        and a harness quietly inventing steps is how a contract comes to
+        pass against something nothing dispatches.
+        """
+        stored, version = await self._event_store.load(PROCEDURE_STREAM_TYPE, procedure_id)
+        if version > 0:
+            existing = [UUID(str(raw["id"])) for raw in stored[0].payload["steps"]]
+            if len(existing) != len(runs):
+                msg = (
+                    f"procedure {procedure_id} was composed with {len(existing)} steps "
+                    f"and is being dispatched with {len(runs)}"
+                )
+                raise ValueError(msg)
+            return existing
+
+        composed = [uuid4() for _ in runs]
+        event = ProcedureDefined(
+            procedure_id=procedure_id,
+            procedure_name=ProcedureName("align_then_scan").value,
+            beamline=ProcedureBeamline(beamline).value,
+            steps=tuple(
+                ComposedStep(
+                    id=step_id,
+                    step=RunStep(operation_id=uuid4(), scopes=(f"2bmb:m{index}",))
+                    if opens_a_run
+                    else SetStep(record=f"2bmb:m{index}", to=float(index)),
+                )
+                for index, (step_id, opens_a_run) in enumerate(zip(composed, runs, strict=True))
+            ),
+            occurred_at=at,
+        )
+        await self._event_store.append(
+            PROCEDURE_STREAM_TYPE,
+            procedure_id,
+            0,
+            [
+                to_new_event(
+                    event_type=type(event).__name__,
+                    payload=procedure_payload(event),
+                    occurred_at=at,
+                    event_id=uuid4(),
+                    command_name="DefineProcedure",
+                    correlation_id=uuid4(),
+                    principal_id=self._principal_id,
+                )
+            ],
+        )
+        return composed
 
     async def claim(self, *, execution_id: UUID, at: datetime) -> None:
         await self._append(
@@ -569,12 +649,18 @@ class EventStoreExecutionWriter:
         at: datetime,
         engine_reference: str | None = None,
         step_id: UUID | None = None,
+        skipped: bool = False,
     ) -> None:
         """Report one step, and the run it opened when it opened one.
 
         `engine_reference` defaults to nothing, which is a step that
         opened no run. The summary contract does not care either way;
         the step contract is entirely about which steps named one.
+
+        `skipped` reports the step as passed over instead of done. It
+        exists because a run step that was never reached should not be
+        read as a run whose data went missing, and the only way to say
+        that is to report the outcome that means it never ran.
 
         A reference arrives as a separate event from a separate client,
         and that is the point rather than an inconvenience. Driving a
@@ -598,16 +684,17 @@ class EventStoreExecutionWriter:
                 ),
                 command_name="ReportStepRun",
             )
-        await self._append(
-            execution_id,
-            event=ExecutionStepDone(
+        ending = (
+            ExecutionStepSkipped(execution_id=execution_id, index=index, occurred_at=at)
+            if skipped
+            else ExecutionStepDone(
                 execution_id=execution_id,
                 index=index,
                 engine_reference=None,
                 occurred_at=at,
-            ),
-            command_name="ReportExecutionStep",
+            )
         )
+        await self._append(execution_id, event=ending, command_name="ReportExecutionStep")
 
     async def run_opened(
         self,

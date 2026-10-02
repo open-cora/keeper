@@ -66,6 +66,14 @@ class UnfiledStepResponse(BaseModel):
     `engine_reference` is what the engine called the run. At a beamline
     whose engine answers with a location it is the path the data was
     written to, and filing the dataset by hand needs nothing else.
+
+    `run_opened_at` is what separates the two faults this listing
+    returns, and reading it is the difference between fixing one run
+    and fixing a beamline. A time means something watched this run
+    begin and its data went unrecorded anyway, so the engine or the
+    filing failed and the loss is one run. None means nothing was
+    watching, so no run at that beamline is being recorded and the
+    reporter there is down or was never installed.
     """
 
     step_id: UUID
@@ -76,6 +84,7 @@ class UnfiledStepResponse(BaseModel):
     outcome: str | None
     engine_reference: str | None
     reported_at: datetime | None
+    run_opened_at: datetime | None
 
 
 class ListStepsWithoutDatasetsResponse(BaseModel):
@@ -144,6 +153,7 @@ async def list_steps_without_datasets(
                 outcome=summary.outcome,
                 engine_reference=summary.engine_reference,
                 reported_at=summary.reported_at,
+                run_opened_at=summary.run_opened_at,
             )
             for summary in page.items
         ],

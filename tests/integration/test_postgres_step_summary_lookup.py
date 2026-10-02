@@ -57,6 +57,7 @@ class _DrainingStepWriter:
         at: datetime,
         beamline: str = "2-bm",
         step_ids: list[UUID] | None = None,
+        runs: list[bool] | None = None,
     ) -> None:
         await self._executions.dispatch(
             execution_id=execution_id,
@@ -65,6 +66,7 @@ class _DrainingStepWriter:
             at=at,
             beamline=beamline,
             step_ids=step_ids,
+            runs=runs,
         )
         await self._drain()
 
@@ -76,6 +78,7 @@ class _DrainingStepWriter:
         at: datetime,
         engine_reference: str | None = None,
         step_id: UUID | None = None,
+        skipped: bool = False,
     ) -> None:
         await self._executions.step(
             execution_id=execution_id,
@@ -83,6 +86,7 @@ class _DrainingStepWriter:
             at=at,
             engine_reference=engine_reference,
             step_id=step_id,
+            skipped=skipped,
         )
         await self._drain()
 
@@ -218,6 +222,7 @@ async def test_replaying_the_whole_log_leaves_the_table_where_it_was(
         steps=["set 2bmb:m1 to 0.0", "run tomo_scan"],
         at=at,
         step_ids=step_ids,
+        runs=[False, True],
     )
     await writer.step(execution_id=execution_id, index=0, at=at)
     await writer.step(

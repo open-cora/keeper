@@ -6,15 +6,36 @@ with the execution streams and with Custody's dataset streams.
 
 ## The filter is in the WHERE and not in the caller
 
-`run_opened_at IS NOT NULL AND reported_at IS NOT NULL AND dataset_id
-IS NULL` is the question rather than a narrowing of it, so it is fixed
-here rather than passed in.
+The question is "which steps should have produced data and did not",
+and it is fixed here rather than passed in.
 
-Three clauses where there were two, and the third is not a refinement.
-A run used to reach this table already finished, because the event that
-filled the column the first clause reads was the step's ending. It now
-reaches it when the run begins, so without `reported_at` every scan
-currently running would come back as a run whose data nobody recorded.
+`opens_a_run` is what makes it that question. The gate used to be
+`run_opened_at`, which only a watcher writes, so the listing found a
+run somebody saw open and recorded nothing, and could not find a run
+nobody saw at all. The second loses every run at a beamline rather than
+one, and was measured doing exactly that: a scan at a commissioned
+beamline with its reporter stopped walked to Done, wrote a file and
+registered nothing, and never appeared here. Whether driving a step
+opens a run is a property of the procedure it came from, known before
+any client is involved, so that is what is asked.
+
+`reported_at` is still required. A run enters this table when it
+begins, so without it every scan currently running reads as a run whose
+data nobody recorded.
+
+The outcome clause is new, and it is paying for the gate. A step that
+was skipped or refused never ran, and used to be excluded for free
+because nothing had opened on it. Gating on the definition admits them,
+so they come out by name. `Broken` stays in: a run that broke may have
+written data before it did, and a reader has the outcome in front of
+them.
+
+## Why `run_opened_at` is returned now that it decides nothing
+
+Because the two kinds of gap want different people. A run watched and
+unfiled is a filing or engine fault; a run with no `run_opened_at` is a
+beamline nobody is reporting. Returning the column lets a caller tell
+them apart, where gating on it showed only the first and hid the second.
 
 The table holds every step of every execution and the overwhelming
 majority of those rows are moves, which produced nothing and are
@@ -33,10 +54,9 @@ the same instant would otherwise have no defined order between them,
 and a page boundary landing in such a tie either repeats a row or skips
 one.
 
-`reported_at` is nullable on the table and never null in this result: a
-row reaches it only by carrying an engine reference, which is written
-by the same statement that sets the time. The sort key is therefore
-total over the rows this returns, which is what a keyset cursor needs.
+`reported_at` is nullable on the table and never null in this result,
+because the filter requires it. The sort key is therefore total over
+the rows this returns, which is what a keyset cursor needs.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
@@ -52,10 +72,11 @@ from keeper.infrastructure.projection.cursor import decode_cursor, encode_cursor
 
 _SELECT_SQL = f"""
 SELECT step_id, execution_id, step_index, describes, beamline,
-       outcome, engine_reference, reported_at, dataset_id, filed_at
+       outcome, engine_reference, reported_at, run_opened_at, dataset_id, filed_at
 FROM {PROJECTION_NAME}
-WHERE run_opened_at IS NOT NULL
+WHERE opens_a_run
   AND reported_at IS NOT NULL
+  AND outcome IN ('Done', 'Broken')
   AND dataset_id IS NULL
   AND ($1::text IS NULL OR beamline = $1)
   AND ($2::timestamptz IS NULL OR (reported_at, step_id) < ($2, $3))
@@ -96,8 +117,8 @@ class PostgresStepSummaryLookup:
 def _cursor_after(items: list[StepSummary]) -> str | None:
     """The sort key of the last row, or nothing when it has no time.
 
-    The guard is unreachable against this query, which returns only rows
-    carrying an engine reference and therefore a reported time. It is
+    The guard is unreachable against this query, which requires a
+    reported time in its filter. It is
     here because the column is nullable and a cursor built from a null
     would decode into a page boundary nothing compares against, which
     reads to a caller as a listing that silently ends early.
@@ -118,6 +139,7 @@ def _to_summary(row: Any) -> StepSummary:
         outcome=row["outcome"],
         engine_reference=row["engine_reference"],
         reported_at=row["reported_at"],
+        run_opened_at=row["run_opened_at"],
         dataset_id=row["dataset_id"],
         filed_at=row["filed_at"],
     )
