@@ -1,5 +1,5 @@
 # Serves the public half of the token signing key, so the keeper's verifier
-# has a JWKS URL to fetch. See keeper-postgres.service.in for why every unit
+# has a JWKS URL to fetch. See cora-keeper-postgres.service.in for why every unit
 # here carries ConditionHost.
 #
 # A whole service for one static file looks like too much, and the

@@ -167,8 +167,8 @@ tier is not.
 ## Operating it
 
 ```bash
-systemctl --user status keeper.service keeper-postgres.service
-journalctl --user -u keeper.service -f
+systemctl --user status cora-keeper.service cora-keeper-postgres.service
+journalctl --user -u cora-keeper.service -f
 tail -f "$CORA_ROOT/log/keeper.log"
 podman logs -f keeper-postgres
 ```
@@ -182,7 +182,7 @@ Starting the database over needs podman, because `:U` chowned the directory
 to a subordinate uid the account cannot remove directly:
 
 ```bash
-systemctl --user stop keeper.service keeper-postgres.service
+systemctl --user stop cora-keeper.service cora-keeper-postgres.service
 podman unshare rm -rf "$CORA_ROOT/pgdata"
 ./install.sh
 ```
@@ -194,9 +194,9 @@ podman unshare rm -rf "$CORA_ROOT/pgdata"
 | `install.sh` | preflight, secrets, virtualenv, tokens, certificate, units, migrations, start |
 | `issue_tokens.py` | the signing key, the JWKS, one token per caller |
 | `issue_tls.py` | the private CA and the server certificate |
-| `keeper-postgres.service.in` | the database, a rootless container |
-| `keeper-jwks.service.in` | the public key, served for the verifier |
-| `keeper.service.in` | the HTTP surface |
+| `cora-keeper-postgres.service.in` | the database, a rootless container |
+| `cora-keeper-jwks.service.in` | the public key, served for the verifier |
+| `cora-keeper.service.in` | the HTTP surface |
 
 The templates carry `@NAME@` placeholders and name no host, so the tracked
 copy shows the shape and the installed copy shows the deployment.

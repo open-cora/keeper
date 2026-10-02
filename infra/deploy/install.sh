@@ -175,9 +175,25 @@ render() {
       -e "s|@API_BIND@|${API_BIND}|g" \
       "$1" > "$2"
 }
-render "${SCRIPT_DIR}/keeper-postgres.service.in" "${UNIT_DIR}/keeper-postgres.service"
-render "${SCRIPT_DIR}/keeper-jwks.service.in" "${UNIT_DIR}/keeper-jwks.service"
-render "${SCRIPT_DIR}/keeper.service.in" "${UNIT_DIR}/keeper.service"
+render "${SCRIPT_DIR}/cora-keeper-postgres.service.in" "${UNIT_DIR}/cora-keeper-postgres.service"
+render "${SCRIPT_DIR}/cora-keeper-jwks.service.in" "${UNIT_DIR}/cora-keeper-jwks.service"
+render "${SCRIPT_DIR}/cora-keeper.service.in" "${UNIT_DIR}/cora-keeper.service"
+
+# These three were installed unprefixed once, which left them as
+# unnamespaced names in a directory the facility also keeps units in. A
+# host that ran that version still has them, and leaving them behind
+# would mean two enabled units per service, both pinned to this host and
+# both able to start: two API processes on one port, and two containers
+# reaching for one data directory. So the old names are taken out here
+# rather than left for somebody to notice.
+for retired in keeper.service keeper-jwks.service keeper-postgres.service; do
+  if [ -f "${UNIT_DIR}/${retired}" ]; then
+    systemctl --user disable --now "${retired}" >/dev/null 2>&1 || true
+    rm -f "${UNIT_DIR}/${retired}"
+    say "retired ${retired}, now carried by cora-${retired}"
+  fi
+done
+
 systemctl --user daemon-reload
 say "ok"
 echo
@@ -188,8 +204,8 @@ echo "Database"
 # environment file is written to disk and never reaches the process. A deploy
 # script that reports success while running the previous revision is worse
 # than one that fails.
-systemctl --user enable keeper-postgres.service
-systemctl --user restart keeper-postgres.service
+systemctl --user enable cora-keeper-postgres.service
+systemctl --user restart cora-keeper-postgres.service
 for _ in $(seq 1 60); do
   if podman exec keeper-postgres pg_isready -U keeper -d keeper >/dev/null 2>&1; then
     say "accepting connections"
@@ -217,13 +233,13 @@ echo "Migrations"
 #
 # Ignoring the failure covers the first install, where the unit does not
 # exist yet.
-systemctl --user stop keeper.service 2>/dev/null || true
+systemctl --user stop cora-keeper.service 2>/dev/null || true
 (cd "${ATLAS_DIR}" && DATABASE_URL="${ATLAS_DB_URL}" atlas migrate apply --env local)
 echo
 
 echo "JWKS"
-systemctl --user enable keeper-jwks.service
-systemctl --user restart keeper-jwks.service
+systemctl --user enable cora-keeper-jwks.service
+systemctl --user restart cora-keeper-jwks.service
 sleep 2
 curl -fsS --max-time 5 "http://127.0.0.1:${JWKS_PORT}/jwks.json" >/dev/null \
   || die "the JWKS is not being served; the keeper could not verify a token"
@@ -231,11 +247,11 @@ say "served on 127.0.0.1:${JWKS_PORT}"
 echo
 
 echo "API"
-systemctl --user enable keeper.service
-systemctl --user restart keeper.service
+systemctl --user enable cora-keeper.service
+systemctl --user restart cora-keeper.service
 sleep 3
-systemctl --user is-active --quiet keeper.service \
-  || die "keeper.service did not stay up; see: journalctl --user -u keeper.service or ${CORA_ROOT}/log/keeper.log"
+systemctl --user is-active --quiet cora-keeper.service \
+  || die "cora-keeper.service did not stay up; see: journalctl --user -u cora-keeper.service or ${CORA_ROOT}/log/keeper.log"
 
 # Both directions, because a check that only tries the valid case cannot
 # tell an enforcing deployment from an open one. This exact mistake shipped
