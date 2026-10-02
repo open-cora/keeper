@@ -39,3 +39,21 @@ def test_the_decision_is_the_same_every_time_for_the_same_inputs() -> None:
     first = decide(None, command, now=_WHEN, new_id=new_id)
     second = decide(None, command, now=_WHEN, new_id=new_id)
     assert first == second
+
+
+def test_a_command_naming_an_id_registers_at_that_id_rather_than_the_minted_one() -> None:
+    chosen, minted = uuid4(), uuid4()
+    events = decide(None, RegisterActor(actor_id=chosen), now=_WHEN, new_id=minted)
+    assert events == [ActorRegistered(actor_id=chosen, occurred_at=_WHEN)]
+
+
+def test_registering_at_an_id_that_already_has_a_history_is_refused() -> None:
+    """The branch above is unreachable while every id is freshly minted."""
+    taken = uuid4()
+    with pytest.raises(ActorAlreadyExistsError):
+        decide(
+            Actor(id=taken, active=True),
+            RegisterActor(actor_id=taken),
+            now=_WHEN,
+            new_id=uuid4(),
+        )

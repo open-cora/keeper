@@ -25,15 +25,15 @@ def decide(
       - State must be None, or the id already has a history
         -> ActorAlreadyExistsError
 
-    The command carries nothing, so that precondition is the whole of
-    the decision. `command` is still taken, and still named, because the
-    canonical decider signature is what the slice rules range over and
-    an underscore here would be a hole in that.
+    `new_id` is what the actor is registered as when the command names
+    no id, which is the ordinary case. A command that names one wins,
+    and the precondition above stops being unreachable: a minted id
+    cannot collide with a stream that already exists, and a chosen one
+    can.
     """
-    _ = command
     if state is not None:
         raise ActorAlreadyExistsError(state.id)
-    return [ActorRegistered(actor_id=new_id, occurred_at=now)]
+    return [ActorRegistered(actor_id=command.actor_id or new_id, occurred_at=now)]
 
 
 __all__ = ["decide"]

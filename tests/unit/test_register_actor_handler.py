@@ -12,7 +12,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from keeper.access.aggregates.actor import ACTOR_STREAM_TYPE, Actor, load_actor
+from keeper.access.aggregates.actor import (
+    ACTOR_STREAM_TYPE,
+    Actor,
+    ActorAlreadyExistsError,
+    load_actor,
+)
 from keeper.access.features.register_actor import RegisterActor, bind
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.deps import make_inmemory_kernel
@@ -101,3 +106,27 @@ async def test_a_denied_caller_gets_an_error_and_writes_nothing() -> None:
     generator = deps.id_generator
     assert isinstance(generator, _CountingIdGenerator)
     assert generator.issued == [], "authorization must be decided before an id is minted"
+
+
+async def test_registering_at_a_chosen_id_makes_the_actor_loadable_by_that_id() -> None:
+    """The id a token authenticates as is not this system's to mint."""
+    deps = _kernel()
+    handler = bind(deps)
+    chosen = uuid4()
+
+    actor_id = await handler(
+        RegisterActor(actor_id=chosen), principal_id=uuid4(), correlation_id=uuid4()
+    )
+
+    assert actor_id == chosen
+    assert await load_actor(deps.event_store, chosen) == Actor(id=chosen, active=True)
+
+
+async def test_registering_at_an_id_that_is_already_taken_is_refused() -> None:
+    deps = _kernel()
+    handler = bind(deps)
+    chosen = uuid4()
+    await handler(RegisterActor(actor_id=chosen), principal_id=uuid4(), correlation_id=uuid4())
+
+    with pytest.raises(ActorAlreadyExistsError):
+        await handler(RegisterActor(actor_id=chosen), principal_id=uuid4(), correlation_id=uuid4())
