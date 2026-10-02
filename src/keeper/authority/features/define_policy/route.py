@@ -27,10 +27,22 @@ from keeper.infrastructure.request import (
 
 
 class PermissionBody(BaseModel):
-    """One principal may issue one command."""
+    """One principal may issue one command, at one place or at none."""
 
     principal_id: UUID
     command_name: str = Field(min_length=1, max_length=200)
+    beamline: str | None = Field(default=None, min_length=1, max_length=200)
+    """The place this grant covers, or absent for a command that names none.
+
+    There is no value meaning everywhere. A principal that may act at
+    four beamlines holds four grants, which is a reach a reader of the
+    rulebook can see rather than one hidden behind a star.
+
+    Spelled the same here as in the granting slice on purpose. Without
+    it a policy could be granted a scoped permission but never born
+    with one, so a deployment authoring its first rulebook would have
+    to write every scoped grant as a second call.
+    """
 
 
 class DefinePolicyRequest(BaseModel):
@@ -88,7 +100,11 @@ async def post_policies(
     policy_id = await handler(
         DefinePolicy(
             permissions=frozenset(
-                Permission(principal_id=p.principal_id, command_name=p.command_name)
+                Permission(
+                    principal_id=p.principal_id,
+                    command_name=p.command_name,
+                    beamline=p.beamline,
+                )
                 for p in body.permissions
             )
         ),

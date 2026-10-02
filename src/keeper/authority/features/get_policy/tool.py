@@ -20,10 +20,11 @@ from keeper.infrastructure.slices.principal import get_mcp_principal_id
 
 
 class PermissionOutput(BaseModel):
-    """One principal may issue one command."""
+    """One principal may issue one command, at one place or at none."""
 
     principal_id: UUID
     command_name: str
+    beamline: str | None = None
 
 
 class GetPolicyOutput(BaseModel):
@@ -56,7 +57,11 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
         return GetPolicyOutput(
             policy_id=policy.id,
             permissions=[
-                PermissionOutput(principal_id=p.principal_id, command_name=p.command_name)
+                PermissionOutput(
+                    principal_id=p.principal_id,
+                    command_name=p.command_name,
+                    beamline=p.beamline,
+                )
                 for p in sorted_permissions(policy.permissions)
             ],
         )

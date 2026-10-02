@@ -23,10 +23,20 @@ from keeper.infrastructure.slices.principal import get_mcp_principal_id
 
 
 class PermissionInput(BaseModel):
-    """One principal may issue one command."""
+    """One principal may issue one command, at one place or at none."""
 
     principal_id: UUID
     command_name: str = Field(min_length=1, max_length=200)
+    beamline: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "The place this grant covers, or absent for a command that names none. "
+            "There is no value meaning everywhere: a principal that may act at four "
+            "beamlines holds four grants."
+        ),
+    )
 
 
 class DefinePolicyOutput(BaseModel):
@@ -50,7 +60,11 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
         policy_id = await handler(
             DefinePolicy(
                 permissions=frozenset(
-                    Permission(principal_id=p.principal_id, command_name=p.command_name)
+                    Permission(
+                        principal_id=p.principal_id,
+                        command_name=p.command_name,
+                        beamline=p.beamline,
+                    )
                     for p in permissions
                 )
             ),

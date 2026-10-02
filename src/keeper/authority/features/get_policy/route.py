@@ -38,10 +38,17 @@ from keeper.infrastructure.request import (
 
 
 class PermissionResponse(BaseModel):
-    """One principal may issue one command."""
+    """One principal may issue one command, at one place or at none.
+
+    `beamline` is null for a grant that names no place. Reporting the
+    permissions without it would make two grants that differ only in
+    where they apply read as one, so an operator checking what a
+    deployment enforces would be shown a rulebook it is not running.
+    """
 
     principal_id: UUID
     command_name: str
+    beamline: str | None = None
 
 
 class GetPolicyResponse(BaseModel):
@@ -90,7 +97,11 @@ async def get_policy(
     return GetPolicyResponse(
         policy_id=policy.id,
         permissions=[
-            PermissionResponse(principal_id=p.principal_id, command_name=p.command_name)
+            PermissionResponse(
+                principal_id=p.principal_id,
+                command_name=p.command_name,
+                beamline=p.beamline,
+            )
             for p in sorted_permissions(policy.permissions)
         ],
     )

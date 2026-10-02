@@ -268,14 +268,30 @@ def test_a_client_can_write_and_read_a_policy_over_the_mcp_surface() -> None:
         _call(client, live, "revoke_permission", policy_id=policy_id, **taken_back)
         after = _call(client, live, "get_policy", policy_id=policy_id)
 
+        _call(
+            client,
+            live,
+            "grant_permission",
+            policy_id=policy_id,
+            principal_id=granted[0],
+            command_name="RegisterDevice",
+            beamline="19-bm",
+        )
+        scoped = _call(client, live, "get_policy", policy_id=policy_id)
+
     assert read["policy_id"] == policy_id
     keys = [(p["principal_id"], p["command_name"]) for p in read["permissions"]]
     assert keys == sorted(keys), "a set has no order, so the tool must impose one"
     assert len(keys) == len(governing) + 8
-
-    assert taken_back in read["permissions"]
-    assert taken_back not in after["permissions"]
+    held_back = {**taken_back, "beamline": None}
+    assert held_back in read["permissions"]
+    assert held_back not in after["permissions"]
     assert len(after["permissions"]) == len(keys) - 1
+    assert {
+        "principal_id": granted[0],
+        "command_name": "RegisterDevice",
+        "beamline": "19-bm",
+    } in scoped["permissions"], "the tool dropped the place a grant covers"
 
 
 def test_a_client_can_switch_an_actor_on_and_off_over_the_mcp_surface() -> None:
