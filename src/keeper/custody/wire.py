@@ -21,13 +21,19 @@ failing is as much a fact about the system as a write that is, and the
 one read that goes to a table rather than to a stream is the one most
 likely to become the slow one.
 
-The two address slices go without the middle layer as well, and for a
-different reason than the reads: the server mints nothing for them, so
-a retry names the same dataset and the same address, and the decider
-refuses it as a duplicate before any second row exists. The wrapper
-would be buying a nicer status code for a retry rather than preventing
-one. That is the same call the sibling context makes for a device
-transition.
+The two address slices and the describing one go without the middle
+layer as well, and for a different reason than the reads: the server
+mints nothing for them, so a retry names the same dataset and says the
+same thing, and the decider refuses it as a duplicate before any second
+row exists. The wrapper would be buying a nicer status code for a retry
+rather than preventing one. That is the same call the sibling context
+makes for a device transition.
+
+The describing slice is the one where that reasoning had to be checked
+rather than inherited, because it is the one that admits a repeat. What
+it admits is a description that DIFFERS, which is a second observation
+and belongs in the log; what a retry sends is a description identical to
+the one already held, and the decider refuses that.
 
 Registering a dataset takes the idempotency wrapper for the same reason
 reporting a run does: the server mints the id, so a retry with no key
@@ -58,6 +64,7 @@ from keeper.custody.features import (
     list_datasets,
     register_dataset,
     register_dataset_address,
+    register_dataset_manifest,
     withdraw_dataset_address,
 )
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
@@ -76,6 +83,7 @@ class CustodyHandlers:
     get_dataset: get_dataset.Handler
     list_datasets: list_datasets.Handler
     register_dataset_address: register_dataset_address.Handler
+    register_dataset_manifest: register_dataset_manifest.Handler
     withdraw_dataset_address: withdraw_dataset_address.Handler
 
 
@@ -122,6 +130,11 @@ def wire_custody(deps: Kernel) -> CustodyHandlers:
         register_dataset_address=with_tracing(
             register_dataset_address.bind(deps),
             command_name="RegisterDatasetAddress",
+            bc=_BC,
+        ),
+        register_dataset_manifest=with_tracing(
+            register_dataset_manifest.bind(deps),
+            command_name="RegisterDatasetManifest",
             bc=_BC,
         ),
         withdraw_dataset_address=with_tracing(

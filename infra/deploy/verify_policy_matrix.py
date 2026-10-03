@@ -59,6 +59,7 @@ def principal_id(subject: str) -> UUID:
 MEASURED: tuple[tuple[str, str, str | None], ...] = (
     ("19-bm", "RegisterDataset", None),
     ("19-bm", "RegisterDatasetAddress", None),
+    ("19-bm", "RegisterDatasetManifest", None),
     ("19-bm", "WithdrawDatasetAddress", None),
     ("19-bm", "RegisterDevice", "19-bm"),
     ("19-bm", "ClaimExecution", None),

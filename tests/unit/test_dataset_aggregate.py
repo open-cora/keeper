@@ -82,6 +82,7 @@ def test_folding_a_registration_gives_the_run_and_the_reference() -> None:
                 value="raw/636de04a-2e43-4c1b-8f99-2f0af326cb66",
             ),
         ),
+        description=None,
     )
 
 

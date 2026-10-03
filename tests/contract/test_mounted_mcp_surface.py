@@ -86,6 +86,7 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "get_dataset",
         "list_datasets",
         "register_dataset_address",
+        "register_dataset_manifest",
         "withdraw_dataset_address",
         "make_proposal",
         "get_proposal",
@@ -512,6 +513,30 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             dataset_id=dataset_id,
             external_ref_scheme="gpfs-file",
             external_ref_value="/central/raw/uid-completing.h5",
+        )
+
+        # What is inside the copy that is left, described against the
+        # genesis address because the one above has just been withdrawn.
+        # Two entries and only one of them measured, which is the shape
+        # a reader gets from a store that serves structure for some of
+        # what it holds and not all of it.
+        _call(
+            client,
+            live,
+            "register_dataset_manifest",
+            dataset_id=dataset_id,
+            external_ref_scheme="tiled-node-path",
+            external_ref_value="raw/uid-completing",
+            convention="dxchange",
+            entries=[
+                {
+                    "path": "/exchange/data",
+                    "shape": [1800, 2048, 2048],
+                    "dtype": "uint16",
+                    "role": "projections",
+                },
+                {"path": "/measurement/sample"},
+            ],
         )
 
         held = _call(client, live, "get_dataset", dataset_id=dataset_id)
@@ -1014,12 +1039,31 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "named no run, and a gap listing that showed it would be counting every "
         "step a facility ever dispatched rather than the runs that produced data"
     )
+    described = held.pop("description")
     assert held == {
         "dataset_id": dataset_id,
         "execution_id": held_execution,
         "step_id": produced_by,
         "external_refs": [{"scheme": "tiled-node-path", "value": "raw/uid-completing"}],
     }
+    assert described["described_at"], "a description is as of a moment, so it carries one"
+    del described["described_at"]
+    assert described == {
+        "external_ref": {"scheme": "tiled-node-path", "value": "raw/uid-completing"},
+        "convention": "dxchange",
+        "entries": [
+            {
+                "path": "/exchange/data",
+                "extent": {"shape": [1800, 2048, 2048], "capacity": None, "dtype": "uint16"},
+                "role": "projections",
+            },
+            {"path": "/measurement/sample", "extent": None, "role": None},
+        ],
+    }, (
+        "an entry nobody measured comes back with no extent and an entry nobody "
+        "named comes back with no role, and both absences have to survive the "
+        "round trip or a reader cannot tell them from a zero"
+    )
 
 
 def _tools_a_walk_calls() -> frozenset[str]:

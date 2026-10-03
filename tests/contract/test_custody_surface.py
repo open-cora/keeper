@@ -100,6 +100,7 @@ def test_a_registered_dataset_reads_back_with_its_step_and_reference(
         "execution_id": execution_id,
         "step_id": step_id,
         "external_refs": [_REF],
+        "description": None,
     }
 
 
@@ -154,6 +155,7 @@ def test_a_withdrawn_address_leaves_the_others_and_the_run_that_made_them(
         "execution_id": execution_id,
         "step_id": step_id,
         "external_refs": [_CENTRAL],
+        "description": None,
     }
 
 
@@ -204,6 +206,181 @@ def test_an_address_whose_value_carries_slashes_needs_no_encoding_to_withdraw(
 
     assert gone.status_code == 204, gone.text
     assert read.json()["external_refs"] == [_REF]
+
+
+def test_a_description_reads_back_with_the_copy_it_was_taken_of(client: TestClient) -> None:
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        filed = client.post(
+            f"/datasets/{dataset_id}/manifests",
+            json={
+                "external_ref": _REF,
+                "convention": "dxchange",
+                "entries": [
+                    {
+                        "path": "/exchange/data",
+                        "extent": {"shape": [1800, 2048, 2048], "dtype": "uint16"},
+                        "role": "projections",
+                    },
+                    {"path": "/measurement/sample"},
+                ],
+            },
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert filed.status_code == 204, filed.text
+    described = read.json()["description"]
+    assert described["external_ref"] == _REF
+    assert described["convention"] == "dxchange"
+    assert described["entries"] == [
+        {
+            "path": "/exchange/data",
+            "extent": {"shape": [1800, 2048, 2048], "capacity": None, "dtype": "uint16"},
+            "role": "projections",
+        },
+        {"path": "/measurement/sample", "extent": None, "role": None},
+    ], (
+        "an entry nobody measured carries no extent and an entry nobody named "
+        "carries no role, and a reader that cannot see those absences cannot "
+        "tell them from a zero"
+    )
+
+
+def test_an_entry_a_convention_expects_and_the_data_lacks_is_simply_absent(
+    client: TestClient,
+) -> None:
+    """The failure this whole seam exists to make visible.
+
+    A tomography scan whose rotation angles were never written cannot
+    be reconstructed, and nothing notices today until somebody tries.
+    The record notices by not holding the entry, which is why nothing
+    on the way in may supply what a convention says should be there.
+    """
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        client.post(
+            f"/datasets/{dataset_id}/manifests",
+            json={
+                "external_ref": _REF,
+                "convention": "dxchange",
+                "entries": [{"path": "/exchange/data", "role": "projections"}],
+            },
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    paths = [entry["path"] for entry in read.json()["description"]["entries"]]
+    assert paths == ["/exchange/data"]
+
+
+def test_a_second_look_that_found_something_new_replaces_the_first(client: TestClient) -> None:
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        body: dict[str, Any] = {
+            "external_ref": _REF,
+            "convention": "dxchange",
+            "entries": [{"path": "/exchange/data", "role": "projections"}],
+        }
+        client.post(f"/datasets/{dataset_id}/manifests", json=body)
+        again = client.post(
+            f"/datasets/{dataset_id}/manifests",
+            json={
+                **body,
+                "entries": [
+                    {"path": "/exchange/data", "role": "projections"},
+                    {"path": "/exchange/theta", "role": "projection-angles"},
+                ],
+            },
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert again.status_code == 204, again.text
+    paths = [entry["path"] for entry in read.json()["description"]["entries"]]
+    assert paths == ["/exchange/data", "/exchange/theta"]
+
+
+def test_a_description_repeating_what_the_record_already_says_is_409(client: TestClient) -> None:
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        body: dict[str, Any] = {
+            "external_ref": _REF,
+            "convention": "dxchange",
+            "entries": [{"path": "/exchange/data", "role": "projections"}],
+        }
+        client.post(f"/datasets/{dataset_id}/manifests", json=body)
+        again = client.post(f"/datasets/{dataset_id}/manifests", json=body)
+
+    assert again.status_code == 409, again.text
+
+
+def test_describing_a_copy_the_dataset_does_not_hold_is_409(client: TestClient) -> None:
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        refused = client.post(
+            f"/datasets/{dataset_id}/manifests",
+            json={
+                "external_ref": {"scheme": "gpfs-file", "value": "/central/raw/nobody-filed.h5"},
+                "convention": "dxchange",
+                "entries": [],
+            },
+        )
+
+    assert refused.status_code == 409, refused.text
+
+
+def test_describing_a_dataset_that_does_not_exist_is_404(client: TestClient) -> None:
+    with client:
+        refused = client.post(
+            f"/datasets/{uuid4()}/manifests",
+            json={"external_ref": _REF, "convention": "dxchange", "entries": []},
+        )
+
+    assert refused.status_code == 404, refused.text
+
+
+def test_a_container_counted_by_two_numbers_is_400_rather_than_500(client: TestClient) -> None:
+    """The one malformed shape this context owns, reaching its own handler.
+
+    Without a dtype an entry describes a container, which is counted by
+    one number. Two says nothing anybody meant, and the value object is
+    what refuses it. Nothing but a route can show that the refusal
+    arrives as a 400 rather than as an unhandled exception.
+    """
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        refused = client.post(
+            f"/datasets/{dataset_id}/manifests",
+            json={
+                "external_ref": _REF,
+                "convention": "dxchange",
+                "entries": [{"path": "/measurement", "extent": {"shape": [4, 2]}}],
+            },
+        )
+
+    assert refused.status_code == 400, refused.text
+
+
+def test_a_container_too_wide_to_describe_is_refused_at_the_boundary(
+    client: TestClient,
+) -> None:
+    with client:
+        execution_id, step_id = _an_acquisition(client)
+        dataset_id = _a_dataset(client, (execution_id, step_id))
+        refused = client.post(
+            f"/datasets/{dataset_id}/manifests",
+            json={
+                "external_ref": _REF,
+                "convention": "dxchange",
+                "entries": [{"path": f"/exchange/data_{index}"} for index in range(65)],
+            },
+        )
+
+    assert refused.status_code == 422, refused.text
 
 
 def test_reading_an_unregistered_dataset_is_404(client: TestClient) -> None:

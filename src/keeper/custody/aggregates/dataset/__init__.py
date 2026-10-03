@@ -4,6 +4,7 @@ from keeper.custody.aggregates.dataset.events import (
     DatasetAddressRegistered,
     DatasetAddressWithdrawn,
     DatasetEvent,
+    DatasetManifestRegistered,
     DatasetRegistered,
     from_stored,
     to_payload,
@@ -12,6 +13,16 @@ from keeper.custody.aggregates.dataset.evolver import (
     DatasetStreamOutOfOrderError,
     evolve,
     fold,
+)
+from keeper.custody.aggregates.dataset.manifest import (
+    ENTRY_PATH_MAX_LENGTH,
+    MANIFEST_LABEL_MAX_LENGTH,
+    MANIFEST_MAX_ENTRIES,
+    Description,
+    Entry,
+    Extent,
+    InvalidManifestError,
+    Manifest,
 )
 from keeper.custody.aggregates.dataset.read import (
     DATASET_STREAM_TYPE,
@@ -24,11 +35,15 @@ from keeper.custody.aggregates.dataset.state import (
     DatasetAddressKnownError,
     DatasetAddressUnknownError,
     DatasetAlreadyExistsError,
+    DatasetDescriptionUnchangedError,
     DatasetNotFoundError,
 )
 
 __all__ = [
     "DATASET_STREAM_TYPE",
+    "ENTRY_PATH_MAX_LENGTH",
+    "MANIFEST_LABEL_MAX_LENGTH",
+    "MANIFEST_MAX_ENTRIES",
     "CopiedBy",
     "Dataset",
     "DatasetAddressKnownError",
@@ -36,10 +51,17 @@ __all__ = [
     "DatasetAddressUnknownError",
     "DatasetAddressWithdrawn",
     "DatasetAlreadyExistsError",
+    "DatasetDescriptionUnchangedError",
     "DatasetEvent",
+    "DatasetManifestRegistered",
     "DatasetNotFoundError",
     "DatasetRegistered",
     "DatasetStreamOutOfOrderError",
+    "Description",
+    "Entry",
+    "Extent",
+    "InvalidManifestError",
+    "Manifest",
     "evolve",
     "fold",
     "from_stored",

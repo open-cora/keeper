@@ -30,7 +30,11 @@ _CENTRAL = Identifier(scheme="gpfs-file", value="/central/raw/scan_034.h5")
 
 def _dataset(*refs: Identifier) -> Dataset:
     return Dataset(
-        id=uuid4(), execution_id=uuid4(), step_id=uuid4(), external_refs=refs or (_BEAMLINE,)
+        id=uuid4(),
+        execution_id=uuid4(),
+        step_id=uuid4(),
+        external_refs=refs or (_BEAMLINE,),
+        description=None,
     )
 
 

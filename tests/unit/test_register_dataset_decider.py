@@ -49,7 +49,13 @@ def test_registering_on_an_empty_stream_emits_one_event() -> None:
 
 
 def test_registering_onto_a_live_stream_is_refused() -> None:
-    existing = Dataset(id=uuid4(), execution_id=uuid4(), step_id=uuid4(), external_refs=(_REF,))
+    existing = Dataset(
+        id=uuid4(),
+        execution_id=uuid4(),
+        step_id=uuid4(),
+        external_refs=(_REF,),
+        description=None,
+    )
 
     with pytest.raises(DatasetAlreadyExistsError):
         decide(

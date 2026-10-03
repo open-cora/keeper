@@ -1,13 +1,15 @@
-"""The two handlers that change where a dataset can be read.
+"""The three handlers that add a later fact to a dataset already held.
 
-Both append to a stream that already has rows, which is what separates
-them from the genesis slice and is the whole of what this file is for:
-that the version the load returned is the version the append uses, and
-that a denied caller writes nothing.
+All three append to a stream that already has rows, which is what
+separates them from the genesis slice and is the whole of what this
+file is for: that the version the load returned is the version the
+append uses, and that a denied caller writes nothing.
 
-One file for the pair, because they share a fixture chain four calls
+One file for the three, because they share a fixture chain four calls
 deep and the sibling context keeps its transition handlers together for
-the same reason.
+the same reason. Two of them say where the data can be read and the
+third says what is inside it, which is a difference the deciders care
+about and these handlers do not.
 """
 
 from datetime import UTC, datetime
@@ -19,12 +21,17 @@ import pytest
 from keeper.custody.aggregates.dataset import (
     DATASET_STREAM_TYPE,
     CopiedBy,
+    Entry,
+    Extent,
+    Manifest,
     load_dataset,
 )
 from keeper.custody.features.register_dataset import RegisterDataset
 from keeper.custody.features.register_dataset import bind as bind_register_dataset
 from keeper.custody.features.register_dataset_address import RegisterDatasetAddress
 from keeper.custody.features.register_dataset_address import bind as bind_register_address
+from keeper.custody.features.register_dataset_manifest import RegisterDatasetManifest
+from keeper.custody.features.register_dataset_manifest import bind as bind_register_manifest
 from keeper.custody.features.withdraw_dataset_address import WithdrawDatasetAddress
 from keeper.custody.features.withdraw_dataset_address import bind as bind_withdraw_address
 from keeper.execution.aggregates.execution import load_execution
@@ -53,6 +60,16 @@ _CLOCK_NOW = datetime(2026, 9, 19, 9, 0, tzinfo=UTC)
 """What the clock says, deliberately not the time any caller reports."""
 _BEAMLINE = Identifier(scheme="posix-file", value="/local1/scan_034.h5")
 _CENTRAL = Identifier(scheme="gpfs-file", value="/central/raw/scan_034.h5")
+_A_MANIFEST = Manifest(
+    convention="dxchange",
+    entries=(
+        Entry(
+            path="/exchange/data",
+            extent=Extent(shape=(1800, 2048, 2048), capacity=None, dtype="uint16"),
+            role="projections",
+        ),
+    ),
+)
 _SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/schema"}
 
 
@@ -206,6 +223,49 @@ async def test_a_withdrawn_address_leaves_the_rest_of_the_record_alone() -> None
     dataset = await load_dataset(deps.event_store, dataset_id)
     assert dataset is not None
     assert dataset.external_refs == (_CENTRAL,)
+
+
+async def test_a_description_lands_with_the_copy_it_was_taken_of() -> None:
+    deps = _kernel()
+    dataset_id = await _a_dataset(deps)
+
+    await bind_register_manifest(deps)(
+        RegisterDatasetManifest(
+            dataset_id=dataset_id,
+            external_ref=_BEAMLINE,
+            manifest=_A_MANIFEST,
+            occurred_at=_WHEN,
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    dataset = await load_dataset(deps.event_store, dataset_id)
+    assert dataset is not None
+    assert dataset.description is not None
+    assert dataset.description.external_ref == _BEAMLINE
+    assert dataset.description.described_at == _WHEN
+    assert dataset.description.manifest == _A_MANIFEST
+    assert dataset.external_refs == (_BEAMLINE,), "describing moves no data and no address"
+
+
+async def test_a_denied_description_writes_nothing_to_the_stream() -> None:
+    deps = _kernel()
+    dataset_id = await _a_dataset(deps)
+    before, _version = await deps.event_store.load(DATASET_STREAM_TYPE, dataset_id)
+    denied = _kernel(authz=_DenyAllAuthorize(), event_store=deps.event_store)
+
+    with pytest.raises(UnauthorizedError):
+        await bind_register_manifest(denied)(
+            RegisterDatasetManifest(
+                dataset_id=dataset_id, external_ref=_BEAMLINE, manifest=_A_MANIFEST
+            ),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+    after, _version = await deps.event_store.load(DATASET_STREAM_TYPE, dataset_id)
+    assert len(after) == len(before)
 
 
 async def test_a_reported_time_is_what_the_event_carries() -> None:

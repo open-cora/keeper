@@ -15,6 +15,9 @@ from keeper.custody.features.register_dataset import tool as register_dataset_to
 from keeper.custody.features.register_dataset_address import (
     tool as register_dataset_address_tool,
 )
+from keeper.custody.features.register_dataset_manifest import (
+    tool as register_dataset_manifest_tool,
+)
 from keeper.custody.features.withdraw_dataset_address import (
     tool as withdraw_dataset_address_tool,
 )
@@ -42,6 +45,10 @@ def register_custody_tools(
     register_dataset_address_tool.register(
         mcp,
         get_handler=lambda: get_handlers().register_dataset_address,
+    )
+    register_dataset_manifest_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().register_dataset_manifest,
     )
     withdraw_dataset_address_tool.register(
         mcp,

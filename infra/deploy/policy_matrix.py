@@ -90,6 +90,7 @@ BEAMLINE_WRITES: tuple[str, ...] = (
     "ReportStepRun",
     "RegisterDataset",
     "RegisterDatasetAddress",
+    "RegisterDatasetManifest",
     "WithdrawDatasetAddress",
     "DefineOperation",
     "MakeInquiry",

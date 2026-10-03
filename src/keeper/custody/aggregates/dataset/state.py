@@ -5,12 +5,42 @@ about it: which run made it, and what the store holding it calls it.
 
 ## Why so little
 
-Three fields, and the absences are the design. The store holds the data,
-its shape, its size and its metadata, and it is addressable, so anything
-copied here would be a second copy of a fact somebody else owns and would
-go stale the first time they changed it. What no store holds is which run
-produced the data, because the store was told a uid and this system holds
-the run. The join is the whole of what this context adds.
+Four fields, and the absences are still the design. The store holds the
+data, its size and its metadata, and it is addressable, so anything
+copied here would be a second copy of a fact somebody else owns and
+would go stale the first time they changed it. What no store holds is
+which run produced the data, because the store was told a uid and this
+system holds the run. The join is what this context was built to add.
+
+## The clause that was reversed, and the conditions it rests on
+
+That paragraph used to refuse a dataset's shape alongside its size and
+its metadata, and the fourth field is that refusal narrowed. Recorded
+here rather than quietly dropped, because a reversal a reader cannot
+see is how a rule turns into folklore.
+
+The clause rested on "and it is addressable", which assumes there is
+an owner to go and ask. At the beamlines this serves there is not: the
+data sits on a local disk, nothing answers questions about it, and a
+reader standing anywhere else cannot open it to learn whether it is
+even usable. The refusal was protecting against duplicating a fact
+somebody else holds, and here nobody else holds it.
+
+So a description is admitted as the same kind of fact an address
+already is. Both say what was true at a moment, both are superseded by
+a later event rather than edited, and neither substitutes for reading
+the data: one says where it is, the other says what shapes are in it,
+and a reader wanting a number still has to go and open it.
+
+What stays refused is anything computed FROM the data, and that part
+is enforced by shape rather than by this paragraph. The entry shape
+has nowhere to put a mean.
+
+The admission is also expected to narrow again. A deployment whose
+store serves structure of its own has an owner for the dimensions, and
+a reader asking that store reports the roles and leaves the numbers
+out. The entry shape already allows that, so the day it happens costs
+no new event.
 
 ## Why the reference is opaque, and who owns the shape of it
 
@@ -55,6 +85,7 @@ an event rather than an edit.
 from dataclasses import dataclass
 from uuid import UUID
 
+from keeper.custody.aggregates.dataset.manifest import Description
 from keeper.shared.identifier import Identifier
 
 
@@ -95,6 +126,32 @@ class DatasetAddressUnknownError(Exception):
 
     def __init__(self, dataset_id: UUID, scheme: str, value: str) -> None:
         super().__init__(f"Dataset {dataset_id} is not recorded at {scheme}:{value}")
+        self.dataset_id = dataset_id
+        self.scheme = scheme
+        self.value = value
+
+
+class DatasetDescriptionUnchangedError(Exception):
+    """A description arrived saying exactly what the record already says.
+
+    Refused rather than appended, which is the same call the address
+    sibling makes and for the same reason: delivery is at-least-once,
+    the server mints nothing a caller could key a retry on, and a
+    redelivered report would otherwise grow the log a row per delivery
+    while changing no state.
+
+    What is NOT refused is a description that differs. Looking twice
+    and seeing two things is the case this aggregate most needs to
+    keep, because the container really does change: a scan engine at
+    some of these beamlines reopens a finished file to append the
+    rotation angle of each frame, so the second look is the true one
+    and the first is the evidence of when it became true.
+    """
+
+    def __init__(self, dataset_id: UUID, scheme: str, value: str) -> None:
+        super().__init__(
+            f"Dataset {dataset_id} already carries that description of {scheme}:{value}"
+        )
         self.dataset_id = dataset_id
         self.scheme = scheme
         self.value = value
@@ -180,12 +237,31 @@ class Dataset:
     produced it is still named here. That is a more useful thing to hold
     than a deleted row, which would answer the question "what did this
     run produce" with silence.
+
+    ## Why one description and not one per address
+
+    `description` is the latest report of what is inside, whichever copy
+    was opened to make it, and absent until something opens one. One
+    rather than a map keyed by address, because the copies of a dataset
+    are the same bytes by this record's own account, and a reader
+    meeting two that disagree has found a copy that is not one.
+
+    The event carries the address it was taken of even so, so the day a
+    deployment converts data as it copies it, keeping one description
+    per copy is a change to how this is folded rather than a new kind
+    of row. History already holds what that fold would need.
+
+    Withdrawing an address does not clear it. What was inside the data
+    is still the best statement this system has about what the run
+    produced, and it is the only one left once every copy is gone,
+    which is the case the empty tuple above exists for.
     """
 
     id: UUID
     execution_id: UUID
     step_id: UUID
     external_refs: tuple[Identifier, ...]
+    description: Description | None
 
 
 __all__ = [
@@ -194,5 +270,6 @@ __all__ = [
     "DatasetAddressKnownError",
     "DatasetAddressUnknownError",
     "DatasetAlreadyExistsError",
+    "DatasetDescriptionUnchangedError",
     "DatasetNotFoundError",
 ]

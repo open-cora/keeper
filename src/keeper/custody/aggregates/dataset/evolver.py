@@ -31,8 +31,10 @@ from keeper.custody.aggregates.dataset.events import (
     DatasetAddressRegistered,
     DatasetAddressWithdrawn,
     DatasetEvent,
+    DatasetManifestRegistered,
     DatasetRegistered,
 )
+from keeper.custody.aggregates.dataset.manifest import Description, Manifest
 from keeper.custody.aggregates.dataset.state import Dataset
 from keeper.shared.identifier import Identifier
 
@@ -55,6 +57,14 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
     that doubled an entry on a row some future repair wrote by hand
     would hand every reader a duplicate, and refusing here would make
     the whole stream unreadable over one redundant row.
+
+    A manifest arm replaces whatever description was there, including
+    one taken of a different copy. Last report wins, because the thing
+    being described is the data rather than the copy, and a reader
+    needing to know which copy was opened reads it off the description
+    it got. It does not require the address to still be held: a report
+    of what was inside a copy that has since been purged is the most
+    this system will ever know about that run's output.
     """
     match event:
         case DatasetRegistered(
@@ -70,6 +80,7 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
                 execution_id=execution_id,
                 step_id=step_id,
                 external_refs=(Identifier(scheme=scheme, value=value),),
+                description=None,
             )
         case DatasetAddressRegistered(
             dataset_id=dataset_id,
@@ -91,6 +102,23 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
             return replace(
                 held,
                 external_refs=tuple(ref for ref in held.external_refs if ref != gone),
+            )
+        case DatasetManifestRegistered(
+            dataset_id=dataset_id,
+            external_ref_scheme=scheme,
+            external_ref_value=value,
+            convention=convention,
+            entries=entries,
+            occurred_at=described_at,
+        ):
+            held = _started(state, dataset_id)
+            return replace(
+                held,
+                description=Description(
+                    manifest=Manifest(convention=convention, entries=entries),
+                    external_ref=Identifier(scheme=scheme, value=value),
+                    described_at=described_at,
+                ),
             )
         case _:
             assert_never(event)
