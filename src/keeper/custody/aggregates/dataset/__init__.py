@@ -4,6 +4,7 @@ from keeper.custody.aggregates.dataset.events import (
     DatasetAddressRegistered,
     DatasetAddressWithdrawn,
     DatasetEvent,
+    DatasetFindingRecorded,
     DatasetManifestRegistered,
     DatasetRegistered,
     from_stored,
@@ -13,6 +14,12 @@ from keeper.custody.aggregates.dataset.evolver import (
     DatasetStreamOutOfOrderError,
     evolve,
     fold,
+)
+from keeper.custody.aggregates.dataset.finding import (
+    DATASET_MAX_FINDINGS,
+    FINDING_JUDGEMENT_MAX_LENGTH,
+    Finding,
+    InvalidFindingError,
 )
 from keeper.custody.aggregates.dataset.manifest import (
     ENTRY_PATH_MAX_LENGTH,
@@ -36,12 +43,16 @@ from keeper.custody.aggregates.dataset.state import (
     DatasetAddressUnknownError,
     DatasetAlreadyExistsError,
     DatasetDescriptionUnchangedError,
+    DatasetFindingsFullError,
+    DatasetFindingUnchangedError,
     DatasetNotFoundError,
 )
 
 __all__ = [
+    "DATASET_MAX_FINDINGS",
     "DATASET_STREAM_TYPE",
     "ENTRY_PATH_MAX_LENGTH",
+    "FINDING_JUDGEMENT_MAX_LENGTH",
     "MANIFEST_LABEL_MAX_LENGTH",
     "MANIFEST_MAX_ENTRIES",
     "CopiedBy",
@@ -53,6 +64,9 @@ __all__ = [
     "DatasetAlreadyExistsError",
     "DatasetDescriptionUnchangedError",
     "DatasetEvent",
+    "DatasetFindingRecorded",
+    "DatasetFindingUnchangedError",
+    "DatasetFindingsFullError",
     "DatasetManifestRegistered",
     "DatasetNotFoundError",
     "DatasetRegistered",
@@ -60,6 +74,8 @@ __all__ = [
     "Description",
     "Entry",
     "Extent",
+    "Finding",
+    "InvalidFindingError",
     "InvalidManifestError",
     "Manifest",
     "evolve",

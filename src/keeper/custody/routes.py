@@ -68,12 +68,16 @@ from keeper.custody.aggregates.dataset import (
     DatasetAddressUnknownError,
     DatasetAlreadyExistsError,
     DatasetDescriptionUnchangedError,
+    DatasetFindingsFullError,
+    DatasetFindingUnchangedError,
     DatasetNotFoundError,
+    InvalidFindingError,
     InvalidManifestError,
 )
 from keeper.custody.features import (
     get_dataset,
     list_datasets,
+    record_dataset_finding,
     register_dataset,
     register_dataset_address,
     register_dataset_manifest,
@@ -104,6 +108,7 @@ def register_custody_routes(app: FastAPI) -> None:
     app.include_router(register_dataset.router)
     app.include_router(get_dataset.router)
     app.include_router(list_datasets.router)
+    app.include_router(record_dataset_finding.router)
     app.include_router(register_dataset_address.router)
     app.include_router(register_dataset_manifest.router)
     app.include_router(withdraw_dataset_address.router)
@@ -113,7 +118,10 @@ def register_custody_routes(app: FastAPI) -> None:
     app.add_exception_handler(DatasetAddressKnownError, _handle_conflict)
     app.add_exception_handler(DatasetAddressUnknownError, _handle_conflict)
     app.add_exception_handler(DatasetDescriptionUnchangedError, _handle_conflict)
+    app.add_exception_handler(DatasetFindingUnchangedError, _handle_conflict)
+    app.add_exception_handler(DatasetFindingsFullError, _handle_conflict)
     app.add_exception_handler(InvalidManifestError, _handle_bad_request)
+    app.add_exception_handler(InvalidFindingError, _handle_bad_request)
 
 
 __all__ = ["register_custody_routes"]

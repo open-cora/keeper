@@ -172,11 +172,49 @@ class DatasetManifestRegistered:
     occurred_at: datetime
 
 
+@dataclass(frozen=True)
+class DatasetFindingRecorded:
+    """Something concluded what this data amounts to, and said so.
+
+    The fourth kind of later fact, and the first that says neither where
+    the data is nor what shapes are in it. It says what somebody made of
+    those shapes, which is the one thing about a body of data that no
+    store anywhere holds.
+
+    Recorded rather than registered, which breaks the verb this stream
+    has used three times, on purpose. The registrations all enter a fact
+    about the container into a register. A judgement is not a fact about
+    the container, and giving it the same verb would say it is. Recorded
+    rather than reported for the opposite reason: this tree already
+    spends the word report on a driver saying how a step went, and a computation
+    saying what it concluded is not that.
+
+    It cites no copy, where the description beside it cites the one that
+    was opened. Nothing opened anything here. A finding is reached from
+    what the record already holds, so there is no copy whose reading
+    could have differed, and a citation would name a file the computation
+    may never have touched.
+
+    `expected` and `arrived` are the counts the computation weighed, kept
+    because the description they were read from is allowed to be
+    superseded and so cannot be relied on to still say what it said. They
+    are evidence for a claim, never a measurement of the data: no number
+    here was computed from a value inside the container.
+    """
+
+    dataset_id: UUID
+    judgement: str
+    expected: int
+    arrived: int
+    occurred_at: datetime
+
+
 DatasetEvent = (
     DatasetRegistered
     | DatasetAddressRegistered
     | DatasetAddressWithdrawn
     | DatasetManifestRegistered
+    | DatasetFindingRecorded
 )
 """Every event that can appear on a Dataset stream.
 
@@ -222,6 +260,14 @@ def to_payload(event: DatasetEvent) -> dict[str, Any]:
                 "external_ref_value": event.external_ref_value,
                 "convention": event.convention,
                 "entries": [_entry_to_payload(entry) for entry in event.entries],
+                "occurred_at": event.occurred_at.isoformat(),
+            }
+        case DatasetFindingRecorded():
+            return {
+                "dataset_id": str(event.dataset_id),
+                "judgement": event.judgement,
+                "expected": event.expected,
+                "arrived": event.arrived,
                 "occurred_at": event.occurred_at.isoformat(),
             }
         case _:
@@ -343,6 +389,18 @@ def from_stored(stored: StoredEvent) -> DatasetEvent:
                     external_ref_value=payload["external_ref_value"],
                     convention=payload["convention"],
                     entries=tuple(_entry_from_payload(raw) for raw in payload["entries"]),
+                    occurred_at=datetime.fromisoformat(payload["occurred_at"]),
+                ),
+                extra=(ValueError,),
+            )
+        case "DatasetFindingRecorded":
+            return deserialize_or_raise(
+                "DatasetFindingRecorded",
+                lambda: DatasetFindingRecorded(
+                    dataset_id=UUID(payload["dataset_id"]),
+                    judgement=payload["judgement"],
+                    expected=payload["expected"],
+                    arrived=payload["arrived"],
                     occurred_at=datetime.fromisoformat(payload["occurred_at"]),
                 ),
                 extra=(ValueError,),

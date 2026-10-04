@@ -89,14 +89,35 @@ class DescriptionResponse(BaseModel):
     described_at: datetime
 
 
+class FindingResponse(BaseModel):
+    """What a computation concluded about this data.
+
+    `expected` and `arrived` are the counts it weighed, kept so a
+    reader can judge the claim without this system handing over a
+    measurement. They are not re-derived on read: they say what was
+    true when the conclusion was reached, and the description they came
+    from is allowed to have moved on since.
+    """
+
+    judgement: str
+    expected: int
+    arrived: int
+
+
 class GetDatasetResponse(BaseModel):
-    """A dataset as this system currently holds it."""
+    """A dataset as this system currently holds it.
+
+    `findings` carries at most one per judgement, in the order this
+    system first heard each. Nothing ranks them, because nothing here
+    knows which of two judgements a reader came for.
+    """
 
     dataset_id: UUID
     execution_id: UUID
     step_id: UUID
     external_refs: list[ExternalRefResponse]
     description: DescriptionResponse | None
+    findings: list[FindingResponse]
 
 
 def _get_handler(request: Request) -> Handler:
@@ -169,4 +190,10 @@ async def get_dataset(
             ExternalRefResponse(scheme=ref.scheme, value=ref.value) for ref in dataset.external_refs
         ],
         description=_described(dataset.description),
+        findings=[
+            FindingResponse(
+                judgement=found.judgement, expected=found.expected, arrived=found.arrived
+            )
+            for found in dataset.findings
+        ],
     )

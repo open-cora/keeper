@@ -86,6 +86,7 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "get_dataset",
         "list_datasets",
         "register_dataset_address",
+        "record_dataset_finding",
         "register_dataset_manifest",
         "withdraw_dataset_address",
         "make_proposal",
@@ -537,6 +538,20 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
                 },
                 {"path": "/measurement/sample"},
             ],
+        )
+
+        # And what somebody made of those shapes, which is the one layer
+        # of this that no store anywhere answers for. The counts are the
+        # evidence and not a measurement: 1800 projections were expected
+        # and 1800 arrived, which the manifest above is where it read.
+        _call(
+            client,
+            live,
+            "record_dataset_finding",
+            dataset_id=dataset_id,
+            judgement="projections-complete",
+            expected=1800,
+            arrived=1800,
         )
 
         held = _call(client, live, "get_dataset", dataset_id=dataset_id)

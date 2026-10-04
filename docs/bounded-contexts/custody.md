@@ -2,7 +2,7 @@
 
 Custody is the bounded context that answers one question: where is the data one run produced, and who is keeping it?
 
-It holds one aggregate, the Dataset, and six things you can do to it. The record is deliberately small, and most of this page is about what is not on it.
+It holds one aggregate, the Dataset, and seven things you can do to it. The record is deliberately small, and most of this page is about what is not on it.
 
 ## What a Dataset is
 
@@ -65,6 +65,7 @@ Custody says what this one can back: where the thing is, and on whose word. It i
 | Record another address for it | `POST /datasets/{dataset_id}/addresses` | `register_dataset_address` | `204` |
 | Record that an address stopped answering | `POST /datasets/{dataset_id}/addresses/withdraw` | `withdraw_dataset_address` | `204` |
 | Record what is inside one copy | `POST /datasets/{dataset_id}/manifests` | `register_dataset_manifest` | `204` |
+| Record what somebody concluded about it | `POST /datasets/{dataset_id}/findings` | `record_dataset_finding` | `204` |
 
 Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/custody/routes.py`.
 
@@ -97,11 +98,13 @@ There is no datasets table. Current state is recomputed by replaying a stream on
    DatasetManifestRegistered  dataset_id, external_ref_scheme,
                               external_ref_value, convention, entries,
                               occurred_at
+   DatasetFindingRecorded     dataset_id, judgement, expected, arrived,
+                              occurred_at
 ```
 
 Each reference travels as two flat strings and is rebuilt into a pair by the fold, because events carry primitives and that pair is a value object.
 
-Four events, and the three later ones add an address, remove one, or report what was inside one, rather than editing the row before them. A record saying where data was at a moment stays true when the data moves, and what changes is that there is a later fact. Registered and withdrawn rather than one moved event, because a copy and a purge are separated by days and both are true in between. An address rather than a copy, because the same bytes answer to a local path, an NFS path and a server URI at once, and what a reader needs to know is which of them it can reach.
+Five events, and the four later ones add an address, remove one, report what was inside one, or say what somebody made of it, rather than editing the row before them. A record saying where data was at a moment stays true when the data moves, and what changes is that there is a later fact. Registered and withdrawn rather than one moved event, because a copy and a purge are separated by days and both are true in between. An address rather than a copy, because the same bytes answer to a local path, an NFS path and a server URI at once, and what a reader needs to know is which of them it can reach.
 
 `copied_by_execution_id` and `copied_by_step_id` are optional together, and the optionality carries a meaning worth stating. A copy this system dispatched is a report it is owed and names the step that made it. A copy somebody else made is something this system was told, and most copies are that: facility data movement runs on its own and will never be a principal in this record. Absent has to mean absent, because a citation naming an execution that did not do the copying reads as a report this system went and asked for.
 
@@ -137,6 +140,31 @@ Three things about it are deliberate and each one is load-bearing.
 
 The vocabulary the roles come from is not defined here and should not be. It accretes, the way the free-form `group` on a device register has been accreting with four beamlines independently reaching the same word. A word several readers reach for has earned agreement; a word one reader reaches for costs nothing. It is also the only part of a description that no store will ever own, which is why it is the part that has to be in the record.
 
+## What somebody made of it, which no store holds
+
+A finding is the third thing a reader can learn about data without opening it. The address says where it is, the description says what shapes are in it, and a finding says what a computation concluded from those shapes.
+
+```
+   Finding
+     judgement   the word the computation reached for
+     expected    what it expected to find
+     arrived     what it found
+```
+
+**It is admitted where a reading is refused.** The rule this context applies is to hold what would otherwise be lost and to refuse what can be read back from whoever owns it. A mean over a frame has an owner: open the data and compute it again. That a scan arrived short of what was asked for has none, because the two halves of that statement live in two places and nothing joins them.
+
+**The two counts are evidence, not measurement.** No number here was computed from a value inside the container. They are kept for the reason an inquiry keeps the boundary it was answered inside: a judgement with nothing beside it is an assertion. They are kept rather than re-derived on read because the description they came from is allowed to be superseded, so what a finding rested on is not recoverable later.
+
+**Presence is a count.** A scan that asked for 128 projections and produced 100 is 128 against 100. A scan whose rotation angles were never recorded is 1 against 0. One shape carries both, which is why there is no fourth field saying which kind this is.
+
+**The judgement is one open word and nothing checks it against a list.** The same choice the role on an entry makes, for the same reason. It carries what was examined as well as the verdict, so there is no second field naming the aspect: two fields would let a caller pair an aspect with a verdict that does not belong to it.
+
+**It cites no copy, where a description cites the one that was opened.** Nothing opened anything. A finding is reached from what this record already holds, so there is no copy whose reading could have differed, and a citation would name a file the computation may never have touched.
+
+A dataset carries at most one finding per judgement, in the order this system first heard each. A second look reaching the same word with different counts replaces the first, because it is the same statement with better evidence. A second look reaching a different word sits beside it. Nothing ranks them, because nothing here knows which of two judgements a reader came for.
+
+Recorded rather than registered, which is the verb the three other writes use. Those enter a fact about the container into a register; a judgement is not one, and reusing the verb would say that it is. Recorded rather than reported, because this system already spends that word on a driver saying how a step went.
+
 ## What gets refused
 
 | Refusal | Status | What happened |
@@ -151,6 +179,9 @@ The vocabulary the roles come from is not defined here and should not be. It acc
 | `DatasetAddressUnknownError` | 409 | An address was withdrawn, or described, that the dataset does not hold. |
 | `DatasetDescriptionUnchangedError` | 409 | A description arrived saying what the record already says. |
 | `InvalidManifestError` | 400 | A description was outside what one may hold. |
+| `InvalidFindingError` | 400 | A finding was outside what one may hold. |
+| `DatasetFindingUnchangedError` | 409 | A finding arrived saying what the record already says. |
+| `DatasetFindingsFullError` | 409 | The dataset already carries as many distinct judgements as it may. |
 | `InvalidCursorError` | 422 | The page cursor is not one this system issued. |
 | `IdempotencyConflictError` | 422 | The same retry key arrived with a different body. |
 
@@ -184,7 +215,7 @@ This is the second cross-context door in the tree and the doors are declared in 
 
 The door was one name wider. `normalize_occurred_at`, which this context's registering command calls to turn a claimed moment into an instant, came through it until a third consumer arrived. It is pure and has no `keeper` imports, so by the table in [Layout](../reference/layout.md#where-shared-code-goes) its home was always `keeper/shared/`, and the rule of three is what held it next door until [Counsel](counsel.md) met it. It is `keeper.shared.instant` now, which every module may import without an edge, and this command imports it like any other shared helper.
 
-## Finding one without its id
+## Looking one up without its id
 
 Reading a dataset by id replays one stream and answers from it, which costs one query and stays correct forever because the stream is the record.
 

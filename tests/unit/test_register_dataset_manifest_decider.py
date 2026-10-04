@@ -55,6 +55,7 @@ def _dataset(*, described: Description | None = None, refs: tuple[Identifier, ..
         step_id=uuid4(),
         external_refs=refs or (_BEAMLINE,),
         description=described,
+        findings=(),
     )
 
 

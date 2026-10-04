@@ -91,6 +91,7 @@ BEAMLINE_WRITES: tuple[str, ...] = (
     "RegisterDataset",
     "RegisterDatasetAddress",
     "RegisterDatasetManifest",
+    "RecordDatasetFinding",
     "WithdrawDatasetAddress",
     "DefineOperation",
     "MakeInquiry",

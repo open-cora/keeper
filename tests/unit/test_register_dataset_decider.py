@@ -55,6 +55,7 @@ def test_registering_onto_a_live_stream_is_refused() -> None:
         step_id=uuid4(),
         external_refs=(_REF,),
         description=None,
+        findings=(),
     )
 
     with pytest.raises(DatasetAlreadyExistsError):

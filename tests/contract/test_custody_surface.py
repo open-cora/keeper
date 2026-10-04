@@ -22,6 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from keeper.api.main import create_app
+from keeper.custody.aggregates.dataset import DATASET_MAX_FINDINGS
 from keeper.infrastructure.settings import Settings
 from keeper.shared.identifier import IDENTIFIER_VALUE_MAX_LENGTH
 
@@ -101,6 +102,7 @@ def test_a_registered_dataset_reads_back_with_its_step_and_reference(
         "step_id": step_id,
         "external_refs": [_REF],
         "description": None,
+        "findings": [],
     }
 
 
@@ -156,6 +158,7 @@ def test_a_withdrawn_address_leaves_the_others_and_the_run_that_made_them(
         "step_id": step_id,
         "external_refs": [_CENTRAL],
         "description": None,
+        "findings": [],
     }
 
 
@@ -548,3 +551,114 @@ def test_the_same_key_with_a_different_body_is_refused(client: TestClient) -> No
         )
 
     assert second.status_code == 422, second.text
+
+
+def test_a_finding_reads_back_on_the_dataset_it_judges(client: TestClient) -> None:
+    """The last of the three layers, over the real app.
+
+    The address says where the data is, the description says what
+    shapes are in it, and this says what somebody made of them. Only
+    this tier shows whether a refusal the route declares has a status
+    code registered for it, because a missing registration is a 500
+    rather than a failing assertion anywhere else.
+    """
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+
+        recorded = client.post(
+            f"/datasets/{dataset_id}/findings",
+            json={"judgement": "projections-short-of-plan", "expected": 128, "arrived": 100},
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert recorded.status_code == 204, recorded.text
+    assert read.json()["findings"] == [
+        {"judgement": "projections-short-of-plan", "expected": 128, "arrived": 100}
+    ]
+
+
+def test_a_finding_against_a_dataset_nobody_registered_is_not_found(
+    client: TestClient,
+) -> None:
+    with client:
+        response = client.post(
+            f"/datasets/{uuid4()}/findings",
+            json={"judgement": "angles-never-recorded", "expected": 1, "arrived": 0},
+        )
+
+    assert response.status_code == 404, response.text
+
+
+def test_a_finding_repeating_what_the_record_says_is_a_conflict(client: TestClient) -> None:
+    body = {"judgement": "angles-never-recorded", "expected": 1, "arrived": 0}
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+
+        client.post(f"/datasets/{dataset_id}/findings", json=body)
+        again = client.post(f"/datasets/{dataset_id}/findings", json=body)
+
+    assert again.status_code == 409, again.text
+
+
+def test_the_same_judgement_on_different_counts_is_admitted_over_http(
+    client: TestClient,
+) -> None:
+    """A second look after the data changed is news, not a redelivery."""
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+
+        client.post(
+            f"/datasets/{dataset_id}/findings",
+            json={"judgement": "projections-short-of-plan", "expected": 128, "arrived": 100},
+        )
+        better = client.post(
+            f"/datasets/{dataset_id}/findings",
+            json={"judgement": "projections-short-of-plan", "expected": 128, "arrived": 128},
+        )
+        read = client.get(f"/datasets/{dataset_id}")
+
+    assert better.status_code == 204, better.text
+    assert read.json()["findings"] == [
+        {"judgement": "projections-short-of-plan", "expected": 128, "arrived": 128}
+    ]
+
+
+def test_a_judgement_of_nothing_but_spaces_is_refused_as_malformed(
+    client: TestClient,
+) -> None:
+    """The one path that reaches the value object's own refusal.
+
+    A blank string is stopped by the request model, so the domain error
+    would never be raised and its status registration would never be
+    exercised. Whitespace passes the length bound and fails the value
+    object, which is what proves the 400 is wired.
+    """
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+
+        response = client.post(
+            f"/datasets/{dataset_id}/findings",
+            json={"judgement": "   ", "expected": 1, "arrived": 0},
+        )
+
+    assert response.status_code == 400, response.text
+
+
+def test_a_dataset_offered_more_judgements_than_it_may_carry_is_a_conflict(
+    client: TestClient,
+) -> None:
+    with client:
+        dataset_id = _a_dataset(client, _an_acquisition(client))
+        for n in range(DATASET_MAX_FINDINGS):
+            filled = client.post(
+                f"/datasets/{dataset_id}/findings",
+                json={"judgement": f"word-{n}", "expected": 1, "arrived": 1},
+            )
+            assert filled.status_code == 204, filled.text
+
+        over = client.post(
+            f"/datasets/{dataset_id}/findings",
+            json={"judgement": "one-too-many", "expected": 1, "arrived": 1},
+        )
+
+    assert over.status_code == 409, over.text

@@ -31,9 +31,11 @@ from keeper.custody.aggregates.dataset.events import (
     DatasetAddressRegistered,
     DatasetAddressWithdrawn,
     DatasetEvent,
+    DatasetFindingRecorded,
     DatasetManifestRegistered,
     DatasetRegistered,
 )
+from keeper.custody.aggregates.dataset.finding import Finding
 from keeper.custody.aggregates.dataset.manifest import Description, Manifest
 from keeper.custody.aggregates.dataset.state import Dataset
 from keeper.shared.identifier import Identifier
@@ -81,6 +83,7 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
                 step_id=step_id,
                 external_refs=(Identifier(scheme=scheme, value=value),),
                 description=None,
+                findings=(),
             )
         case DatasetAddressRegistered(
             dataset_id=dataset_id,
@@ -120,6 +123,15 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
                     described_at=described_at,
                 ),
             )
+        case DatasetFindingRecorded(
+            dataset_id=dataset_id,
+            judgement=judgement,
+            expected=expected,
+            arrived=arrived,
+        ):
+            held = _started(state, dataset_id)
+            recorded = Finding(judgement=judgement, expected=expected, arrived=arrived)
+            return replace(held, findings=_with(held.findings, recorded))
         case _:
             assert_never(event)
 
@@ -146,6 +158,28 @@ class DatasetStreamOutOfOrderError(Exception):
             "no state for it to change"
         )
         self.dataset_id = dataset_id
+
+
+def _with(held: tuple[Finding, ...], recorded: Finding) -> tuple[Finding, ...]:
+    """The findings a dataset carries once this one has landed.
+
+    Keyed by the judgement, so a second look reaching the same word
+    replaces the first and a second look reaching a different one sits
+    beside it. Replaced in place rather than moved to the end, because
+    the order here is when this system first heard each judgement and a
+    better-evidenced repeat of an old claim is not news.
+
+    No bound is applied here. A fold meets a log that was already
+    accepted, and refusing a row at this point would make a stream
+    unloadable rather than a caller refused. The decider is where a
+    seventeenth judgement is turned away.
+    """
+    replacing = [
+        recorded if standing.judgement == recorded.judgement else standing for standing in held
+    ]
+    if any(standing.judgement == recorded.judgement for standing in held):
+        return tuple(replacing)
+    return (*held, recorded)
 
 
 def fold(events: Sequence[DatasetEvent]) -> Dataset | None:

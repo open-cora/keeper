@@ -1,15 +1,16 @@
-"""The three handlers that add a later fact to a dataset already held.
+"""The four handlers that add a later fact to a dataset already held.
 
-All three append to a stream that already has rows, which is what
+All four append to a stream that already has rows, which is what
 separates them from the genesis slice and is the whole of what this
 file is for: that the version the load returned is the version the
 append uses, and that a denied caller writes nothing.
 
-One file for the three, because they share a fixture chain four calls
+One file for the four, because they share a fixture chain four calls
 deep and the sibling context keeps its transition handlers together for
-the same reason. Two of them say where the data can be read and the
-third says what is inside it, which is a difference the deciders care
-about and these handlers do not.
+the same reason. Two of them say where the data can be read, the third
+says what is inside it and the fourth says what somebody made of that,
+which is a difference the deciders care about and these handlers do
+not.
 """
 
 from datetime import UTC, datetime
@@ -23,9 +24,12 @@ from keeper.custody.aggregates.dataset import (
     CopiedBy,
     Entry,
     Extent,
+    Finding,
     Manifest,
     load_dataset,
 )
+from keeper.custody.features.record_dataset_finding import RecordDatasetFinding
+from keeper.custody.features.record_dataset_finding import bind as bind_record_finding
 from keeper.custody.features.register_dataset import RegisterDataset
 from keeper.custody.features.register_dataset import bind as bind_register_dataset
 from keeper.custody.features.register_dataset_address import RegisterDatasetAddress
@@ -266,6 +270,61 @@ async def test_a_denied_description_writes_nothing_to_the_stream() -> None:
 
     after, _version = await deps.event_store.load(DATASET_STREAM_TYPE, dataset_id)
     assert len(after) == len(before)
+
+
+async def test_a_finding_lands_on_the_dataset_it_judges() -> None:
+    deps = _kernel()
+    dataset_id = await _a_dataset(deps)
+    reached = Finding(judgement="projections-short-of-plan", expected=128, arrived=100)
+
+    await bind_record_finding(deps)(
+        RecordDatasetFinding(dataset_id=dataset_id, finding=reached, occurred_at=_WHEN),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    dataset = await load_dataset(deps.event_store, dataset_id)
+    assert dataset is not None
+    assert dataset.findings == (reached,)
+    assert dataset.description is None, "judging opens nothing and describes nothing"
+    assert dataset.external_refs == (_BEAMLINE,), "judging moves no data and no address"
+
+
+async def test_a_denied_finding_writes_nothing_to_the_stream() -> None:
+    deps = _kernel()
+    dataset_id = await _a_dataset(deps)
+    before, _version = await deps.event_store.load(DATASET_STREAM_TYPE, dataset_id)
+    denied = _kernel(authz=_DenyAllAuthorize(), event_store=deps.event_store)
+
+    with pytest.raises(UnauthorizedError):
+        await bind_record_finding(denied)(
+            RecordDatasetFinding(
+                dataset_id=dataset_id,
+                finding=Finding(judgement="angles-never-recorded", expected=1, arrived=0),
+            ),
+            principal_id=uuid4(),
+            correlation_id=uuid4(),
+        )
+
+    after, _version = await deps.event_store.load(DATASET_STREAM_TYPE, dataset_id)
+    assert len(after) == len(before)
+
+
+async def test_a_finding_omitting_its_time_is_stamped_when_the_report_arrived() -> None:
+    deps = _kernel()
+    dataset_id = await _a_dataset(deps)
+
+    await bind_record_finding(deps)(
+        RecordDatasetFinding(
+            dataset_id=dataset_id,
+            finding=Finding(judgement="angles-never-recorded", expected=1, arrived=0),
+        ),
+        principal_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    rows, _version = await deps.event_store.load(DATASET_STREAM_TYPE, dataset_id)
+    assert rows[-1].occurred_at == _CLOCK_NOW
 
 
 async def test_a_reported_time_is_what_the_event_carries() -> None:

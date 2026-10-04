@@ -85,6 +85,7 @@ an event rather than an edit.
 from dataclasses import dataclass
 from uuid import UUID
 
+from keeper.custody.aggregates.dataset.finding import Finding
 from keeper.custody.aggregates.dataset.manifest import Description
 from keeper.shared.identifier import Identifier
 
@@ -155,6 +156,44 @@ class DatasetDescriptionUnchangedError(Exception):
         self.dataset_id = dataset_id
         self.scheme = scheme
         self.value = value
+
+
+class DatasetFindingUnchangedError(Exception):
+    """A finding arrived saying exactly what the record already says.
+
+    The same call the description sibling makes, for the same reason:
+    delivery is at-least-once, the server mints nothing a caller could
+    key a retry on, and a redelivered conclusion would grow the log a
+    row per delivery while changing no state.
+
+    What is NOT refused is the same judgement reached on different
+    counts. A computation that looked again after the data changed has
+    something new to say, and the counts are how a reader tells the two
+    looks apart.
+    """
+
+    def __init__(self, dataset_id: UUID, judgement: str) -> None:
+        super().__init__(f"Dataset {dataset_id} already carries that finding of {judgement!r}")
+        self.dataset_id = dataset_id
+        self.judgement = judgement
+
+
+class DatasetFindingsFullError(Exception):
+    """A dataset was offered more distinct judgements than it may carry.
+
+    Refused rather than trimmed. A caller past the bound is using the
+    judgement as a key for something it was not meant to key, and
+    dropping the oldest would leave a record that looks complete and is
+    not. Replacing a judgement already held is not affected, because
+    that adds none.
+    """
+
+    def __init__(self, dataset_id: UUID, limit: int) -> None:
+        super().__init__(
+            f"Dataset {dataset_id} already carries {limit} findings, which is the most"
+        )
+        self.dataset_id = dataset_id
+        self.limit = limit
 
 
 class DatasetAlreadyExistsError(Exception):
@@ -255,6 +294,25 @@ class Dataset:
     is still the best statement this system has about what the run
     produced, and it is the only one left once every copy is gone,
     which is the case the empty tuple above exists for.
+
+    ## Why findings are many where a description is one
+
+    `findings` holds what computations concluded about this data, at most
+    one per judgement. Many rather than one, because the judgements are
+    about different things: a scan can arrive short of the projections
+    asked for and also be missing its rotation angles, and those are two
+    statements that do not supersede each other.
+
+    Keyed by the judgement for exactly that reason. A second look
+    reaching the same judgement on different counts replaces the first,
+    because it is the same statement made again with better evidence. A
+    second look reaching a different judgement is a different statement
+    and sits beside it.
+
+    Nothing orders them by importance, and nothing could. This system
+    does not know which of two judgements a reader cares about, and
+    ranking them would invent a severity out of a word it did not coin,
+    which is the refusal the device register makes about a group.
     """
 
     id: UUID
@@ -262,6 +320,7 @@ class Dataset:
     step_id: UUID
     external_refs: tuple[Identifier, ...]
     description: Description | None
+    findings: tuple[Finding, ...]
 
 
 __all__ = [
@@ -271,5 +330,7 @@ __all__ = [
     "DatasetAddressUnknownError",
     "DatasetAlreadyExistsError",
     "DatasetDescriptionUnchangedError",
+    "DatasetFindingUnchangedError",
+    "DatasetFindingsFullError",
     "DatasetNotFoundError",
 ]

@@ -34,6 +34,7 @@ def _dataset(*refs: Identifier) -> Dataset:
         step_id=uuid4(),
         external_refs=refs or (_BEAMLINE,),
         description=None,
+        findings=(),
     )
 
 

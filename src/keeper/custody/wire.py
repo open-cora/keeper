@@ -62,6 +62,7 @@ from keeper.custody.aggregates.dataset.summary import DatasetSummaryLookup
 from keeper.custody.features import (
     get_dataset,
     list_datasets,
+    record_dataset_finding,
     register_dataset,
     register_dataset_address,
     register_dataset_manifest,
@@ -82,6 +83,7 @@ class CustodyHandlers:
     register_dataset: register_dataset.IdempotentHandler
     get_dataset: get_dataset.Handler
     list_datasets: list_datasets.Handler
+    record_dataset_finding: record_dataset_finding.Handler
     register_dataset_address: register_dataset_address.Handler
     register_dataset_manifest: register_dataset_manifest.Handler
     withdraw_dataset_address: withdraw_dataset_address.Handler
@@ -125,6 +127,11 @@ def wire_custody(deps: Kernel) -> CustodyHandlers:
         list_datasets=with_tracing(
             list_datasets.bind(deps, _dataset_summary_lookup(deps)),
             command_name="ListDatasets",
+            bc=_BC,
+        ),
+        record_dataset_finding=with_tracing(
+            record_dataset_finding.bind(deps),
+            command_name="RecordDatasetFinding",
             bc=_BC,
         ),
         register_dataset_address=with_tracing(
