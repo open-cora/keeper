@@ -59,10 +59,18 @@ machine.
    the read models catch up      separately, on their own schedule
 ```
 
-**No status is stored.** How far an execution got, whether a device is faulted,
-whether a pursuit is still running: each is worked out by replaying what
-happened, every time it is asked for. A stored status can disagree with the
-history behind it, and a derived one cannot.
+**No status is a fact anybody wrote down.** How far an execution got, whether a
+device is faulted, whether a pursuit is still running: none of the three is a
+field something set. Each is worked out from what happened, and asking about
+one of them works it out from the history at that moment.
+
+Asking for a list is the exception, and it is worth knowing which answer you
+are holding. A listing reads a summary built as the events arrived, because
+folding every stream to answer one page does not hold up at any size. That
+summary is derived, rebuildable, and not the record: it can lag the log, and a
+rebuild has once left a column behind that nothing writes any more. So a
+listing is an answer about the record rather than the record, and the record is
+the log.
 
 ### Seven contexts, one log
 
