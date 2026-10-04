@@ -67,8 +67,8 @@ CREATE INDEX proj_execution_step_summary_unfiled_idx
 -- match nothing, and the listing would come back empty while reading as
 -- rebuilt. A reset pairs with a truncate whenever a change adds a column the
 -- genesis arm fills.
-TRUNCATE TABLE proj_execution_step_summary;
-TRUNCATE TABLE proj_execution_step_summary_kinds;
+TRUNCATE TABLE proj_execution_step_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
+TRUNCATE TABLE proj_execution_step_summary_kinds;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 UPDATE projection_bookmarks
 SET last_position = 0, last_transaction_id = '0'::xid8

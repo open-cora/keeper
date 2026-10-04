@@ -52,5 +52,5 @@ SET external_refs = jsonb_build_array(
 
 ALTER TABLE proj_custody_dataset_summary
     ALTER COLUMN external_refs DROP DEFAULT,
-    DROP COLUMN external_ref_scheme,
-    DROP COLUMN external_ref_value;
+    DROP COLUMN external_ref_scheme,  -- atlas:safety:allow=projection table, rebuilt from the event log
+    DROP COLUMN external_ref_value;  -- atlas:safety:allow=projection table, rebuilt from the event log

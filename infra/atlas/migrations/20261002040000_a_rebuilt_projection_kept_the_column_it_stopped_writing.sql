@@ -32,7 +32,7 @@
 -- what this does, and it is what a bookmark reset should be paired with
 -- whenever a change stops writing something.
 
-TRUNCATE TABLE proj_execution_step_summary;
+TRUNCATE TABLE proj_execution_step_summary;  -- atlas:safety:allow=projection table, rebuilt from the event log
 
 UPDATE projection_bookmarks
 SET last_position = 0, last_transaction_id = '0'::xid8
