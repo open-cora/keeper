@@ -32,6 +32,33 @@ text swept in from outside is where a person's name arrives in a table
 that cannot be edited. The same rule, for the same reason, keeps a
 reason off a run.
 
+## What `beamline` and `group` are
+
+Two more authored labels, the same kind of thing as `name` and subject to
+the same rule against copying a facility field into them.
+
+`beamline` is where the device is, written the way the descriptor
+directory writes it. It is stored as given and compared as given, which
+is what Execution already does with a procedure's beamline, and for the
+same reason: a second register of which beamlines exist would be a thing
+to keep in step with the descriptors for nobody's benefit.
+
+`group` is which functional cluster a device belongs to at that
+beamline, and it is optional because most records honestly belong to
+none. A motor whose only description is the channel it occupies in a
+crate is not part of anything anybody has named, and inventing a group
+for it would manufacture a fact.
+
+**`group` is a value rows share, not a thing that owns them.** There is
+no group aggregate, no parent, and no membership anywhere else. A group
+exists while some device says that word and stops existing when the last
+one stops. What that refuses is a catalog: no nesting, no ordering, and
+nothing that can be said about a group rather than about a device.
+
+The pair is meant together. A group name means different hardware at
+each beamline, so a group without a beamline beside it does not pick out
+a set.
+
 ## The status, and where it comes from
 
 Derived in the fold from which events the stream carries, never stored,
@@ -113,6 +140,61 @@ class InvalidDeviceNameError(ValueError):
 @dataclass(frozen=True)
 class DeviceName:
     """The label this system holds for a device, trimmed and bounded."""
+
+    value: str
+
+
+DEVICE_BEAMLINE_MAX_LENGTH = 100
+"""Longest beamline name this system will hold on a device.
+
+The same bound Execution puts on a procedure's beamline, because they
+name the same thing and a device that could not be registered at a
+beamline a procedure can be dispatched to would be a trap.
+"""
+
+
+class InvalidDeviceBeamlineError(ValueError):
+    """A device beamline is empty, whitespace-only, or too long."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(f"Device beamline is invalid (got: {value!r})")
+        self.value = value
+
+
+@bounded_name(max_length=DEVICE_BEAMLINE_MAX_LENGTH, error_class=InvalidDeviceBeamlineError)
+@dataclass(frozen=True)
+class DeviceBeamline:
+    """Where a device is, as the descriptor directory writes it."""
+
+    value: str
+
+
+DEVICE_GROUP_MAX_LENGTH = 100
+"""Longest group name this system will hold on a device.
+
+Matched to the label beside it rather than argued separately. A group
+name is a short phrase people say out loud, so the bound is not the
+thing that will ever be reached.
+"""
+
+
+class InvalidDeviceGroupError(ValueError):
+    """A device group is empty, whitespace-only, or too long.
+
+    Absent is the way to say a device belongs to no group. A present but
+    blank one is a caller who meant something and did not say it, which
+    is the case this refuses.
+    """
+
+    def __init__(self, value: str) -> None:
+        super().__init__(f"Device group is invalid (got: {value!r})")
+        self.value = value
+
+
+@bounded_name(max_length=DEVICE_GROUP_MAX_LENGTH, error_class=InvalidDeviceGroupError)
+@dataclass(frozen=True)
+class DeviceGroup:
+    """Which functional cluster a device belongs to, at its own beamline."""
 
     value: str
 
@@ -262,6 +344,8 @@ class Device:
     id: UUID
     external_ref: Identifier
     name: DeviceName
+    beamline: DeviceBeamline
+    group: DeviceGroup | None
     status: DeviceStatus
 
     @property
@@ -275,15 +359,21 @@ class Device:
 
 
 __all__ = [
+    "DEVICE_BEAMLINE_MAX_LENGTH",
+    "DEVICE_GROUP_MAX_LENGTH",
     "DEVICE_NAME_MAX_LENGTH",
     "Device",
     "DeviceAlreadyExistsError",
+    "DeviceBeamline",
     "DeviceCannotBeFaultedError",
     "DeviceCannotBeRecoveredError",
     "DeviceCannotBeRetiredError",
+    "DeviceGroup",
     "DeviceName",
     "DeviceNotFoundError",
     "DeviceStatus",
+    "InvalidDeviceBeamlineError",
     "InvalidDeviceFilterError",
+    "InvalidDeviceGroupError",
     "InvalidDeviceNameError",
 ]

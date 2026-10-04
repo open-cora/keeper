@@ -7,8 +7,7 @@ produce one append and one conflict rather than two rows saying the same
 thing. A reader needs no such thing and gets the shorter function.
 
 Both are here from the first landing, the way Counsel's are, because
-this aggregate has three commands beyond its genesis. Custody has only
-the shorter one, because nothing appends to a dataset after its genesis.
+this aggregate has three commands beyond its genesis.
 
 There is no devices table: the answer is recomputed from history on
 every call. That is the right trade for reading one device by id, where

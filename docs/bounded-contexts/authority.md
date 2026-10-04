@@ -8,7 +8,7 @@ It is one of two contexts whose subject is a permission rather than a thing. The
 
 ## What a Policy is
 
-A policy is the rulebook one deployment authorizes against: the set of pairs that are permitted. Everything not in the set is refused, so a policy says what may happen rather than what may not.
+A policy is the rulebook one deployment authorizes against: the set of grants that are permitted. Everything not in the set is refused, so a policy says what may happen rather than what may not.
 
 ```
    Policy
@@ -18,7 +18,10 @@ A policy is the rulebook one deployment authorizes against: the set of pairs tha
    Permission
      principal_id  who may act
      command_name  the one command they may issue
+     beamline      where, or absent for a command that names none
 ```
+
+Matching is exact on all three, with no wildcard and no fallback from a beamline to the grant for nowhere. A principal that may act at four beamlines holds four grants. That is deliberate: a facility-wide reach spelled out beamline by beamline is one a reader of the rulebook can see, where one spelled with a star is a reach nobody notices.
 
 A deployment authorizes against exactly one policy, named by the `AUTHZ_POLICY_ID` setting. Switching rulebooks means pointing at a different id and restarting.
 
@@ -29,6 +32,10 @@ This is the shape the whole context turns on, and the wrong shape is the obvious
 An earlier version in the codebase this chassis came from held two independent sets, the permitted principals and the permitted commands, and checked membership in each separately. That grants every principal every command. A rulebook listing a read-only status feed alongside a supervisor who may abort a run had, between those two lines, granted the feed permission to abort runs. Nothing ever exercised it, and the rulebook still claimed more than the system it governed did, which is the one thing a rulebook must never do.
 
 Holding pairs makes that cross product unrepresentable rather than merely unchecked. There is no test for it, because there is no way to write the bug.
+
+The beamline is a third value in the same matching, not a hierarchy above it, and it was named for the dimension rather than held as an open scheme-and-value pair. One named dimension cannot pose the question an open one does, of whether a command resolving to two resources needs a grant for each or either, and it does not double the strings a typo can land in, which matters in the one component where a typo silently refuses instead of silently admitting.
+
+**What this does not reach**: which operation a principal may run, or which device it may touch. Both are a second dimension rather than a different spelling of this one.
 
 ## Why it has no name
 
@@ -63,6 +70,8 @@ The governing names live on the aggregate rather than in the slice that issues t
 | Author a policy | `POST /policies` | `define_policy` | `201` with the new id |
 | Add one permission | `POST /policies/{policy_id}/permissions` | `grant_permission` | `204` |
 | Remove one permission | `DELETE /policies/{policy_id}/permissions/{principal_id}/{command_name}` | `revoke_permission` | `204` |
+
+Revocation carries the beamline as a query parameter rather than a fourth path segment, because a grant's place is optional and a path segment cannot be. One route serves both shapes where two would make a reader work out which meant the grant for nowhere.
 | Read the rulebook | `GET /policies/{policy_id}` | `get_policy` | `200` with the permissions |
 
 Every operation is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes above are declared once, in `src/keeper/authority/routes.py`.

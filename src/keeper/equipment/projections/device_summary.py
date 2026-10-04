@@ -89,9 +89,9 @@ below is built from this map so a new key is subscribed by construction.
 
 _INSERT_SQL = f"""
 INSERT INTO {PROJECTION_NAME} (
-    device_id, external_ref_scheme, external_ref_value, name, status,
-    registered_at, updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $6)
+    device_id, external_ref_scheme, external_ref_value, name, beamline,
+    "group", status, registered_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
 ON CONFLICT (device_id) DO NOTHING
 """
 
@@ -145,6 +145,8 @@ class DeviceSummaryProjection:
             payload["external_ref_scheme"],
             payload["external_ref_value"],
             payload["device_name"],
+            payload["beamline"],
+            payload["group"],
             DeviceStatus.AVAILABLE.value,
             event.occurred_at,
         )

@@ -11,12 +11,32 @@ config value or a database.
 The wildcard arm calls `assert_never`, so adding an event class to the
 union without handling it here is a type error rather than a state that
 silently comes back as None.
+
+## Why the later arms raise on an empty stream
+
+Genesis ignores the state before it. The other two require one, and a
+stream whose first row registers an address is one no command in this
+system could have written. Raising says the log is wrong, where building
+a dataset out of that row would invent an execution and a step
+that nothing recorded, and that record would then be indistinguishable
+from one somebody meant.
 """
 
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import assert_never
+from uuid import UUID
 
-from keeper.custody.aggregates.dataset.events import DatasetEvent, DatasetRegistered
+from keeper.custody.aggregates.dataset.events import (
+    DatasetAddressRegistered,
+    DatasetAddressWithdrawn,
+    DatasetEvent,
+    DatasetFindingRecorded,
+    DatasetManifestRegistered,
+    DatasetRegistered,
+)
+from keeper.custody.aggregates.dataset.finding import Finding
+from keeper.custody.aggregates.dataset.manifest import Description, Manifest
 from keeper.custody.aggregates.dataset.state import Dataset
 from keeper.shared.identifier import Identifier
 
@@ -32,6 +52,21 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
     a record nothing could have written. That is the same round trip a
     an execution step's reference makes, and it is why events carry the two halves flat
     rather than carrying the pair.
+
+    Registering is written to tolerate an address already held, where
+    the decider refuses one. The two are not in disagreement: the
+    decider is what a caller meets, and this is what a log meets. A fold
+    that doubled an entry on a row some future repair wrote by hand
+    would hand every reader a duplicate, and refusing here would make
+    the whole stream unreadable over one redundant row.
+
+    A manifest arm replaces whatever description was there, including
+    one taken of a different copy. Last report wins, because the thing
+    being described is the data rather than the copy, and a reader
+    needing to know which copy was opened reads it off the description
+    it got. It does not require the address to still be held: a report
+    of what was inside a copy that has since been purged is the most
+    this system will ever know about that run's output.
     """
     match event:
         case DatasetRegistered(
@@ -46,10 +81,105 @@ def evolve(state: Dataset | None, event: DatasetEvent) -> Dataset:
                 id=dataset_id,
                 execution_id=execution_id,
                 step_id=step_id,
-                external_ref=Identifier(scheme=scheme, value=value),
+                external_refs=(Identifier(scheme=scheme, value=value),),
+                description=None,
+                findings=(),
             )
+        case DatasetAddressRegistered(
+            dataset_id=dataset_id,
+            external_ref_scheme=scheme,
+            external_ref_value=value,
+        ):
+            held = _started(state, dataset_id)
+            added = Identifier(scheme=scheme, value=value)
+            if added in held.external_refs:
+                return held
+            return replace(held, external_refs=(*held.external_refs, added))
+        case DatasetAddressWithdrawn(
+            dataset_id=dataset_id,
+            external_ref_scheme=scheme,
+            external_ref_value=value,
+        ):
+            held = _started(state, dataset_id)
+            gone = Identifier(scheme=scheme, value=value)
+            return replace(
+                held,
+                external_refs=tuple(ref for ref in held.external_refs if ref != gone),
+            )
+        case DatasetManifestRegistered(
+            dataset_id=dataset_id,
+            external_ref_scheme=scheme,
+            external_ref_value=value,
+            convention=convention,
+            entries=entries,
+            occurred_at=described_at,
+        ):
+            held = _started(state, dataset_id)
+            return replace(
+                held,
+                description=Description(
+                    manifest=Manifest(convention=convention, entries=entries),
+                    external_ref=Identifier(scheme=scheme, value=value),
+                    described_at=described_at,
+                ),
+            )
+        case DatasetFindingRecorded(
+            dataset_id=dataset_id,
+            judgement=judgement,
+            expected=expected,
+            arrived=arrived,
+        ):
+            held = _started(state, dataset_id)
+            recorded = Finding(judgement=judgement, expected=expected, arrived=arrived)
+            return replace(held, findings=_with(held.findings, recorded))
         case _:
             assert_never(event)
+
+
+def _started(state: Dataset | None, dataset_id: UUID) -> Dataset:
+    """The state a later event needs, or a refusal to invent one."""
+    if state is None:
+        raise DatasetStreamOutOfOrderError(dataset_id)
+    return state
+
+
+class DatasetStreamOutOfOrderError(Exception):
+    """A dataset's stream began with something other than its genesis.
+
+    Unreachable through any command here, because every writing slice
+    appends at an expected version and only registration appends at
+    zero. It exists so the fold says which stream is wrong instead of
+    raising an attribute error somewhere further along.
+    """
+
+    def __init__(self, dataset_id: UUID) -> None:
+        super().__init__(
+            f"Dataset {dataset_id} has an event before its registration, so there is "
+            "no state for it to change"
+        )
+        self.dataset_id = dataset_id
+
+
+def _with(held: tuple[Finding, ...], recorded: Finding) -> tuple[Finding, ...]:
+    """The findings a dataset carries once this one has landed.
+
+    Keyed by the judgement, so a second look reaching the same word
+    replaces the first and a second look reaching a different one sits
+    beside it. Replaced in place rather than moved to the end, because
+    the order here is when this system first heard each judgement and a
+    better-evidenced repeat of an old claim is not news.
+
+    No bound is applied here. A fold meets a log that was already
+    accepted, and refusing a row at this point would make a stream
+    unloadable rather than a caller refused. The decider is where a
+    seventeenth judgement is turned away.
+    """
+    replacing = [
+        recorded if standing.judgement == recorded.judgement else standing for standing in held
+    ]
+    if any(standing.judgement == recorded.judgement for standing in held):
+        return tuple(replacing)
+    return (*held, recorded)
 
 
 def fold(events: Sequence[DatasetEvent]) -> Dataset | None:
@@ -65,4 +195,4 @@ def fold(events: Sequence[DatasetEvent]) -> Dataset | None:
     return state
 
 
-__all__ = ["evolve", "fold"]
+__all__ = ["DatasetStreamOutOfOrderError", "evolve", "fold"]

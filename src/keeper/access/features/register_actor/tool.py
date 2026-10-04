@@ -9,11 +9,11 @@ so the wrapped handler is called with None and behaves as the bare one.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from mcp.server.fastmcp import Context, FastMCP
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from keeper.access.features.register_actor.command import RegisterActor
 from keeper.access.features.register_actor.handler import IdempotentHandler
@@ -37,14 +37,25 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], IdempotentHandler]) -> N
     )
     async def register_actor_tool(  # pyright: ignore[reportUnusedFunction]
         ctx: Context[Any, Any, Any],
+        actor_id: Annotated[
+            UUID | None,
+            Field(
+                default=None,
+                description=(
+                    "Register at this id instead of a minted one. Leave it out unless "
+                    "the id has to match something outside this system, such as the "
+                    "principal id a token authenticates as."
+                ),
+            ),
+        ] = None,
     ) -> RegisterActorOutput:
         handler = get_handler()
-        actor_id = await handler(
-            RegisterActor(),
+        registered = await handler(
+            RegisterActor(actor_id=actor_id),
             principal_id=get_mcp_principal_id(ctx),
             # The tool runs inside the instrumented request that carried
             # it, so the trace context is already in scope.
             correlation_id=current_correlation_id(),
             surface_id=get_mcp_surface_id(),
         )
-        return RegisterActorOutput(actor_id=actor_id)
+        return RegisterActorOutput(actor_id=registered)

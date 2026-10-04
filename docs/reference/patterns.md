@@ -75,7 +75,7 @@ Create-style commands accept an idempotency key so client-side retries do not du
 A handler that returns nothing can be wrapped: pass `NOOP_SERIALIZE` and `NOOP_DESERIALIZE`. The store records which state a row is in with an `outcome` column rather than by whether a result is stored, so a null result is a cached success rather than a cache miss.
 
 ```python
-register_thing=with_idempotency(
+register_thing = with_idempotency(
     register_thing.bind(deps),
     deps.idempotency_store,
     command_name="RegisterThing",

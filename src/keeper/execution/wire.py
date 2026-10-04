@@ -49,10 +49,13 @@ from keeper.execution.adapters import (
     InMemoryExecutionSummaryLookup,
     InMemoryOperationSummaryLookup,
     InMemoryProcedureSummaryLookup,
+    InMemoryStepSummaryLookup,
     PostgresExecutionSummaryLookup,
     PostgresOperationSummaryLookup,
     PostgresProcedureSummaryLookup,
+    PostgresStepSummaryLookup,
 )
+from keeper.execution.aggregates.execution.step_summary import StepSummaryLookup
 from keeper.execution.aggregates.execution.summary import ExecutionSummaryLookup
 from keeper.execution.aggregates.operation.summary import OperationSummaryLookup
 from keeper.execution.aggregates.procedure.summary import ProcedureSummaryLookup
@@ -68,6 +71,7 @@ from keeper.execution.features import (
     list_executions,
     list_operations,
     list_procedures,
+    list_steps_without_datasets,
     report_step,
     report_step_run,
 )
@@ -96,6 +100,7 @@ class ExecutionHandlers:
     end_execution: end_execution.Handler
     get_execution: get_execution.Handler
     list_executions: list_executions.Handler
+    list_steps_without_datasets: list_steps_without_datasets.Handler
 
 
 def _execution_summary_lookup(deps: Kernel) -> ExecutionSummaryLookup:
@@ -109,6 +114,21 @@ def _execution_summary_lookup(deps: Kernel) -> ExecutionSummaryLookup:
         return PostgresExecutionSummaryLookup(deps.pool)
     if isinstance(deps.event_store, InMemoryEventStore):
         return InMemoryExecutionSummaryLookup(deps.event_store)
+    raise UnreadableSummariesError(type(deps.event_store).__name__)
+
+
+def _step_summary_lookup(deps: Kernel) -> StepSummaryLookup:
+    """Pick the read adapter for steps, the same way and for the same reason.
+
+    The one pair here whose two halves reach a second context. Both do
+    it without importing one: the table the Postgres half reads is kept
+    by a projection subscribed to Custody's events, and the fold the
+    in-memory half runs reads Custody's streams by name.
+    """
+    if deps.pool is not None:
+        return PostgresStepSummaryLookup(deps.pool)
+    if isinstance(deps.event_store, InMemoryEventStore):
+        return InMemoryStepSummaryLookup(deps.event_store)
     raise UnreadableSummariesError(type(deps.event_store).__name__)
 
 
@@ -223,6 +243,11 @@ def wire_execution(deps: Kernel) -> ExecutionHandlers:
         list_executions=with_tracing(
             list_executions.bind(deps, _execution_summary_lookup(deps)),
             command_name="ListExecutions",
+            bc=_BC,
+        ),
+        list_steps_without_datasets=with_tracing(
+            list_steps_without_datasets.bind(deps, _step_summary_lookup(deps)),
+            command_name="ListStepsWithoutDatasets",
             bc=_BC,
         ),
     )

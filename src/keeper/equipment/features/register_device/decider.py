@@ -60,6 +60,8 @@ def decide(
             external_ref_scheme=command.external_ref.scheme,
             external_ref_value=command.external_ref.value,
             device_name=command.name.value,
+            beamline=command.beamline.value,
+            group=command.group.value if command.group is not None else None,
             occurred_at=now,
         )
     ]

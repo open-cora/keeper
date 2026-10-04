@@ -11,13 +11,14 @@ is what a given run produced. That one cannot name a stream, so it cannot
 fold one, and it needs a maintained summary table instead. It belongs in
 its own module and is not here yet.
 
-Nothing here hands back the version the state was folded from, and the
-sibling loader that would is absent on purpose. That version is what a
-writing handler passes as its expected version so two callers acting at
-once produce one append and one conflict, and it matters only where a
-handler appends to a stream that already has rows. Nothing appends to a
-dataset after its genesis, so the loader that returns it arrives with the
-first command that does.
+Two loaders, and the difference between them is the version. A handler
+about to append to a stream that already has rows needs the version it
+folded from, so that two callers registering an address at once produce
+one append and one conflict rather than two rows saying the same thing.
+A reader needs no such thing and gets the shorter function.
+
+The second one arrived with the commands that change where a dataset
+can be read, which are the first things to append after a genesis.
 
 Lives with the aggregate rather than with a slice because it reads the
 aggregate's whole stream, whatever command happened to write each row.
@@ -50,4 +51,20 @@ async def load_dataset(event_store: EventStore, dataset_id: UUID) -> Dataset | N
     return fold([from_stored(row) for row in stored])
 
 
-__all__ = ["DATASET_STREAM_TYPE", "load_dataset"]
+async def load_dataset_with_version(
+    event_store: EventStore, dataset_id: UUID
+) -> tuple[Dataset | None, int]:
+    """Return the dataset's state and the version it was folded from.
+
+    The version is what a writing handler passes as `expected_version`,
+    so that two callers registering an address on one dataset at once
+    produce one append and one `ConcurrencyError`. Without it the second
+    append would land an address the decider had no chance to refuse,
+    because it decided against state that was already stale, and the
+    duplicate it was there to catch would be in the log.
+    """
+    stored, version = await event_store.load(DATASET_STREAM_TYPE, dataset_id)
+    return fold([from_stored(row) for row in stored]), version
+
+
+__all__ = ["DATASET_STREAM_TYPE", "load_dataset", "load_dataset_with_version"]

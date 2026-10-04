@@ -38,6 +38,28 @@ def test_posting_to_actors_creates_one_and_returns_its_id(client: TestClient) ->
     assert response.json()["actor_id"]
 
 
+def test_posting_an_actor_id_registers_at_that_id_rather_than_a_minted_one(
+    client: TestClient,
+) -> None:
+    """A deployment's callers authenticate as an id this system did not mint."""
+    chosen = str(uuid4())
+    with client:
+        response = client.post("/actors", json={"actor_id": chosen})
+        read_back = client.get(f"/actors/{chosen}")
+    assert response.status_code == 201
+    assert response.json()["actor_id"] == chosen
+    assert read_back.status_code == 200
+
+
+def test_posting_an_actor_id_that_is_already_taken_is_a_conflict(client: TestClient) -> None:
+    chosen = str(uuid4())
+    with client:
+        first = client.post("/actors", json={"actor_id": chosen})
+        second = client.post("/actors", json={"actor_id": chosen})
+    assert first.status_code == 201
+    assert second.status_code == 409
+
+
 def test_two_posts_without_a_key_create_two_different_actors(client: TestClient) -> None:
     """The baseline the idempotency test below is measured against."""
     with client:

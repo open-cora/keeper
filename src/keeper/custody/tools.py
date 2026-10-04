@@ -11,7 +11,19 @@ from mcp.server.fastmcp import FastMCP
 
 from keeper.custody.features.get_dataset import tool as get_dataset_tool
 from keeper.custody.features.list_datasets import tool as list_datasets_tool
+from keeper.custody.features.record_dataset_finding import (
+    tool as record_dataset_finding_tool,
+)
 from keeper.custody.features.register_dataset import tool as register_dataset_tool
+from keeper.custody.features.register_dataset_address import (
+    tool as register_dataset_address_tool,
+)
+from keeper.custody.features.register_dataset_manifest import (
+    tool as register_dataset_manifest_tool,
+)
+from keeper.custody.features.withdraw_dataset_address import (
+    tool as withdraw_dataset_address_tool,
+)
 from keeper.custody.wire import CustodyHandlers
 
 
@@ -32,6 +44,21 @@ def register_custody_tools(
     list_datasets_tool.register(
         mcp,
         get_handler=lambda: get_handlers().list_datasets,
+    )
+    record_dataset_finding_tool.register(
+        mcp, get_handler=lambda: get_handlers().record_dataset_finding
+    )
+    register_dataset_address_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().register_dataset_address,
+    )
+    register_dataset_manifest_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().register_dataset_manifest,
+    )
+    withdraw_dataset_address_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().withdraw_dataset_address,
     )
 
 

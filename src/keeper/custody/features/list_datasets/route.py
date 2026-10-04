@@ -47,7 +47,7 @@ class DatasetSummaryResponse(BaseModel):
     dataset_id: UUID
     execution_id: UUID
     step_id: UUID
-    external_ref: ExternalRefResponse
+    external_refs: list[ExternalRefResponse]
     created_at: datetime
 
 
@@ -110,10 +110,10 @@ async def get_datasets(
                 dataset_id=summary.dataset_id,
                 execution_id=summary.execution_id,
                 step_id=summary.step_id,
-                external_ref=ExternalRefResponse(
-                    scheme=summary.external_ref.scheme,
-                    value=summary.external_ref.value,
-                ),
+                external_refs=[
+                    ExternalRefResponse(scheme=ref.scheme, value=ref.value)
+                    for ref in summary.external_refs
+                ],
                 created_at=summary.created_at,
             )
             for summary in page.items

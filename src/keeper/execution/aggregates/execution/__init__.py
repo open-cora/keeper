@@ -1,4 +1,4 @@
-"""The Execution aggregate: state, events, evolver, and its two read paths."""
+"""The Execution aggregate: state, events, evolver, and its three read paths."""
 
 from keeper.execution.aggregates.execution.events import (
     ExecutionClaimed,
@@ -52,6 +52,11 @@ from keeper.execution.aggregates.execution.state import (
     StepRunCannotBeReportedError,
     validated_steps,
 )
+from keeper.execution.aggregates.execution.step_summary import (
+    StepSummary,
+    StepSummaryLookup,
+    StepSummaryPage,
+)
 from keeper.execution.aggregates.execution.summary import (
     ExecutionSummary,
     ExecutionSummaryLookup,
@@ -102,6 +107,9 @@ __all__ = [
     "InvalidStepReportError",
     "StepOutcome",
     "StepRunCannotBeReportedError",
+    "StepSummary",
+    "StepSummaryLookup",
+    "StepSummaryPage",
     "evolve",
     "fold",
     "from_stored",

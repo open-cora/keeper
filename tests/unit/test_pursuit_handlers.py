@@ -41,7 +41,7 @@ from keeper.execution.features.dispatch_execution import bind as bind_dispatch_e
 from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventStore
 from keeper.infrastructure.deps import make_inmemory_kernel
 from keeper.infrastructure.kernel import Kernel
-from keeper.infrastructure.ports import AllowAllAuthorize, Deny
+from keeper.infrastructure.ports import Allow, AllowAllAuthorize, Deny
 from keeper.infrastructure.ports.authorize import AuthzResult
 from keeper.infrastructure.settings import Settings
 from keeper.pursuit.aggregates.pursuit import (
@@ -97,6 +97,29 @@ _BUDGET = Budget({BudgetDimension.ROUNDS: 8, BudgetDimension.TOKENS: 400000})
 _SCHEMA: dict[str, Any] = {"$schema": "https://json-schema.org/draft/2020-12/schema"}
 
 
+class _RecordingAuthorize:
+    """Allows everything and remembers what it was asked.
+
+    The architecture rule proves a handler passes `beamline=` at all.
+    This proves the value is the pursuit's own, which a handler reading
+    the wrong field would still satisfy there.
+    """
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, str | None]] = []
+
+    async def authorize(
+        self,
+        principal_id: UUID,
+        command_name: str,
+        surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
+    ) -> AuthzResult:
+        _ = (principal_id, surface_id)
+        self.asked.append((command_name, beamline))
+        return Allow()
+
+
 class _FixedClock:
     def now(self) -> datetime:
         return _CLOCK_NOW
@@ -113,6 +136,7 @@ class _DenyAllAuthorize:
         principal_id: UUID,
         command_name: str,
         surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
     ) -> AuthzResult:
         _ = (principal_id, command_name, surface_id)
         return Deny(reason="not granted in this test")
@@ -287,6 +311,21 @@ async def test_reading_a_pursuit_that_was_never_started_is_not_found() -> None:
         await bind_get(deps)(
             GetPursuit(pursuit_id=uuid4()), principal_id=uuid4(), correlation_id=uuid4()
         )
+
+
+async def test_starting_a_pursuit_is_authorized_against_the_beamline_it_names() -> None:
+    """Scoping is only real if the place reaches the port.
+
+    A grant for 2-bm must not admit a pursuit at 19-bm, and the only
+    thing making that true is this argument arriving with the right
+    value in it.
+    """
+    authz = _RecordingAuthorize()
+    deps = _kernel(authz=authz)
+
+    await _a_pursuit(deps)
+
+    assert ("StartPursuit", "2-bm") in authz.asked
 
 
 async def test_starting_asks_the_authorization_port_before_anything_else() -> None:

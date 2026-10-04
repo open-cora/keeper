@@ -57,6 +57,8 @@ class DeviceSummaryResponse(BaseModel):
     device_id: UUID
     external_ref: ExternalRefResponse
     name: str
+    beamline: str
+    group: str | None
     status: DeviceStatus = Field(
         description=(
             "What this system has been told. Available means no fault has been "
@@ -110,6 +112,13 @@ async def list_devices(
     surface_id: Annotated[UUID, Depends(get_surface_id)],
     external_ref_scheme: Annotated[str | None, Query()] = None,
     external_ref_value: Annotated[str | None, Query()] = None,
+    beamline: Annotated[
+        str | None,
+        Query(
+            description="Only the devices registered at this beamline, such as 19-bm. "
+            "Matched as written, the way the beamline was given at registration.",
+        ),
+    ] = None,
     device_status: Annotated[DeviceStatus | None, Query(alias="status")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
     cursor: Annotated[str | None, Query()] = None,
@@ -118,6 +127,7 @@ async def list_devices(
         ListDevices.with_external_ref(
             scheme=external_ref_scheme,
             value=external_ref_value,
+            beamline=beamline,
             status=device_status,
             limit=limit,
             cursor=cursor,
@@ -135,6 +145,8 @@ async def list_devices(
                     value=summary.external_ref.value,
                 ),
                 name=summary.name,
+                beamline=summary.beamline,
+                group=summary.group,
                 status=summary.status,
                 registered_at=summary.registered_at,
                 updated_at=summary.updated_at,

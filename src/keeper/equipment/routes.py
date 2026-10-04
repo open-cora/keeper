@@ -6,7 +6,8 @@ MCP surface where those numbers mean nothing.
 
 Four shapes:
 
-    400  InvalidDeviceNameError
+    400  InvalidDeviceNameError, InvalidDeviceBeamlineError,
+         InvalidDeviceGroupError
              the label is empty, whitespace-only, or too long
          InvalidDeviceFilterError
              a list was asked for half an external reference
@@ -55,7 +56,9 @@ from keeper.equipment.aggregates.device import (
     DeviceCannotBeRecoveredError,
     DeviceCannotBeRetiredError,
     DeviceNotFoundError,
+    InvalidDeviceBeamlineError,
     InvalidDeviceFilterError,
+    InvalidDeviceGroupError,
     InvalidDeviceNameError,
 )
 from keeper.equipment.features import (
@@ -95,7 +98,12 @@ def register_equipment_routes(app: FastAPI) -> None:
     app.include_router(get_device.router)
     app.include_router(list_devices.router)
 
-    for bad_request_cls in (InvalidDeviceNameError, InvalidDeviceFilterError):
+    for bad_request_cls in (
+        InvalidDeviceNameError,
+        InvalidDeviceBeamlineError,
+        InvalidDeviceGroupError,
+        InvalidDeviceFilterError,
+    ):
         app.add_exception_handler(bad_request_cls, _handle_bad_request)
     app.add_exception_handler(DeviceNotFoundError, _handle_not_found)
     for conflict_cls in (

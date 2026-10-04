@@ -81,9 +81,14 @@ TOOLS_A_CLIENT_SHOULD_SEE = frozenset(
         "end_execution",
         "get_execution",
         "list_executions",
+        "list_steps_without_datasets",
         "register_dataset",
         "get_dataset",
         "list_datasets",
+        "register_dataset_address",
+        "record_dataset_finding",
+        "register_dataset_manifest",
+        "withdraw_dataset_address",
         "make_proposal",
         "get_proposal",
         "take_proposal",
@@ -265,14 +270,30 @@ def test_a_client_can_write_and_read_a_policy_over_the_mcp_surface() -> None:
         _call(client, live, "revoke_permission", policy_id=policy_id, **taken_back)
         after = _call(client, live, "get_policy", policy_id=policy_id)
 
+        _call(
+            client,
+            live,
+            "grant_permission",
+            policy_id=policy_id,
+            principal_id=granted[0],
+            command_name="RegisterDevice",
+            beamline="19-bm",
+        )
+        scoped = _call(client, live, "get_policy", policy_id=policy_id)
+
     assert read["policy_id"] == policy_id
     keys = [(p["principal_id"], p["command_name"]) for p in read["permissions"]]
     assert keys == sorted(keys), "a set has no order, so the tool must impose one"
     assert len(keys) == len(governing) + 8
-
-    assert taken_back in read["permissions"]
-    assert taken_back not in after["permissions"]
+    held_back = {**taken_back, "beamline": None}
+    assert held_back in read["permissions"]
+    assert held_back not in after["permissions"]
     assert len(after["permissions"]) == len(keys) - 1
+    assert {
+        "principal_id": granted[0],
+        "command_name": "RegisterDevice",
+        "beamline": "19-bm",
+    } in scoped["permissions"], "the tool dropped the place a grant covers"
 
 
 def test_a_client_can_switch_an_actor_on_and_off_over_the_mcp_surface() -> None:
@@ -474,8 +495,74 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             external_ref_value="raw/uid-completing",
         )
         dataset_id = registered["dataset_id"]
+
+        # A second address on the same data, then its removal, so the
+        # read below sees the genesis address alone and the two writing
+        # tools have each run their body rather than only been listed.
+        _call(
+            client,
+            live,
+            "register_dataset_address",
+            dataset_id=dataset_id,
+            external_ref_scheme="gpfs-file",
+            external_ref_value="/central/raw/uid-completing.h5",
+        )
+        _call(
+            client,
+            live,
+            "withdraw_dataset_address",
+            dataset_id=dataset_id,
+            external_ref_scheme="gpfs-file",
+            external_ref_value="/central/raw/uid-completing.h5",
+        )
+
+        # What is inside the copy that is left, described against the
+        # genesis address because the one above has just been withdrawn.
+        # Two entries and only one of them measured, which is the shape
+        # a reader gets from a store that serves structure for some of
+        # what it holds and not all of it.
+        _call(
+            client,
+            live,
+            "register_dataset_manifest",
+            dataset_id=dataset_id,
+            external_ref_scheme="tiled-node-path",
+            external_ref_value="raw/uid-completing",
+            convention="dxchange",
+            entries=[
+                {
+                    "path": "/exchange/data",
+                    "shape": [1800, 2048, 2048],
+                    "dtype": "uint16",
+                    "role": "projections",
+                },
+                {"path": "/measurement/sample"},
+            ],
+        )
+
+        # And what somebody made of those shapes, which is the one layer
+        # of this that no store anywhere answers for. The counts are the
+        # evidence and not a measurement: 1800 projections were expected
+        # and 1800 arrived, which the manifest above is where it read.
+        _call(
+            client,
+            live,
+            "record_dataset_finding",
+            dataset_id=dataset_id,
+            judgement="projections-complete",
+            expected=1800,
+            arrived=1800,
+        )
+
         held = _call(client, live, "get_dataset", dataset_id=dataset_id)
         produced = _call(client, live, "list_datasets", step_id=produced_by)
+
+        # The other direction, on the same step: what this execution
+        # produced and nothing recorded. Nothing, because the step above
+        # was never reported and so named no run, which is the answer
+        # that proves the tool reads the two halves together rather than
+        # listing every step it can see.
+        gaps = _call(client, live, "list_steps_without_datasets", beamline="2-bm")
 
         # Counsel rides along for the same reason Custody does, and it
         # closes the loop the other two halves of this walk opened: a
@@ -599,6 +686,8 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
             external_ref_scheme="epics-prefix",
             external_ref_value="2bmb:m1",
             name="sample x translation",
+            beamline="2-bm",
+            group="sample-stack",
         )
         device_id = enrolled["device_id"]
         resolved = _call(
@@ -960,13 +1049,36 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "is the one thing this record must never read as"
     )
     assert [item["dataset_id"] for item in produced["items"]] == [dataset_id]
+    assert gaps["items"] == [], (
+        "the step this walk registered data against was never reported, so it "
+        "named no run, and a gap listing that showed it would be counting every "
+        "step a facility ever dispatched rather than the runs that produced data"
+    )
+    described = held.pop("description")
     assert held == {
         "dataset_id": dataset_id,
         "execution_id": held_execution,
         "step_id": produced_by,
-        "external_ref_scheme": "tiled-node-path",
-        "external_ref_value": "raw/uid-completing",
+        "external_refs": [{"scheme": "tiled-node-path", "value": "raw/uid-completing"}],
     }
+    assert described["described_at"], "a description is as of a moment, so it carries one"
+    del described["described_at"]
+    assert described == {
+        "external_ref": {"scheme": "tiled-node-path", "value": "raw/uid-completing"},
+        "convention": "dxchange",
+        "entries": [
+            {
+                "path": "/exchange/data",
+                "extent": {"shape": [1800, 2048, 2048], "capacity": None, "dtype": "uint16"},
+                "role": "projections",
+            },
+            {"path": "/measurement/sample", "extent": None, "role": None},
+        ],
+    }, (
+        "an entry nobody measured comes back with no extent and an entry nobody "
+        "named comes back with no role, and both absences have to survive the "
+        "round trip or a reader cannot tell them from a zero"
+    )
 
 
 def _tools_a_walk_calls() -> frozenset[str]:

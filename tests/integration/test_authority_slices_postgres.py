@@ -99,7 +99,7 @@ async def test_a_permission_set_survives_a_round_trip_through_jsonb(
     assert policy.permissions == granted
 
 
-async def test_the_stored_row_holds_sorted_pairs_under_the_pinned_stream_type(
+async def test_the_stored_row_holds_sorted_permissions_under_the_pinned_stream_type(
     handlers: AuthorityHandlers, db_pool: asyncpg.Pool
 ) -> None:
     """Read the raw JSONB, so the shape is asserted and not just the fold.
@@ -107,11 +107,17 @@ async def test_the_stored_row_holds_sorted_pairs_under_the_pinned_stream_type(
     A fold that agrees with itself would pass even if the payload were
     a dict, a string, or unsorted. The stored shape is a contract with
     every future reader of this table, so it is checked directly.
+
+    Two of the permissions differ only in their beamline, because the
+    column is where a dropped scope would be visible and a fold reading
+    the same truncated rows back would not show it.
     """
     alice, bob = uuid4(), uuid4()
     granted = _governing(alice) | {
         Permission(principal_id=bob, command_name="RegisterActor"),
         Permission(principal_id=alice, command_name="DefinePolicy"),
+        Permission(principal_id=bob, command_name="RegisterDevice", beamline="19-bm"),
+        Permission(principal_id=bob, command_name="RegisterDevice", beamline="2-bm"),
     }
 
     policy_id = await handlers.define_policy(
@@ -129,9 +135,9 @@ async def test_the_stored_row_holds_sorted_pairs_under_the_pinned_stream_type(
     )
     assert row is not None
     assert row["event_type"] == "PolicyDefined"
-    pairs = json.loads(row["payload"])["permissions"]
-    assert pairs == sorted(pairs), "a set has no order, so the payload must impose one"
-    assert pairs == sorted([[str(p.principal_id), p.command_name] for p in granted])
+    entries = json.loads(row["payload"])["permissions"]
+    assert entries == sorted(entries), "a set has no order, so the payload must impose one"
+    assert entries == sorted([[str(p.principal_id), p.command_name, p.beamline] for p in granted])
 
 
 async def test_the_smallest_legal_policy_round_trips_intact(

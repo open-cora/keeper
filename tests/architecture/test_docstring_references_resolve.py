@@ -43,6 +43,7 @@ from tests.architecture.conftest import (
     REPO_ROOT,
     tracked_file_basenames,
     tracked_migration_files,
+    tracked_other_python_files,
     tracked_python_files,
     tracked_test_files,
 )
@@ -53,6 +54,18 @@ EXTERNAL_NAMES: frozenset[str] = frozenset(
     {
         # Postgres
         "AccessExclusiveLock",
+        # A column of proj_execution_step_summary and of the kinds table
+        # beside it, created in SQL by a migration and never bound in
+        # Python. Named in prose because the gap filter turns on it, and
+        # because saying which column replaced `run_opened_at` as the
+        # gate is the whole of what that prose is for.
+        "opens_a_run",
+        # The environment variable the installer writes into the unit's
+        # environment file, which pydantic reads back as the settings
+        # field of the same name in lower case. Real, and outside Python
+        # on the side a Python symbol scan can see: it exists as a line
+        # of shell and a line of an env file.
+        "IDENTITY_PROVIDERS",
         # Postgres catalog: the trigger table and the function that renders
         # one back as DDL, both read by the counsel notify test
         "pg_trigger",
@@ -225,7 +238,7 @@ survived the first sweep for exactly that reason."""
 
 
 def _all_python_files() -> list[Path]:
-    return sorted(tracked_python_files() | tracked_test_files())
+    return sorted(tracked_python_files() | tracked_test_files() | tracked_other_python_files())
 
 
 _SQL_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")

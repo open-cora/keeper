@@ -125,6 +125,7 @@ from keeper.execution.features import (
     list_executions,
     list_operations,
     list_procedures,
+    list_steps_without_datasets,
     report_step,
     report_step_run,
 )
@@ -165,6 +166,7 @@ def register_execution_routes(app: FastAPI) -> None:
     app.include_router(define_procedure.router)
     app.include_router(get_procedure.router)
     app.include_router(list_procedures.router)
+    app.include_router(list_steps_without_datasets.router)
 
     for malformed_cls in (
         InvalidOperationNameError,

@@ -12,7 +12,7 @@ test regenerates it on every run and fails on any difference, so it cannot be
 out of date. Do not edit it by hand. What each operation means, and what it
 refuses, is on that context's own page.
 
-48 operations, across 7 bounded contexts.
+53 operations, across 7 bounded contexts.
 
 ## Access
 
@@ -62,6 +62,10 @@ refuses, is on that context's own page.
 | `GET /datasets` | `list_datasets` | `200` |
 | `POST /datasets` | `register_dataset` | `201` |
 | `GET /datasets/{dataset_id}` | `get_dataset` | `200` |
+| `POST /datasets/{dataset_id}/addresses` | `register_dataset_address` | `204` |
+| `POST /datasets/{dataset_id}/addresses/withdraw` | `withdraw_dataset_address` | `204` |
+| `POST /datasets/{dataset_id}/findings` | `record_dataset_finding` | `204` |
+| `POST /datasets/{dataset_id}/manifests` | `register_dataset_manifest` | `204` |
 
 ## Equipment
 
@@ -95,6 +99,7 @@ refuses, is on that context's own page.
 | `GET /procedures` | `list_procedures` | `200` |
 | `POST /procedures` | `define_procedure` | `201` |
 | `GET /procedures/{procedure_id}` | `get_procedure` | `200` |
+| `GET /steps/without-datasets` | `list_steps_without_datasets` | `200` |
 
 ## Pursuit
 

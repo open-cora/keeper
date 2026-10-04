@@ -172,6 +172,25 @@ def tracked_test_files() -> frozenset[Path]:
     return _tracked_python_files_under("tests")
 
 
+@cache
+def tracked_other_python_files() -> frozenset[Path]:
+    """Git-tracked `.py` files this project ships outside `src` and `tests`.
+
+    The deploy scripts, the migration scanners' own tests, the surface
+    generator. They are part of the repository and their prose rots like
+    any other, but every content rule here enumerated a hand-written list
+    of directories and none of them was on it.
+
+    By subtraction rather than by naming a directory, so a project that
+    grows one does not also have to remember this. Deliberately not fed to
+    the architecture rules: a slice contract or a decider purity check is
+    about `src/keeper` and ranging it over a deploy script would be a
+    different claim.
+    """
+    known = tracked_python_files() | tracked_test_files()
+    return _tracked_python_files_under(".") - known
+
+
 def _tracked_python_files_under(subdir: str) -> frozenset[Path]:
     # Strip pre-commit's GIT_DIR and GIT_INDEX_FILE: inside a worktree they
     # point at the parent repo's hook staging area, which masks the worktree's

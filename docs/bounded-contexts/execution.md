@@ -104,6 +104,7 @@ Two gaps in that check are worth stating rather than discovering. A run supplyin
 | Nothing more is coming | `POST /executions/{execution_id}/end` | `end_execution` | `204` |
 | Read one back | `GET /executions/{execution_id}` | `get_execution` | `200` with the execution and its steps |
 | Find executions | `GET /executions` | `list_executions` | `200` with a page of executions |
+| Find runs nothing filed | `GET /steps/without-datasets` | `list_steps_without_datasets` | `200` with a page of steps |
 
 Each is published twice, once as an HTTP route and once as an MCP tool, from the same handler. The status codes are declared once, in `src/keeper/execution/routes.py`.
 
@@ -128,6 +129,7 @@ There are three derived tables, one per aggregate, and none holds state the fold
                         beamline, steps, occurred_at
    ExecutionClaimed     execution_id, occurred_at
    ExecutionStepDone    execution_id, index, engine_reference, occurred_at
+                        (the reference is carried and no longer read)
    ExecutionStepRefused execution_id, index, occurred_at
    ExecutionStepBroken  execution_id, index, cause, occurred_at
    ExecutionStepSkipped execution_id, index, occurred_at
@@ -467,7 +469,9 @@ The answer is a page and not a single execution, and nothing reserves a row for 
 
 A procedure's genesis checks that every operation it cites exists, and that check is real. The equivalent one scale down is unavailable, and the reason is worth stating rather than discovering.
 
-A driver reports a run step the moment its engine returns, and carries the engine's own name for the run it opened. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
+Whatever watches an engine reports the name it gave a run, on a start. Nothing here can ask that engine whether such a run exists, and nothing holds a record of it to check against. So `engine_reference` is a correlation hint rather than a key, which is what `docs/reference/client-contract.md` already says such a reference is.
+
+A driver used to report it too, on a `Done`, and the field is still on that event because drivers still send it. It is no longer folded into the step. Driving a step says how the call went and nothing about what the engine called the run: the value a driver holds is whatever its own call returned, which is proximity rather than knowledge, and the same value is readable by anything watching. Reading both also let arrival order decide the answer, because the driver's report lands after the watcher's and would replace a true reference with a stale one, or with nothing at all. The field comes off the event once no deployed driver sends one.
 
 That is weaker than an operation reference and it is the honest shape. An engine's names are the engine's, and a system that claimed to have checked one would be claiming to have asked.
 
@@ -526,12 +530,13 @@ What a driving surface would still add is the asking side of a pause, which is a
        end_execution/
        get_execution/
        list_executions/
+       list_steps_without_datasets/  the one read here that also sees Custody
      routes.py                  HTTP mounting and the error-to-status mapping
      tools.py                   MCP tool registration
      wire.py                    which handler gets idempotency, which gets tracing
 ```
 
-**Thirteen directories where there were twenty-one.** Eight went with an aggregate this context no longer has, and six of those were its transitions: five near-identical handlers plus a genesis. [Layout](../reference/layout.md#bc-root-extras) records a shared shell for them that was built and then reverted, and the decision it records is still the live one, because the same question came up again here and was answered the other way.
+**Fourteen directories where there were twenty-one.** Eight went with an aggregate this context no longer has, and six of those were its transitions: five near-identical handlers plus a genesis. [Layout](../reference/layout.md#bc-root-extras) records a shared shell for them that was built and then reverted, and the decision it records is still the live one, because the same question came up again here and was answered the other way.
 
 `report_step` and `report_step_run` each take a discriminator rather than splitting into four and six slices. That is the reverse of what that aggregate did, and the reason is that the outcome is a value on a refusable command rather than a separate call site: one command that can be refused, several event classes that cannot be set wrong. Thirty near-identical files would have been the wrong trade when the sibling slice on the same stream had already answered it.
 

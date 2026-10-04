@@ -22,14 +22,25 @@ from keeper.infrastructure.request import get_mcp_surface_id
 from keeper.infrastructure.slices.principal import get_mcp_principal_id
 
 
+class ExternalRefOutput(BaseModel):
+    """One store's address for this data.
+
+    A nested object rather than two flat fields, now that a dataset can
+    be at several addresses at once. Flattening would need an index in
+    every name and would let a caller build half a reference.
+    """
+
+    scheme: str
+    value: str
+
+
 class DatasetSummaryOutput(BaseModel):
     """A dataset as a list shows it."""
 
     dataset_id: UUID
     execution_id: UUID
     step_id: UUID
-    external_ref_scheme: str
-    external_ref_value: str
+    external_refs: list[ExternalRefOutput]
     created_at: datetime
 
 
@@ -71,8 +82,10 @@ def register(mcp: FastMCP, *, get_handler: Callable[[], Handler]) -> None:
                     dataset_id=summary.dataset_id,
                     execution_id=summary.execution_id,
                     step_id=summary.step_id,
-                    external_ref_scheme=summary.external_ref.scheme,
-                    external_ref_value=summary.external_ref.value,
+                    external_refs=[
+                        ExternalRefOutput(scheme=ref.scheme, value=ref.value)
+                        for ref in summary.external_refs
+                    ],
                     created_at=summary.created_at,
                 )
                 for summary in page.items

@@ -76,6 +76,21 @@ class Authorize(Protocol):
     authorize this command." A factory protocol such as
     `AuthorizeFactory` DOES use `__call__`, because it IS a construction
     function; this port is not.
+
+    ## Why `beamline` is optional and defaults to absent
+
+    Most commands name no place and pass nothing, which is also what
+    makes this a widening rather than a rewrite of fifty call sites. A
+    handler passes one only when its command resolves to a beamline,
+    and a permission granted for a beamline matches only a call that
+    names that beamline. Absent matches absent.
+
+    The consequence worth stating: a handler that resolves a beamline
+    and forgets to pass it asks a narrower question than it should, and
+    is answered against the permissions for nowhere. That fails closed
+    rather than open, so it refuses a caller rather than admitting one,
+    and `tests/architecture/test_beamline_commands_are_scoped.py` is
+    what keeps it from being discovered that way.
     """
 
     async def authorize(
@@ -83,6 +98,7 @@ class Authorize(Protocol):
         principal_id: UUID,
         command_name: str,
         surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
     ) -> AuthzResult: ...
 
 
@@ -100,6 +116,7 @@ class AllowAllAuthorize:
         principal_id: UUID,
         command_name: str,
         surface_id: UUID = NIL_SENTINEL_ID,
+        beamline: str | None = None,
     ) -> AuthzResult:
-        _ = (principal_id, command_name, surface_id)
+        _ = (principal_id, command_name, surface_id, beamline)
         return Allow()

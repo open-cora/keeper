@@ -30,7 +30,13 @@ from keeper.equipment.aggregates.device.events import (
     DeviceRegistered,
     DeviceRetired,
 )
-from keeper.equipment.aggregates.device.state import Device, DeviceName, DeviceStatus
+from keeper.equipment.aggregates.device.state import (
+    Device,
+    DeviceBeamline,
+    DeviceGroup,
+    DeviceName,
+    DeviceStatus,
+)
 from keeper.infrastructure.slices.evolver import require_state
 from keeper.shared.identifier import Identifier
 
@@ -42,11 +48,17 @@ def evolve(state: Device | None, event: DeviceEvent) -> Device:
     must be None. The other three require one, because nothing can be
     reported about a device that was never registered.
 
-    The genesis re-validates as it rebuilds: the reference and the label
-    go back through their value objects rather than being copied as the
-    strings the payload holds. That is what docs/reference/modeling.md
-    asks for, and it means a payload that could not be constructed today
-    fails on read rather than becoming state nothing checked.
+    The genesis re-validates as it rebuilds: the reference and every
+    label go back through their value objects rather than being copied
+    as the strings the payload holds. That is what
+    docs/reference/modeling.md asks for, and it means a payload that
+    could not be constructed today fails on read rather than becoming
+    state nothing checked.
+
+    An absent group stays absent rather than becoming an empty label.
+    The value object refuses a blank string, so passing one through
+    would turn "belongs to no cluster" into a payload that cannot be
+    read back, which is the opposite of what optional means.
     """
     match event:
         case DeviceRegistered(
@@ -54,12 +66,16 @@ def evolve(state: Device | None, event: DeviceEvent) -> Device:
             external_ref_scheme=scheme,
             external_ref_value=value,
             device_name=device_name,
+            beamline=beamline,
+            group=group,
         ):
             _ = state
             return Device(
                 id=device_id,
                 external_ref=Identifier(scheme=scheme, value=value),
                 name=DeviceName(device_name),
+                beamline=DeviceBeamline(beamline),
+                group=DeviceGroup(group) if group is not None else None,
                 status=DeviceStatus.AVAILABLE,
             )
         case DeviceFaulted():

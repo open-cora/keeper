@@ -69,11 +69,13 @@ Default to **flat fields** until three members of a group exist. Then hoist into
 class Thing:
     required_part_ids: frozenset[UUID]
 
+
 # 2 members: still flat
 @dataclass(frozen=True)
 class Thing:
     required_part_ids: frozenset[UUID]
     required_inputs: frozenset[str]
+
 
 # 3+ members: hoist
 @dataclass(frozen=True)
@@ -81,6 +83,7 @@ class Needs:
     part_ids: frozenset[UUID]
     inputs: frozenset[str]
     fixture_ids: frozenset[UUID]
+
 
 @dataclass(frozen=True)
 class Thing:
@@ -105,7 +108,7 @@ When two aggregates could plausibly record the same act, select on the act's **o
 
 Two axes are commonly conflated with that selection and should be kept separate:
 
-- **Who drove the act.** Whether the system conducted it, or was told afterwards that something else did, is orthogonal to which aggregate owns the record. Both modes belong to whichever aggregate the output test picks. The two are named **conducted** and **reported** in the [Glossary](glossary.md).
+- **Who drove the act.** Whether the system composed the work itself, or was told afterwards that something else performed it, is orthogonal to which aggregate owns the record. Both modes belong to whichever aggregate the output test picks. The two are named **composed** and **reported** in the [Glossary](glossary.md).
 - **How the act reached its substrate.** The port an act travelled over is an adapter concern. It never decides the aggregate.
 
 Data that merely transits an act is not an output of record. When an act computes a value from intermediate artifacts it does not retain, the value is the output and the artifacts are not.

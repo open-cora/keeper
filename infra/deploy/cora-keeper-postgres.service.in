@@ -1,0 +1,67 @@
+# The keeper's PostgreSQL, run as a rootless container under `systemd --user`.
+# Written by install.sh from this template; the tracked copy names no host so
+# that reading it tells you the shape, and reading the installed copy tells
+# you the deployment.
+#
+# Plain podman rather than a quadlet `.container` file, and the reason is the
+# kernel rather than taste. Quadlet always passes `--cgroups=split`, which
+# needs cgroups v2. This host runs v1, where a rootless container cannot
+# create its own cgroup: podman exits 126 with a permission error on
+# /sys/fs/cgroup before the image is ever started. A plain unit passes no
+# cgroup flag and runs. Revisit this on a host running cgroups v2, where
+# quadlet is the better tool.
+#
+# ConditionHost is the load-bearing line. `systemd --user` reads units only
+# from $HOME, and $HOME here is NFS mounted by every machine the account can
+# log into. Without the guard, enabling this once from the wrong shell starts
+# a second Postgres elsewhere; if that host also mounts the data directory,
+# two clusters open one set of files, which is data loss rather than a
+# warning. install.sh writes the FULL hostname, because that is what systemd
+# compares against and the spelling differs between machines here: `hostname`
+# answers with the FQDN on some and the short form on others.
+#
+# The data directory is on local disk, not under $HOME, for the mirror image
+# of the same reason. Postgres over NFS is a file-locking hazard even with a
+# single writer.
+
+[Unit]
+Description=Keeper PostgreSQL
+ConditionHost=@DEPLOY_HOST@
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# `--rm` with a recreate beforehand, so a hard kill cannot leave a stale
+# container that blocks the next start. The database survives this because
+# it lives in the bind mount, not in the container.
+ExecStartPre=-/usr/bin/podman rm -f keeper-postgres
+
+# The mount is at /var/lib/postgresql, one level ABOVE the data directory.
+# Postgres 18 images place the cluster in a versioned subdirectory and refuse
+# to start when handed the old /var/lib/postgresql/data path. The development
+# compose file makes the same choice and cites the upstream change.
+#
+# `:U` makes podman chown the directory to the subordinate uid the image's
+# postgres user maps to. Without it a rootless bind mount arrives owned by
+# container-root, the image drops to its own user, and initdb fails on a
+# directory it cannot write.
+#
+# Plain postgres, not the pgvector image the compose file uses: no migration
+# in this project creates an extension, so that would be a development
+# convenience inherited by accident.
+#
+# Loopback only. Nothing off this host has a reason to reach the database.
+ExecStart=/usr/bin/podman run --rm --name keeper-postgres \
+    --volume @CORA_ROOT@/pgdata:/var/lib/postgresql:U \
+    --publish 127.0.0.1:@PG_PORT@:5432 \
+    --env-file @CORA_ROOT@/etc/postgres.env \
+    docker.io/library/postgres:18
+
+ExecStop=/usr/bin/podman stop -t 30 keeper-postgres
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

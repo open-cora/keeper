@@ -82,6 +82,7 @@ def bind(deps: Kernel, summaries: DeviceSummaryLookup) -> Handler:
 
         return await summaries.list_devices(
             external_ref=query.external_ref,
+            beamline=query.beamline,
             status=query.status,
             limit=min(query.limit, MAX_PAGE_SIZE),
             cursor=query.cursor,

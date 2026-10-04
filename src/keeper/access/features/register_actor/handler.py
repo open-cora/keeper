@@ -1,8 +1,12 @@
 """Run the registration: authorize, decide, append.
 
-Create-style shape. A freshly minted id provably has no history, so this
-handler skips the load-and-fold that an update-style handler starts with
-and hands `state=None` straight to the decider.
+Create-style shape, with one load the minting path does not need. A
+freshly minted id provably has no history; an id the caller chose does
+not, so the stream is folded before the decision and the decider is
+given what it finds. Loading on both paths rather than only the second
+keeps one shape here: the read is of an empty stream when the id was
+just minted, which costs a round trip on a command issued a handful of
+times in a deployment's life.
 
 One store is written, so there is no ordering to get right and no window
 in which a crash leaves two stores disagreeing about the same actor. The
@@ -12,7 +16,7 @@ append either lands or it does not.
 from typing import Protocol
 from uuid import UUID
 
-from keeper.access.aggregates.actor import ACTOR_STREAM_TYPE, to_payload
+from keeper.access.aggregates.actor import ACTOR_STREAM_TYPE, load_actor, to_payload
 from keeper.access.features.register_actor.command import RegisterActor
 from keeper.access.features.register_actor.decider import decide
 from keeper.infrastructure.kernel import Kernel
@@ -91,9 +95,9 @@ def bind(deps: Kernel) -> Handler:
             )
             raise UnauthorizedError(decision.reason)
 
-        new_id = deps.id_generator.new_id()
+        new_id = command.actor_id or deps.id_generator.new_id()
         now = deps.clock.now()
-        events = decide(None, command, now=now, new_id=new_id)
+        events = decide(await load_actor(deps.event_store, new_id), command, now=now, new_id=new_id)
 
         await deps.event_store.append(
             ACTOR_STREAM_TYPE,

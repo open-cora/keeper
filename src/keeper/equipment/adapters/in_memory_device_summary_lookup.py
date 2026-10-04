@@ -69,6 +69,7 @@ class InMemoryDeviceSummaryLookup:
         self,
         *,
         external_ref: Identifier | None,
+        beamline: str | None,
         status: DeviceStatus | None,
         limit: int,
         cursor: str | None,
@@ -78,6 +79,7 @@ class InMemoryDeviceSummaryLookup:
             summary
             for summary in await self._all_summaries()
             if (external_ref is None or summary.external_ref == external_ref)
+            and (beamline is None or summary.beamline == beamline)
             and (status is None or summary.status is status)
         ]
         summaries.sort(key=lambda summary: (summary.registered_at, summary.device_id), reverse=True)
@@ -111,6 +113,8 @@ class InMemoryDeviceSummaryLookup:
                     device_id=device.id,
                     external_ref=device.external_ref,
                     name=device.name.value,
+                    beamline=device.beamline.value,
+                    group=device.group.value if device.group is not None else None,
                     status=device.status,
                     registered_at=stored[0].occurred_at,
                     updated_at=stored[-1].occurred_at,

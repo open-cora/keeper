@@ -99,7 +99,7 @@ async def check_a_registered_dataset_shows_with_its_step_reference_and_time(
     (summary,) = page.items
     assert summary.dataset_id == dataset_id
     assert summary.step_id == step_id
-    assert summary.external_ref == Identifier(scheme="example-store-path", value="raw/one")
+    assert summary.external_refs == (Identifier(scheme="example-store-path", value="raw/one"),)
     assert summary.created_at == _EPOCH
 
 

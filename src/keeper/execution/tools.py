@@ -20,6 +20,9 @@ from keeper.execution.features.get_procedure import tool as get_procedure_tool
 from keeper.execution.features.list_executions import tool as list_executions_tool
 from keeper.execution.features.list_operations import tool as list_operations_tool
 from keeper.execution.features.list_procedures import tool as list_procedures_tool
+from keeper.execution.features.list_steps_without_datasets import (
+    tool as list_steps_without_datasets_tool,
+)
 from keeper.execution.features.report_step import tool as report_step_tool
 from keeper.execution.features.report_step_run import tool as report_step_run_tool
 from keeper.execution.wire import ExecutionHandlers
@@ -82,6 +85,10 @@ def register_execution_tools(
     list_executions_tool.register(
         mcp,
         get_handler=lambda: get_handlers().list_executions,
+    )
+    list_steps_without_datasets_tool.register(
+        mcp,
+        get_handler=lambda: get_handlers().list_steps_without_datasets,
     )
 
 

@@ -1,6 +1,12 @@
 """HTTP door for revoking a permission.
 
-`DELETE /policies/{policy_id}/permissions/{principal_id}/{command_name}`.
+`DELETE /policies/{policy_id}/permissions/{principal_id}/{command_name}`,
+with the beamline as a query parameter rather than a fourth segment.
+
+A grant's place is optional, and a path segment cannot be. Carrying it
+in the query keeps one route for both shapes, where a path would need
+two and a reader would have to know which meant the permission for
+nowhere.
 
 A permission has no id of its own: the pair IS its identity, so both
 halves are in the path and the permission is addressable the way any
@@ -76,11 +82,14 @@ async def delete_policy_permission(
     cid: Annotated[UUID, Depends(get_correlation_id)],
     caller_id: Annotated[UUID, Depends(get_principal_id)],
     surface_id: Annotated[UUID, Depends(get_surface_id)],
+    beamline: str | None = None,
 ) -> None:
     await handler(
         RevokePolicyPermission(
             policy_id=policy_id,
-            permission=Permission(principal_id=principal_id, command_name=command_name),
+            permission=Permission(
+                principal_id=principal_id, command_name=command_name, beamline=beamline
+            ),
         ),
         principal_id=caller_id,
         correlation_id=cid,

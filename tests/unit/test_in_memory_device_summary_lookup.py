@@ -71,7 +71,7 @@ async def test_a_plan_stream_in_the_same_store_is_not_read_as_a_device() -> None
     )
 
     page = await InMemoryDeviceSummaryLookup(event_store).list_devices(
-        external_ref=None, status=None, limit=10, cursor=None
+        beamline=None, external_ref=None, status=None, limit=10, cursor=None
     )
 
     assert len(page.items) == 1

@@ -8,7 +8,7 @@ The keeper is a parallel modeling effort on an inherited chassis: event-sourced 
 
 The chassis was copied once, from an earlier private tree, and is owned outright from that point on. There is no shared package with that tree and no expectation that a fix in one lands in the other. Do not reach into it for code, and do not add provenance comments pointing at it.
 
-The domains are the open question. The baseline carries zero bounded contexts on purpose, so the first ones can be modeled without inheriting a vocabulary.
+The domains are no longer the open question. The bounded contexts are Access, Authority, Execution, Custody, Counsel, Equipment and Pursuit, one page each under [docs/bounded-contexts/](docs/bounded-contexts/). They were modeled here rather than inherited, which is what the empty baseline was for. How a new slice joins one of them is in [docs/reference/](docs/reference/index.md).
 
 ## Conventions
 
@@ -45,9 +45,9 @@ Both hold in every project and both were learned here.
 
 ## Architecture fitness tests
 
-`tests/architecture/` holds structural checks that range over whatever bounded contexts exist. With zero BCs they find nothing to check and pass vacuously, which is a false negative, not a green light.
+`tests/architecture/` holds structural checks that range over whatever bounded contexts exist. They range over real ones now. The hazard they were pinned against was a vacuous pass while the chassis carried none; the hazard now is a context, an aggregate or a slice arriving or leaving without anybody saying so, which every one of these checks would absorb silently.
 
-`test_fitness_scope.py` pins the discovered-BC count to a checked-in integer for exactly that reason. Adding the first BC is meant to fail it. When that happens, confirm the fitness suite now ranges over something real, then bump the integer in the same commit.
+`test_fitness_scope.py` pins all three counts to checked-in integers for that reason. Adding or removing one is meant to fail it. Confirm the suite still ranges over what you expect, then move the integer in the same commit.
 
 ## Memory hygiene
 

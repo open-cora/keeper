@@ -60,6 +60,7 @@ nav:
   - Home: index.md
   - Running one: running.md
   - Understanding it:
+      - Keeping: keeping.md
       - The surface: surface.md
       - Contract: reference/client-contract.md
       - Glossary: reference/glossary.md

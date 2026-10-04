@@ -4,11 +4,11 @@ The other read path. `read.py` rebuilds one device by replaying its
 stream, which answers a question that already names the device. The two
 questions this context is actually asked name no device at all.
 
-## The two filters, and why each has a caller
+## The three filters, and why each has a caller
 
 The Counsel summary beside this one argues that a filter without a
 caller is a column and a parameter earning nothing, and declines three
-on those grounds. Both of these have one.
+on those grounds. All three of these have one.
 
 `external_ref` is what makes the context usable by an adapter at all. A
 reporter watching a beamline knows the address it is subscribed to and
@@ -22,14 +22,28 @@ the only way in for a writer that was not the registrar.
 answer: what is faulted right now. It is the counterpart of the run
 listing's openness filter rather than a second spelling of it.
 
+`beamline` is the question one installation serving several beamlines
+cannot otherwise be asked. Without it, listing the devices at one
+beamline means reading every device everywhere and matching on the
+shape of an address, which is a convention nothing here enforces.
+
+**There is deliberately no filter on `group`**, and the same rule is
+why. A group is returned on every row, so grouping a beamline's listing
+is something a caller does with what it already has. A server-side
+filter would earn its place the day something composes work from a
+group and asks for one directly, and not before. The column exists
+because it is information; the parameter does not, because nothing
+calls it.
+
 ## What a summary leaves out
 
 Nothing, which is worth stating because its two siblings both leave out
 a field. A run summary drops the parameters and a proposal summary drops
 the same, on the grounds that they are unbounded and a page of fifty
-rows would be mostly them. A device has no unbounded field: the label is
-bounded and everything else is an id, a status or a time. So the summary
-is the whole record and a caller reading a list needs no second call.
+rows would be mostly them. A device has no unbounded field: all three
+labels are bounded and everything else is an id, a status or a time. So
+the summary is the whole record and a caller reading a list needs no
+second call.
 
 ## The two timestamps
 
@@ -69,6 +83,8 @@ class DeviceSummary:
     device_id: UUID
     external_ref: Identifier
     name: str
+    beamline: str
+    group: str | None
     status: DeviceStatus
     registered_at: datetime
     updated_at: datetime
@@ -98,6 +114,7 @@ class DeviceSummaryLookup(Protocol):
         self,
         *,
         external_ref: Identifier | None,
+        beamline: str | None,
         status: DeviceStatus | None,
         limit: int,
         cursor: str | None,

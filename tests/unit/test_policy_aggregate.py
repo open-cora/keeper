@@ -87,6 +87,72 @@ def test_a_permission_set_survives_the_round_trip_through_a_payload() -> None:
     assert rebuilt == original
 
 
+def test_a_beamline_scoped_permission_survives_the_round_trip_through_a_payload() -> None:
+    """The sibling above passed while every scope was being dropped.
+
+    It builds its permissions without a beamline, so both halves of the
+    serializer could ignore the field and still agree with each other.
+    A policy authored with scoped grants then folded back holding none
+    of them, which denies the caller that names a beamline and admits
+    the caller that names none.
+    """
+    alice = uuid4()
+    original = PolicyDefined(
+        policy_id=uuid4(),
+        permissions=frozenset(
+            {
+                Permission(principal_id=alice, command_name="RegisterDevice", beamline="19-bm"),
+                Permission(principal_id=alice, command_name="RegisterDevice", beamline="2-bm"),
+                Permission(principal_id=alice, command_name="RegisterDevice"),
+            }
+        ),
+        occurred_at=_NOW,
+    )
+
+    rebuilt = from_stored(_stored("PolicyDefined", to_payload(original)))
+
+    assert rebuilt == original
+    assert isinstance(rebuilt, PolicyDefined)
+    assert len(rebuilt.permissions) == 3
+
+
+def test_a_permission_stored_before_a_permission_could_say_where_reads_as_nowhere() -> None:
+    """Two-value entries are in the log and have to keep folding."""
+    alice = uuid4()
+    payload = {
+        "policy_id": str(uuid4()),
+        "permissions": [[str(alice), "GrantPolicyPermission"]],
+        "occurred_at": _NOW.isoformat(),
+    }
+
+    rebuilt = from_stored(_stored("PolicyDefined", payload))
+
+    assert isinstance(rebuilt, PolicyDefined)
+    assert rebuilt.permissions == frozenset(
+        {Permission(principal_id=alice, command_name="GrantPolicyPermission")}
+    )
+
+
+def test_permissions_differing_only_in_beamline_serialize_in_a_stable_order() -> None:
+    """A sort key short of the whole permission is not a total order.
+
+    The key was the principal and the command, so three grants of one
+    command at three beamlines sorted equal and came out in whatever
+    order the set happened to iterate, which differs per process. The
+    payload then stopped being reproducible from the state that
+    produced it, and the test above could not see it because its own
+    permissions differed by command.
+    """
+    alice = uuid4()
+    for _ in range(50):
+        permissions = frozenset(
+            Permission(principal_id=alice, command_name="RegisterDevice", beamline=where)
+            for where in ("19-bm", "2-bm", "7-bm", "32-id")
+        )
+        entries = to_payload(PolicyDefined(uuid4(), permissions, _NOW))["permissions"]
+        assert entries == sorted(entries)
+
+
 def test_a_permission_set_always_serializes_in_sorted_order() -> None:
     """Determinism across processes, which one process cannot observe.
 
@@ -232,11 +298,18 @@ def test_the_read_order_and_the_stored_order_are_the_same() -> None:
     per process, so the order under test is not the same twice.
     """
     for _ in range(50):
+        shared = uuid4()
         permissions = frozenset(
-            Permission(principal_id=uuid4(), command_name=name)
-            for name in ("DefinePolicy", "RegisterActor", "GetActor", "DeactivateActor")
+            {
+                Permission(principal_id=uuid4(), command_name="DefinePolicy"),
+                Permission(principal_id=uuid4(), command_name="RegisterActor"),
+                Permission(principal_id=shared, command_name="RegisterDevice", beamline="19-bm"),
+                Permission(principal_id=shared, command_name="RegisterDevice", beamline="2-bm"),
+                Permission(principal_id=shared, command_name="RegisterDevice"),
+            }
         )
         stored = to_payload(PolicyDefined(uuid4(), permissions, _NOW))["permissions"]
-        assert [[str(p.principal_id), p.command_name] for p in sorted_permissions(permissions)] == (
-            stored
-        )
+        assert [
+            [str(p.principal_id), p.command_name, p.beamline]
+            for p in sorted_permissions(permissions)
+        ] == stored

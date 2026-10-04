@@ -171,7 +171,7 @@ def test_granting_the_system_principal_a_permission_is_unprocessable(client: Tes
     assert response.status_code == 422
 
 
-def test_reading_a_policy_returns_the_pairs_it_permits(client: TestClient) -> None:
+def test_reading_a_policy_returns_the_permissions_it_holds(client: TestClient) -> None:
     grantee = str(uuid4())
     with client:
         policy_id = _a_policy(client)
@@ -183,7 +183,46 @@ def test_reading_a_policy_returns_the_pairs_it_permits(client: TestClient) -> No
     assert response.status_code == 200
     body = response.json()
     assert body["policy_id"] == policy_id
-    assert {"principal_id": grantee, "command_name": "RegisterActor"} in body["permissions"]
+    assert {
+        "principal_id": grantee,
+        "command_name": "RegisterActor",
+        "beamline": None,
+    } in body["permissions"]
+
+
+def test_a_policy_can_be_born_holding_a_scoped_permission(client: TestClient) -> None:
+    """Defining took no beamline while granting did, so a first rulebook
+    could not be authored with the scoped grants it is for.
+
+    Read back as well as written, because the read surface dropped the
+    field too: a deployment could have seeded a fenced policy and been
+    shown an unfenced one, with no way to tell which it was running.
+    """
+    grantee = str(uuid4())
+    scoped = {"principal_id": grantee, "command_name": "RegisterDevice", "beamline": "19-bm"}
+    with client:
+        response = client.post(
+            "/policies",
+            json={"permissions": [*_governing_body(_ADMINISTRATOR), scoped]},
+        )
+        assert response.status_code == 201, response.text
+        policy_id = response.json()["policy_id"]
+        held = client.get(f"/policies/{policy_id}").json()["permissions"]
+    assert scoped in held
+
+
+def test_two_grants_differing_only_in_beamline_read_back_as_two(client: TestClient) -> None:
+    """Dropping the field anywhere would collapse these into one row."""
+    grantee = str(uuid4())
+    here = {"principal_id": grantee, "command_name": "RegisterDevice", "beamline": "19-bm"}
+    there = {"principal_id": grantee, "command_name": "RegisterDevice", "beamline": "2-bm"}
+    with client:
+        policy_id = _a_policy(client)
+        for grant in (here, there):
+            assert client.post(f"/policies/{policy_id}/permissions", json=grant).status_code == 204
+        held = client.get(f"/policies/{policy_id}").json()["permissions"]
+    assert here in held
+    assert there in held
 
 
 def test_reading_a_policy_that_was_never_defined_is_a_not_found(client: TestClient) -> None:
@@ -199,17 +238,17 @@ def test_a_grant_and_a_revocation_are_visible_to_the_next_read(client: TestClien
     notice the read slice and the writing slices disagreeing about the
     stream type, which nothing else here can see.
     """
-    pair = {"principal_id": str(uuid4()), "command_name": "RegisterActor"}
+    grantee = str(uuid4())
+    sent = {"principal_id": grantee, "command_name": "RegisterActor"}
+    held = {**sent, "beamline": None}
     with client:
         policy_id = _a_policy(client)
-        client.post(f"/policies/{policy_id}/permissions", json=pair)
+        client.post(f"/policies/{policy_id}/permissions", json=sent)
         after_grant = client.get(f"/policies/{policy_id}").json()["permissions"]
-        client.delete(
-            f"/policies/{policy_id}/permissions/{pair['principal_id']}/{pair['command_name']}"
-        )
+        client.delete(f"/policies/{policy_id}/permissions/{grantee}/RegisterActor")
         after_revoke = client.get(f"/policies/{policy_id}").json()["permissions"]
-    assert pair in after_grant
-    assert pair not in after_revoke
+    assert held in after_grant
+    assert held not in after_revoke
 
 
 def test_the_permissions_come_back_in_a_declared_order(client: TestClient) -> None:

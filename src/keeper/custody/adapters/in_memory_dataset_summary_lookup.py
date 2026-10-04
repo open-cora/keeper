@@ -96,7 +96,7 @@ class InMemoryDatasetSummaryLookup:
                     dataset_id=dataset.id,
                     execution_id=dataset.execution_id,
                     step_id=dataset.step_id,
-                    external_ref=dataset.external_ref,
+                    external_refs=dataset.external_refs,
                     created_at=stored[0].occurred_at,
                 )
             )

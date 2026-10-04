@@ -61,6 +61,7 @@ class _DrainingExecutionWriter:
         steps: list[str],
         at: datetime,
         beamline: str = "2-bm",
+        step_ids: list[UUID] | None = None,
     ) -> None:
         await self._writer.dispatch(
             execution_id=execution_id,
@@ -68,6 +69,7 @@ class _DrainingExecutionWriter:
             steps=steps,
             at=at,
             beamline=beamline,
+            step_ids=step_ids,
         )
         await self._drain()
 
@@ -75,8 +77,17 @@ class _DrainingExecutionWriter:
         await self._writer.claim(execution_id=execution_id, at=at)
         await self._drain()
 
-    async def step(self, *, execution_id: UUID, index: int, at: datetime) -> None:
-        await self._writer.step(execution_id=execution_id, index=index, at=at)
+    async def step(
+        self,
+        *,
+        execution_id: UUID,
+        index: int,
+        at: datetime,
+        engine_reference: str | None = None,
+    ) -> None:
+        await self._writer.step(
+            execution_id=execution_id, index=index, at=at, engine_reference=engine_reference
+        )
         await self._drain()
 
     async def end(self, *, execution_id: UUID, at: datetime) -> None:
