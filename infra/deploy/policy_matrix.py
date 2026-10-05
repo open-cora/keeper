@@ -1,9 +1,16 @@
 """Who may issue which command, and where, when this deployment stops allowing everything.
 
-Today the keeper runs with no `AUTHZ_POLICY_ID`, so `build_authorize` hands
-back `AllowAllAuthorize` and every authenticated caller may issue every
-command. This module is the rulebook that replaces that, written as data so
-it can be read, argued with and replayed before anything is turned on.
+This module is the rulebook, written as data so it can be read, argued with
+and replayed before it is enabled. A keeper with no `AUTHZ_POLICY_ID` hands
+back `AllowAllAuthorize` instead, and every authenticated caller may then
+issue every command.
+
+**Which of those a deployment is doing is not written here, and must not
+be.** Only `AUTHZ_POLICY_ID` in that host's environment file answers it,
+and a sentence here claiming otherwise is a second copy that nothing
+compares. This page said the keeper ran permissively for long enough that
+the claim outlived the cutover it described, and it was read back as fact
+by somebody planning the next change.
 
 ## The shape of it
 
@@ -24,10 +31,11 @@ adopt a proposal, and it does not confine who may dispatch an execution.
 
 ## Why reads are granted to everyone
 
-Because that is what today does, and read scoping is a separate decision.
-This pass narrows writes. Narrowing reads at the same time would mean two
-behaviour changes arriving in one restart with one of them untested, and the
-read path is the one every client is on constantly.
+Because a permissive keeper allows them anyway, so granting them here
+narrows nothing and refusing them would be the change. Read scoping is a
+separate decision: this matrix narrows writes, and narrowing reads in the
+same restart would be two behaviour changes with one of them untested,
+on the path every client is on constantly.
 
 `GetActor` and `GetPolicy` are the exception and are held by the
 administrator alone. No deployed client calls either, measured against both

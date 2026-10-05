@@ -1,9 +1,14 @@
 """Register an actor per principal, then author the policy this deployment will enforce.
 
-Run once, against a keeper still running `AllowAllAuthorize`, before
-`AUTHZ_POLICY_ID` is set. Nothing it writes changes a decision: a policy
-is inert until the environment points at it, and an actor only matters
-to an adapter that is not running yet.
+Nothing it writes changes a decision on its own: a policy is inert until
+`AUTHZ_POLICY_ID` points at it, so authoring one is safe against a
+running deployment.
+
+Against a permissive keeper it needs no credential. Against one already
+enforcing a policy it does, because registering an actor and defining a
+policy are themselves gated, so pass `--token-file` with the
+administrator's. That is the ordinary case once a deployment has been
+through this once: the second rulebook is authored under the first.
 
 ## The order, which is the whole reason this is one script
 
@@ -161,7 +166,7 @@ def main() -> int:
         return 0
 
     print(f"  defined {policy_id}")
-    print("\nNothing is enforced yet. Verify against this policy, then enable it with:")
+    print("\nThis policy decides nothing until something points at it. Verify it, then:")
     print(f"  AUTHZ_POLICY_ID={policy_id} ./push.sh HEAD")
     return 0
 
