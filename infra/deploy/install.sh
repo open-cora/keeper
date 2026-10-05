@@ -52,7 +52,17 @@ JWKS_PORT="${JWKS_PORT:-8081}"
 # The list is a default rather than something a caller passes, because a
 # deploy that forgot a subject would drop that subject's binding from the
 # identity provider and lock it out at the next restart.
-SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker admin}"
+#
+# That is also why a subject added by hand to identity-providers.json does
+# not survive: issue_tokens.py rewrites the file from this list on every
+# deploy, so a binding not named here is gone at the next one. A new caller
+# belongs in this line and nowhere else.
+#
+# `viewer` reads the event log and nothing else. It is central rather than
+# per beamline, because the log cannot be fenced to one: the three events
+# that name a beamline each open a stream and nothing that follows one names
+# it, so whoever reads the log reads the facility.
+SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker viewer admin}"
 
 # Not a production-tier value, and that is the honest setting rather than a
 # placeholder. A production tier refuses to boot without configured
