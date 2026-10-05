@@ -97,7 +97,7 @@ deployment nobody can fix through the API.
 
    3.  set AUTHZ_POLICY_ID to the policy id
        set REQUIRE_AUTHENTICATED_PRINCIPAL=true
-       set APP_ENV to anything but local, test or dev
+       set ENVIRONMENT to anything but local, test or dev
        point DATABASE_URL at keeper_app
 
    4.  restart
@@ -129,7 +129,7 @@ restarting. There is no way back in through the API, and that is the point.
 
 ## What refuses to start
 
-On a production `APP_ENV`, which means anything other than `local`, `test` or
+On a production `ENVIRONMENT`, which means anything other than `local`, `test` or
 `dev`, the keeper will not boot if:
 
 ```
@@ -154,7 +154,7 @@ system that looks like it is running and is not doing what somebody thinks.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `APP_ENV` | `local` | Which posture to run in. Anything but `local`, `test` or `dev` turns the refusals above on, so a name this list does not know is treated as real. |
+| `ENVIRONMENT` | `local` | Which posture to run in. Anything but `local`, `test` or `dev` turns the refusals above on, so a name this list does not know is treated as real. |
 | `DATABASE_URL` | local Postgres on 5433 | Where the database is, and which user to be. |
 | `AUTHZ_POLICY_ID` | unset | The rulebook to authorize against. Unset means allow everything. |
 | `REQUIRE_AUTHENTICATED_PRINCIPAL` | `false` | Whether an unidentified request is refused or runs as the fallback identity. |

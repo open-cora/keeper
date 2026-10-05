@@ -64,7 +64,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Test (unit + architecture + contract)
-        # APP_ENV=test comes from tests/conftest.py, so these tiers build
+        # ENVIRONMENT=test comes from tests/conftest.py, so these tiers build
         # in-memory adapters and start no container. CI=true activates the
         # Hypothesis `ci` profile: derandomized seed, no example database, no
         # deadline.

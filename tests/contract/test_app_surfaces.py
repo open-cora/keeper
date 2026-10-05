@@ -92,7 +92,7 @@ class _RefusingPool:
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def test_health_returns_ok_without_touching_any_dependency(client: TestClient) -> None:
@@ -113,7 +113,7 @@ def test_readyz_reports_ready_with_no_pool_in_test_mode(client: TestClient) -> N
     # `skipped`, not `ok`: test mode builds no pool, and the probe says so
     # rather than reporting a healthy database that does not exist.
     assert body["database"] == "skipped"
-    assert body["app_env"] == "test"
+    assert body["environment"] == "test"
     assert body["schema"] == "matched"
 
 
@@ -149,7 +149,7 @@ def test_protected_resource_metadata_is_discoverable(client: TestClient) -> None
 
 def test_oversized_request_body_is_rejected_with_413(client: TestClient) -> None:
     """The body-size cap runs before anything reads the body."""
-    settings = Settings(app_env="test")
+    settings = Settings(environment="test")
     oversized = b"x" * (settings.max_request_body_size_bytes + 1)
     with client:
         response = client.post("/health", content=oversized)
@@ -176,7 +176,7 @@ IdP, so `BodySizeLimitMiddleware` has to sit outside `BearerAuthMiddleware`.
 
 
 def test_middleware_runs_size_limit_before_token_verification() -> None:
-    app = create_app(settings=Settings(app_env="test"))
+    app = create_app(settings=Settings(environment="test"))
     # Starlette types `Middleware.cls` as a factory protocol rather than a
     # class, so the class name is not reachable through the declared type.
     installed = tuple(cast("type", m.cls).__name__ for m in app.user_middleware)
@@ -194,7 +194,7 @@ def test_readyz_returns_503_and_retry_after_when_a_dependency_is_down() -> None:
     The pool is swapped for one that refuses rather than the environment being
     bent, so the route, the probe and the status mapping all run for real.
     """
-    app = create_app(settings=Settings(app_env="test"))
+    app = create_app(settings=Settings(environment="test"))
     with TestClient(app) as client:
         object.__setattr__(app.state.deps, "pool", _RefusingPool())
         response = client.get("/readyz")
@@ -242,7 +242,7 @@ def test_metadata_advertises_the_audience_of_each_configured_surface() -> None:
     the default test settings configure no provider at all.
     """
     settings = Settings(
-        app_env="test",
+        environment="test",
         identity_providers=(
             IdpConfig(
                 issuer="https://idp.example",

@@ -9,12 +9,12 @@ pytestmark = pytest.mark.unit
 
 
 def test_readiness_body_reports_ready_when_the_database_probe_is_skipped() -> None:
-    body = readiness_body("skipped", Settings(app_env="test"))
+    body = readiness_body("skipped", Settings(environment="test"))
     assert body["status"] == "ready"
 
 
 def test_readiness_body_reports_not_ready_when_the_database_is_unreachable() -> None:
-    body = readiness_body("unreachable", Settings(app_env="local"))
+    body = readiness_body("unreachable", Settings(environment="local"))
     assert body["status"] == "not_ready"
     assert body["database"] == "unreachable"
 
@@ -25,14 +25,14 @@ def test_readiness_body_reports_ready_despite_a_degraded_schema() -> None:
     Reporting it unready would have an orchestrator pull it from rotation and
     remove the very access the override existed to grant.
     """
-    body = readiness_body("ok", Settings(app_env="local"), "degraded")
+    body = readiness_body("ok", Settings(environment="local"), "degraded")
     assert body["status"] == "ready"
     assert body["schema"] == "degraded"
 
 
 def test_readiness_body_omits_the_database_url_and_error_text() -> None:
     """The endpoint is unauthenticated; the body must describe nothing."""
-    settings = Settings(app_env="local", database_url="postgresql://secret:pw@db.internal/x")
+    settings = Settings(environment="local", database_url="postgresql://secret:pw@db.internal/x")
     body = readiness_body("unreachable", settings)
     rendered = " ".join(body.values())
     assert "secret" not in rendered

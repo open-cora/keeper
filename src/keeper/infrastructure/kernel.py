@@ -2,7 +2,7 @@
 
 `Kernel` carries the cross-BC primitives (settings, clock, id_generator,
 authorize, event_store, idempotency_store) plus the asyncpg `pool`, which is
-None when `app_env=test`. It is the "shared kernel" in the DDD sense: a
+None when `environment=test`. It is the "shared kernel" in the DDD sense: a
 deliberately-shared set of dependencies every bounded context's
 `wire_<bc>(deps)` function pulls from.
 
@@ -96,7 +96,7 @@ class UnreadableSummariesError(RuntimeError):
 class Kernel:
     """Process-wide dependencies. Immutable after construction.
 
-    `pool` is the asyncpg connection pool, None when `app_env=test`. A BC that
+    `pool` is the asyncpg connection pool, None when `environment=test`. A BC that
     needs an additional Postgres-backed adapter (an entry store, a projection)
     constructs it in its own `wire_<bc>(deps)` from this pool, which keeps
     BC-specific stores out of the kernel.

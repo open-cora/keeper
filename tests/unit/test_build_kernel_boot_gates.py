@@ -46,7 +46,7 @@ def _stub_authorize_factory(settings: Settings, event_store: EventStore) -> Auth
 
 @pytest.mark.parametrize("env", ["prod", "production", "staging"])
 async def test_production_tier_refuses_to_boot_without_an_authorize_factory(env: str) -> None:
-    settings = Settings(app_env=env, require_authenticated_principal=True)
+    settings = Settings(environment=env, require_authenticated_principal=True)
     with pytest.raises(ValueError, match="requires authorize_factory"):
         await build_kernel(settings=settings)
 
@@ -54,7 +54,7 @@ async def test_production_tier_refuses_to_boot_without_an_authorize_factory(env:
 @pytest.mark.parametrize("env", ["prod", "production", "staging"])
 async def test_production_tier_refuses_to_boot_without_authenticated_principals(env: str) -> None:
     """Without the header check, any caller can claim any principal."""
-    settings = Settings(app_env=env, require_authenticated_principal=False)
+    settings = Settings(environment=env, require_authenticated_principal=False)
     with pytest.raises(ValueError, match="REQUIRE_AUTHENTICATED_PRINCIPAL"):
         await build_kernel(
             settings=settings,
@@ -71,7 +71,7 @@ async def test_production_tier_refuses_to_boot_with_no_policy_configured(env: st
     returns, cannot be: building one needs an event store. It lives in
     the integration tier, where a database exists.
     """
-    settings = Settings(app_env=env, require_authenticated_principal=True)
+    settings = Settings(environment=env, require_authenticated_principal=True)
     with pytest.raises(ValueError, match="AUTHZ_POLICY_ID"):
         await build_kernel(settings=settings, authorize_factory=_stub_authorize_factory)
 
@@ -82,7 +82,7 @@ async def test_test_env_builds_an_in_memory_kernel_with_no_pool() -> None:
     If test mode also refused, the two tests above would pass for the wrong
     reason and this file would prove nothing about production specifically.
     """
-    kernel, teardown = await build_kernel(settings=Settings(app_env="test"))
+    kernel, teardown = await build_kernel(settings=Settings(environment="test"))
     try:
         assert kernel.pool is None
         assert kernel.authz is not None

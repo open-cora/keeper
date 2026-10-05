@@ -259,7 +259,7 @@ async def build_kernel(
             raise ValueError(msg)
         if not settings.require_authenticated_principal:
             msg = (
-                "APP_ENV is production-tier but REQUIRE_AUTHENTICATED_PRINCIPAL "
+                "ENVIRONMENT is production-tier but REQUIRE_AUTHENTICATED_PRINCIPAL "
                 "is false; the API would accept a client-supplied X-Principal-Id "
                 "header and let any caller claim any principal"
             )
@@ -270,7 +270,7 @@ async def build_kernel(
             # adapter the factory actually returns is checked separately
             # below, which is the part a factory cannot talk its way out of.
             msg = (
-                "APP_ENV is production-tier but AUTHZ_POLICY_ID is unset; the "
+                "ENVIRONMENT is production-tier but AUTHZ_POLICY_ID is unset; the "
                 "authorize factory would hand back AllowAllAuthorize and every "
                 "command would be permitted. Author a policy under a "
                 "non-production tier, then set AUTHZ_POLICY_ID to its id"
@@ -314,7 +314,7 @@ async def build_kernel(
         # guarantee that examining a class name cannot give.
         await pool.close()
         msg = (
-            "APP_ENV is production-tier and the authorize factory returned "
+            "ENVIRONMENT is production-tier and the authorize factory returned "
             "AllowAllAuthorize, which permits every command with nothing "
             "recording that no policy was consulted"
         )

@@ -112,7 +112,7 @@ class _DenyAllAuthorize:
 
 def _kernel(*, authz: object | None = None) -> Kernel:
     return make_inmemory_kernel(
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=_FixedClock(),
         id_generator=_Uuid4IdGenerator(),
         authz=authz or AllowAllAuthorize(),  # pyright: ignore[reportArgumentType]

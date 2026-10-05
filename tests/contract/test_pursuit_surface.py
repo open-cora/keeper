@@ -48,7 +48,7 @@ _BODY: dict[str, Any] = {
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def _a_pursuit(client: TestClient, **overrides: Any) -> str:

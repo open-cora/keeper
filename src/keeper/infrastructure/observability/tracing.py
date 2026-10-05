@@ -19,7 +19,7 @@ the trace exporter under normal traffic.
 Exporter selection (`settings.otel_exporter`):
 
 - `none`: no provider installed; the global default no-op tracer
-              stays active. Default for `app_env=test` so spans don't
+              stays active. Default for `environment=test` so spans don't
               accumulate across many `create_app()` instances in the
               test process. Also the package-level default (Settings
               field) so unconfigured deployments are observable-when-
@@ -111,7 +111,7 @@ def build_tracing(settings: "Settings") -> tuple[TracerProvider | None, Teardown
             SERVICE_NAME: settings.otel_service_name,
             SERVICE_VERSION: __version__,
             SERVICE_NAMESPACE: "keeper",
-            DEPLOYMENT_ENVIRONMENT: settings.app_env,
+            DEPLOYMENT_ENVIRONMENT: settings.environment,
         }
     )
 

@@ -212,7 +212,7 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         if authorization is None:
             # For non-MCP paths: defer the 401-or-fallback decision to
             # get_principal_id which knows about
-            # `require_authenticated_principal` + `app_env`.
+            # `require_authenticated_principal` + `environment`.
             #
             # For /mcp/* paths under bearer-auth mode the middleware
             # MUST enforce here. FastMCP framing calls (initialize,

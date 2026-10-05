@@ -54,7 +54,7 @@ def _production_settings(cloned_database: ClonedDatabase) -> Settings:
     its own test rather than a shared fixture.
     """
     return Settings(
-        app_env="prod",
+        environment="prod",
         database_url=cloned_database.url_as(_APP_ROLE, _APP_ROLE),
         require_authenticated_principal=True,
         authz_policy_id=uuid4(),
@@ -72,7 +72,7 @@ async def test_a_production_tier_refuses_a_role_that_can_rewrite_events(
     grant anybody held.
     """
     settings = Settings(
-        app_env="prod",
+        environment="prod",
         database_url=cloned_database.url,
         require_authenticated_principal=True,
         authz_policy_id=uuid4(),

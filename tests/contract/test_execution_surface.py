@@ -35,7 +35,7 @@ _SCHEMA: dict[str, Any] = {
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def _an_operation(client: TestClient, name: str = "count") -> str:

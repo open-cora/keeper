@@ -28,7 +28,7 @@ pytestmark = pytest.mark.contract
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def test_posting_to_actors_creates_one_and_returns_its_id(client: TestClient) -> None:

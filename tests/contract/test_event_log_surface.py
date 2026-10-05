@@ -64,7 +64,7 @@ class _GrantsOnly:
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def _grant(client: TestClient, *command_names: str) -> None:

@@ -5,7 +5,7 @@ The composition root wraps the FastAPI lifespan body with this
 context manager. On entry: spawns the worker as a background task.
 On exit: cancels the task and awaits cleanup. Quietly no-ops when
 the registry is empty or the kernel has no Postgres pool (i.e.,
-`app_env=test` running entirely in-memory).
+`environment=test` running entirely in-memory).
 """
 
 import asyncio
@@ -37,7 +37,7 @@ async def projection_worker_lifespan(
 
     No-op cases:
       - The registry is empty (no projections registered yet).
-      - The kernel has no Postgres pool (`app_env=test` with in-memory
+      - The kernel has no Postgres pool (`environment=test` with in-memory
         adapters; the worker has nothing to read from).
 
     On normal exit: cancels the worker task, waits for it to finish

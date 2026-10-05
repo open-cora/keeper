@@ -69,7 +69,7 @@ SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker viewer admin}"
 # that cannot rewrite events. This script supplies all four, so a refusal
 # here means one of them did not take rather than that the tier is wrong.
 # Lowering it would switch the gates off and hide whichever one failed.
-APP_ENV="${APP_ENV:-pilot}"
+ENVIRONMENT="${ENVIRONMENT:-pilot}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -226,7 +226,7 @@ AUTHZ_POLICY_ID="${AUTHZ_POLICY_ID:-}"
 
 umask 077
 cat > "${KEEPER_ENV}" <<ENV
-APP_ENV=${APP_ENV}
+ENVIRONMENT=${ENVIRONMENT}
 DATABASE_URL=${DATABASE_URL}
 LOG_LEVEL=INFO
 REQUIRE_AUTHENTICATED_PRINCIPAL=true

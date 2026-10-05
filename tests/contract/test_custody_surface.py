@@ -34,7 +34,7 @@ _REF = {"scheme": "tiled-node-path", "value": "raw/636de04a-2e43-4c1b"}
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def _an_acquisition(client: TestClient) -> tuple[str, str]:

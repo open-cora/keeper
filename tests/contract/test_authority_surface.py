@@ -35,7 +35,7 @@ def _governing_body(principal_id: UUID = _ADMINISTRATOR) -> list[dict[str, str]]
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app(settings=Settings(app_env="test")))
+    return TestClient(create_app(settings=Settings(environment="test")))
 
 
 def _a_policy(client: TestClient, principal_id: UUID = _ADMINISTRATOR) -> str:
@@ -285,7 +285,9 @@ def test_an_app_pointed_at_a_policy_that_does_not_exist_refuses_everything() -> 
     Its own client rather than the fixture, because the posture is set
     at boot and every other test in this file wants the permissive one.
     """
-    enforcing = TestClient(create_app(settings=Settings(app_env="test", authz_policy_id=uuid4())))
+    enforcing = TestClient(
+        create_app(settings=Settings(environment="test", authz_policy_id=uuid4()))
+    )
     with enforcing:
         defined = enforcing.post("/policies", json={"permissions": _governing_body()})
         read = enforcing.get(f"/policies/{uuid4()}")
@@ -301,6 +303,6 @@ def test_the_permissive_posture_is_what_the_other_tests_here_run_under() -> None
     an unrelated reason would read as evidence that the policy adapter
     was consulted.
     """
-    with TestClient(create_app(settings=Settings(app_env="test"))) as permissive:
+    with TestClient(create_app(settings=Settings(environment="test"))) as permissive:
         response = permissive.post("/policies", json={"permissions": _governing_body()})
     assert response.status_code == 201

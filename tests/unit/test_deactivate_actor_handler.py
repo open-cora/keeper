@@ -104,7 +104,7 @@ def _kernel(
     *, authz: object | None = None, event_store: InMemoryEventStore | None = None
 ) -> Kernel:
     return make_inmemory_kernel(
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=_FixedClock(),
         id_generator=_Uuid4Generator(),  # pyright: ignore[reportArgumentType]
         authz=authz or AllowAllAuthorize(),  # pyright: ignore[reportArgumentType]

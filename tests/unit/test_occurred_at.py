@@ -81,7 +81,7 @@ class _Ids:
 
 def _kernel() -> Kernel:
     return make_inmemory_kernel(
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=_FixedClock(),
         id_generator=_Ids(),
         authz=AllowAllAuthorize(),  # pyright: ignore[reportArgumentType]

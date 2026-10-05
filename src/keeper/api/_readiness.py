@@ -111,14 +111,14 @@ def readiness_body(
 ) -> dict[str, str]:
     """Render the probe result. Fixed vocabulary, no free text.
 
-    `app_env` is here because `test` builds an in-memory kernel with no
+    `environment` is here because `test` builds an in-memory kernel with no
     persistence, and a green probe over a store that loses everything on
     restart is worth making visible to whoever reads this.
     """
     return {
         "status": "ready" if database in ("ok", "skipped") else "not_ready",
         "database": database,
-        "app_env": settings.app_env,
+        "environment": settings.environment,
         "schema": schema,
     }
 

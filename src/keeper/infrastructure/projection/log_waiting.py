@@ -65,7 +65,7 @@ async def log_waiting_lifespan(deps: Kernel, settings: Settings) -> AsyncGenerat
     before the pool is.
 
     Falls back to `PollOnlyWakeup` with no pool or with LISTEN/NOTIFY
-    switched off, which is what `app_env=test` runs.
+    switched off, which is what `environment=test` runs.
     """
     source: WakeupSource = (
         ListenNotifyWakeup(deps.pool, channel=NOTIFY_CHANNEL)

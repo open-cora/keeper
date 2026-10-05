@@ -50,10 +50,10 @@ OtelExporter = Literal["otlp", "console", "none"]
 # they cannot see.
 #
 # Adding a name here widens what may run permissively, so it is the edit to
-# look at twice. tests/architecture/test_the_deployed_env_is_a_production_tier.py
+# look at twice. tests/architecture/test_the_deployed_environment_is_a_production_tier.py
 # checks this against what the installer actually deploys rather than letting
 # two files agree by hand.
-DEVELOPMENT_TIER_ENVS = frozenset({"dev", "local", "test"})
+DEVELOPMENT_ENVIRONMENTS = frozenset({"dev", "local", "test"})
 
 
 class Settings(BaseSettings):
@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     )
 
     # App
-    app_env: str = "local"
+    environment: str = "local"
     log_level: str = "INFO"
 
     # Database
@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     # from an `X-Principal-Id` header. That is a development convenience and
     # nothing more: anyone can claim any principal. `require_authenticated_principal`
     # decides what happens when the header is absent (False yields the system
-    # principal, True yields 401), and a production-tier `app_env` refuses to
+    # principal, True yields 401), and a production-tier `environment` refuses to
     # boot unless it is True.
     #
     # Production must ALSO front the API with a proxy that authenticates the
@@ -155,12 +155,12 @@ class Settings(BaseSettings):
     @property
     def is_production_tier(self) -> bool:
         """True when this environment must refuse permissive defaults."""
-        return self.app_env.lower() not in DEVELOPMENT_TIER_ENVS
+        return self.environment.lower() not in DEVELOPMENT_ENVIRONMENTS
 
     @property
     def is_test(self) -> bool:
         """True when adapters should be in-memory and no pool is built."""
-        return self.app_env.lower() == "test"
+        return self.environment.lower() == "test"
 
     @field_validator("database_url")
     @classmethod

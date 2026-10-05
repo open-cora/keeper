@@ -103,7 +103,7 @@ test-contract:
 # Local mirrors of the two CI test lanes (see .github/workflows/ci.yml).
 # Path-based selection matches CI: it is the robust selector, since some
 # helper and __init__ files carry no marker. test-noio starts no Postgres
-# container (APP_ENV=test gives in-memory adapters); test-db needs `db-up`.
+# container (ENVIRONMENT=test gives in-memory adapters); test-db needs `db-up`.
 #
 # The two files are compared against each other by
 # tests/architecture/test_every_tier_is_named_by_a_ci_lane.py, which fails

@@ -81,7 +81,7 @@ class _DenyAllAuthorize:
 
 def _kernel(*, authz: object | None = None) -> Kernel:
     return make_inmemory_kernel(
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=_FixedClock(),
         id_generator=_Uuid4IdGenerator(),
         authz=authz or AllowAllAuthorize(),  # pyright: ignore[reportArgumentType]
@@ -314,7 +314,7 @@ async def test_a_denied_transition_writes_nothing() -> None:
     allowed = _kernel()
     device_id = await _a_device(allowed)
     denied = make_inmemory_kernel(
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=_FixedClock(),
         id_generator=_Uuid4IdGenerator(),
         authz=_DenyAllAuthorize(),  # pyright: ignore[reportArgumentType]

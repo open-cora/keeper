@@ -134,7 +134,7 @@ def _result(response_text: str) -> dict[str, Any]:
 
 
 def test_the_mounted_mcp_endpoint_publishes_every_tool_a_client_needs() -> None:
-    with TestClient(create_app(settings=Settings(app_env="test"))) as client:
+    with TestClient(create_app(settings=Settings(environment="test"))) as client:
         opened = client.post(
             "/mcp/",
             headers=_HEADERS,
@@ -250,7 +250,7 @@ def test_a_client_can_write_and_read_a_policy_over_the_mcp_surface() -> None:
         for name in sorted(GOVERNING_COMMAND_NAMES)
     ]
 
-    with TestClient(create_app(settings=Settings(app_env="test"))) as client:
+    with TestClient(create_app(settings=Settings(environment="test"))) as client:
         live = _open_session(client)
         defined = _call(client, live, "define_policy", permissions=governing)
         policy_id = defined["policy_id"]
@@ -311,7 +311,7 @@ def test_a_client_can_switch_an_actor_on_and_off_over_the_mcp_surface() -> None:
     that echoed an input instead of returning what the handler produced
     has nothing to echo.
     """
-    with TestClient(create_app(settings=Settings(app_env="test"))) as client:
+    with TestClient(create_app(settings=Settings(environment="test"))) as client:
         live = _open_session(client)
         actor_id = _call(client, live, "register_actor")["actor_id"]
         fresh = _call(client, live, "get_actor", actor_id=actor_id)
@@ -346,7 +346,7 @@ def test_a_client_can_write_and_read_a_plan_over_the_mcp_surface() -> None:
         "required": ["exposure_seconds"],
     }
 
-    with TestClient(create_app(settings=Settings(app_env="test"))) as client:
+    with TestClient(create_app(settings=Settings(environment="test"))) as client:
         live = _open_session(client)
         defined = _call(client, live, "define_operation", name="count", parameters_schema=schema)
         operation_id = defined["operation_id"]
@@ -390,7 +390,7 @@ def test_a_procedure_composed_over_mcp_reads_back_with_every_step_it_was_given()
         "properties": {"exposure_seconds": {"type": "number", "minimum": 0}},
         "required": ["exposure_seconds"],
     }
-    with TestClient(create_app(settings=Settings(app_env="test"))) as client:
+    with TestClient(create_app(settings=Settings(environment="test"))) as client:
         live = _open_session(client)
         operation_id = _call(
             client, live, "define_operation", name="count", parameters_schema=schema
@@ -446,7 +446,7 @@ def test_a_client_can_dispatch_and_follow_an_execution_over_the_mcp_surface() ->
         "required": ["exposure_seconds"],
     }
 
-    with TestClient(create_app(settings=Settings(app_env="test"))) as client:
+    with TestClient(create_app(settings=Settings(environment="test"))) as client:
         live = _open_session(client)
         operation_id = _call(
             client, live, "define_operation", name="count", parameters_schema=schema

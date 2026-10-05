@@ -51,7 +51,7 @@ def bundles(db_pool: asyncpg.Pool) -> tuple[AccessHandlers, AuthorityHandlers]:
     """
     kernel = make_postgres_kernel(
         db_pool,
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=SystemClock(),
         id_generator=UUIDv7Generator(),
         authz=AllowAllAuthorize(),
