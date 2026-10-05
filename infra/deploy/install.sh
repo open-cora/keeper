@@ -277,6 +277,28 @@ say "ok"
 echo
 
 echo "Database"
+# The API stops before anything touches the database, for two reasons that
+# both point the same way.
+#
+# Postgres is about to restart under it. A keeper still running against it
+# has its pool severed mid-request, so the outgoing revision spends the
+# restart failing whoever is calling instead of being cleanly out of the way.
+#
+# The second was measured here. A migration may reset a projection bookmark
+# so that a read model is rebuilt against the new code. A worker belonging to
+# the revision being replaced will happily take that reset and rebuild with
+# its own arms, and the bookmark then sits at the end of the log with nothing
+# left to replay. A migration added a column and reset the bookmark; the
+# outgoing revision rebuilt the whole table before the restart, leaving the
+# new column null on every row, the old column full of values no current arm
+# writes, and the rebuild already marked done. Nothing failed, which is what
+# made it worth a comment: the deploy reported success and the read model was
+# quietly a revision behind.
+#
+# Ignoring the failure covers the first install, where the unit does not
+# exist yet.
+systemctl --user stop cora-keeper.service 2>/dev/null || true
+
 # enable and restart, never `enable --now`. On a re-run `--now` is a no-op
 # against a service that is already up, so a changed unit or a changed
 # environment file is written to disk and never reaches the process. A deploy
@@ -296,22 +318,8 @@ podman exec keeper-postgres pg_isready -U keeper -d keeper >/dev/null 2>&1 \
 echo
 
 echo "Migrations"
-# The API is stopped first, and for a specific reason rather than general
-# caution. A migration may reset a projection bookmark so that a read model
-# is rebuilt against the new code. A worker belonging to the revision being
-# replaced will happily take that reset and rebuild with its own arms, and
-# the bookmark then sits at the end of the log with nothing left to replay.
-#
-# Measured here. A migration added a column and reset the bookmark; the
-# outgoing revision rebuilt the whole table before the restart, leaving the
-# new column null on every row, the old column full of values no current arm
-# writes, and the rebuild already marked done. Nothing failed, which is what
-# made it worth a comment: the deploy reported success and the read model
-# was quietly a revision behind.
-#
-# Ignoring the failure covers the first install, where the unit does not
-# exist yet.
-systemctl --user stop cora-keeper.service 2>/dev/null || true
+# The API has been down since the Database step above, which is where the
+# reasons for stopping it are.
 (cd "${ATLAS_DIR}" && DATABASE_URL="${ATLAS_DB_URL}" atlas migrate apply --env local)
 
 # After the migrations, because the role is created by the baseline and a
