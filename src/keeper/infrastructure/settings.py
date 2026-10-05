@@ -37,7 +37,15 @@ OtelExporter = Literal["otlp", "console", "none"]
 
 # Environments where a permissive default is a production incident rather than
 # a convenience. `staging` counts: it usually holds real data and is reachable.
-PRODUCTION_TIER_ENVS = frozenset({"prod", "production", "staging"})
+#
+# So does `pilot`, which is the value infra/deploy/install.sh deploys with. A
+# pilot driving four beamlines holds a record somebody will be asked to
+# defend, which is the whole of the rule above, and it sat outside this set
+# long enough for every refusal below to be skipped on the one installation
+# that has real data in it. Membership is checked against the installer by
+# tests/architecture/test_the_deployed_env_is_a_production_tier.py rather
+# than agreed between two files by hand.
+PRODUCTION_TIER_ENVS = frozenset({"pilot", "prod", "production", "staging"})
 
 
 class Settings(BaseSettings):
