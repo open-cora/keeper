@@ -1,4 +1,9 @@
-"""Refuse to serve a database whose shape this build does not expect.
+"""Refuse to serve a database this build cannot trust: its shape, and its grants.
+
+Two boot-time questions, both asked of the database rather than of the
+configuration, because the configuration is what gets them wrong. The
+first is whether the applied schema is the one this build expects. The
+second is whether the role this process connected as can rewrite history.
 
 Migrations are applied out of band (`make migrate-apply`), never by the
 app: `apps/keeper/Dockerfile` says so, and forward-only migrations mean the
@@ -17,9 +22,12 @@ afterwards. This module is that guard as a mechanism instead.
 
 ## Why refusing is the proportionate response
 
-An event store is append-only at the database-role level, so events
-written against the wrong schema are not rows to correct later, they are
-history. The failure is
+An event store is append-only, so events written against the wrong schema
+are not rows to correct later, they are history. Whether that append-only
+property is a database grant or only a habit of the application's SQL is
+the second question below, and it was worth asking: the deployment
+connected as the schema owner for months while three documents said it
+did not. The failure is
 also not reliably loud: a mismatch that DROPS a constraint added by a
 later migration leaves every write succeeding and admits exactly the
 records the constraint existed to reject. Crashing on a missing column is
@@ -44,6 +52,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, Literal
 
 import asyncpg
+
+from keeper.infrastructure.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -74,7 +84,9 @@ class SchemaCheck:
     expected: str
 
 
-EXPECTED_SCHEMA_VERSION: Final = "20261002230000"
+_log = get_logger(__name__)
+
+EXPECTED_SCHEMA_VERSION: Final = "20261005020000"
 """The newest migration this build was written against.
 
 Hand-maintained, and deliberately not derived at runtime: the image does
@@ -197,6 +209,73 @@ def compare_versions(applied: str | None, expected: str) -> None:
     raise SchemaBehindError(applied, expected)
 
 
+APP_ROLE_PRIVILEGE_SQL = """
+SELECT has_table_privilege(current_user, 'public.events', 'UPDATE')
+    OR has_table_privilege(current_user, 'public.events', 'DELETE')
+    OR has_table_privilege(current_user, 'public.events', 'TRUNCATE')
+"""
+"""Whether the connected role can rewrite the record.
+
+Asked of the database, about the session's own role, so it reports what
+this process actually holds rather than what a connection string appears
+to name. A deployment that reuses an old environment file is exactly the case
+a configuration check would miss.
+"""
+
+
+class RewritableHistoryError(RuntimeError):
+    """The connected role can change or delete events, so history is not sealed."""
+
+    def __init__(self, role: str) -> None:
+        super().__init__(
+            "the keeper will not start: the database role it connected as can "
+            f"rewrite history.\n"
+            f"  connected as    {role}\n"
+            "  this role holds UPDATE, DELETE or TRUNCATE on events\n"
+            "\n"
+            "The application is meant to connect as keeper_app, which holds "
+            "SELECT and INSERT on events and nothing else, so an append-only "
+            "record is a database guarantee rather than a property of this "
+            "build's SQL. Point DATABASE_URL at that role. Migrations keep "
+            "the owner, which is the role that may change the schema.\n"
+        )
+        self.role = role
+
+
+async def verify_append_only_role(pool: asyncpg.Pool, *, refuse: bool) -> bool:
+    """Report whether the connected role is barred from rewriting events.
+
+    Returns True when history is sealed. When it is not, `refuse` decides
+    between raising and logging, and the split is deliberate rather than
+    timid. Local development connects as the owner because it also runs
+    the migrations, and a check that refused there would make the ordinary
+    way of working impossible for a guarantee that only matters where
+    there is a record worth defending. Above that tier there is such a
+    record, and the answer is to stop.
+
+    Never silent in either direction. The warning exists because the
+    failure it describes is invisible: everything works, and the only
+    thing missing is what would have stopped a rewrite nobody is
+    attempting yet.
+    """
+    async with pool.acquire() as conn:
+        rewritable: bool = await conn.fetchval(APP_ROLE_PRIVILEGE_SQL)
+        role: str = await conn.fetchval("SELECT current_user")
+    if not rewritable:
+        return True
+    if refuse:
+        raise RewritableHistoryError(role)
+    _log.warning(
+        "schema.history_is_rewritable",
+        role=role,
+        detail=(
+            "the connected role can UPDATE or DELETE events, so append-only is "
+            "this build's SQL rather than a database grant"
+        ),
+    )
+    return False
+
+
 async def verify_schema_version(
     pool: asyncpg.Pool,
     *,
@@ -248,7 +327,9 @@ def is_well_formed(version: str) -> bool:
 
 
 __all__ = [
+    "APP_ROLE_PRIVILEGE_SQL",
     "EXPECTED_SCHEMA_VERSION",
+    "RewritableHistoryError",
     "SchemaAbsentError",
     "SchemaAheadError",
     "SchemaBehindError",

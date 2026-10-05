@@ -70,7 +70,7 @@ def handlers(db_pool: asyncpg.Pool) -> AuthorityHandlers:
     return wire_authority(
         make_postgres_kernel(
             db_pool,
-            settings=Settings(app_env="test"),
+            settings=Settings(environment="test"),
             clock=SystemClock(),
             id_generator=UUIDv7Generator(),
             authz=AllowAllAuthorize(),

@@ -52,14 +52,24 @@ JWKS_PORT="${JWKS_PORT:-8081}"
 # The list is a default rather than something a caller passes, because a
 # deploy that forgot a subject would drop that subject's binding from the
 # identity provider and lock it out at the next restart.
-SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker admin}"
+#
+# That is also why a subject added by hand to identity-providers.json does
+# not survive: issue_tokens.py rewrites the file from this list on every
+# deploy, so a binding not named here is gone at the next one. A new caller
+# belongs in this line and nowhere else.
+#
+# `viewer` reads the event log and nothing else. It is central rather than
+# per beamline, because the log cannot be fenced to one: the three events
+# that name a beamline each open a stream and nothing that follows one names
+# it, so whoever reads the log reads the facility.
+SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker viewer admin}"
 
-# Not a production-tier value, and that is the honest setting rather than a
-# placeholder. A production tier refuses to boot without configured
-# authentication and an authorization policy, neither of which exists yet.
-# Naming the tier accurately is what keeps the loopback bind in the unit
-# file correct instead of merely cautious.
-APP_ENV="${APP_ENV:-pilot}"
+# A production-tier value, which arms four boot refusals: a real authorize
+# adapter, authenticated callers, a configured policy, and a database role
+# that cannot rewrite events. This script supplies all four, so a refusal
+# here means one of them did not take rather than that the tier is wrong.
+# Lowering it would switch the gates off and hide whichever one failed.
+ENVIRONMENT="${ENVIRONMENT:-pilot}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -110,6 +120,7 @@ echo
 
 echo "Secrets"
 PG_ENV="${CORA_ROOT}/etc/postgres.env"
+APP_PG_ENV="${CORA_ROOT}/etc/keeper-app-db.env"
 KEEPER_ENV="${CORA_ROOT}/etc/keeper.env"
 
 if [ -f "${PG_ENV}" ]; then
@@ -129,7 +140,43 @@ ENV
 fi
 chmod 600 "${PG_ENV}"
 
-DATABASE_URL="postgresql://keeper:${PG_PASSWORD}@127.0.0.1:${PG_PORT}/keeper"
+# The application's own password, which is not the owner's.
+#
+# Two roles and two passwords, because the whole point of the second role is
+# that holding the application's credential does not let you rewrite history.
+# One password shared between them would hand the owner's privileges to
+# anything that read the keeper's environment file, and the separation would
+# be a label rather than a boundary.
+#
+# The baseline migration creates keeper_app with a password equal to its own
+# name, which is right for a local container reachable from nowhere and wrong
+# for a host. This rotates it on every install, so the published default is
+# never what a deployment runs with.
+if [ -f "${APP_PG_ENV}" ]; then
+  say "reusing the existing application password in ${APP_PG_ENV}"
+  APP_PG_PASSWORD="$(grep '^KEEPER_APP_PASSWORD=' "${APP_PG_ENV}" | cut -d= -f2-)"
+  [ -n "${APP_PG_PASSWORD}" ] || die "${APP_PG_ENV} exists but carries no KEEPER_APP_PASSWORD"
+else
+  APP_PG_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 32)"
+  umask 077
+  cat > "${APP_PG_ENV}" <<ENV
+KEEPER_APP_PASSWORD=${APP_PG_PASSWORD}
+ENV
+  say "generated an application password in ${APP_PG_ENV}"
+fi
+chmod 600 "${APP_PG_ENV}"
+
+# What the API connects as, and it is deliberately not the owner.
+#
+# keeper_app holds SELECT and INSERT on events and is revoked UPDATE, DELETE
+# and TRUNCATE, so the running server cannot rewrite the record even if its
+# own code tried to. That is the difference between append-only as a database
+# guarantee and append-only as a promise about our SQL, and it is worth a
+# second role and a second password.
+#
+# Atlas keeps the owner below, because changing the schema is exactly what
+# this role may not do.
+DATABASE_URL="postgresql://keeper_app:${APP_PG_PASSWORD}@127.0.0.1:${PG_PORT}/keeper"
 
 # Atlas gets its own spelling of the same database, and the difference is not
 # cosmetic. Atlas negotiates SSL by default and fails outright against a
@@ -179,7 +226,7 @@ AUTHZ_POLICY_ID="${AUTHZ_POLICY_ID:-}"
 
 umask 077
 cat > "${KEEPER_ENV}" <<ENV
-APP_ENV=${APP_ENV}
+ENVIRONMENT=${ENVIRONMENT}
 DATABASE_URL=${DATABASE_URL}
 LOG_LEVEL=INFO
 REQUIRE_AUTHENTICATED_PRINCIPAL=true
@@ -230,6 +277,28 @@ say "ok"
 echo
 
 echo "Database"
+# The API stops before anything touches the database, for two reasons that
+# both point the same way.
+#
+# Postgres is about to restart under it. A keeper still running against it
+# has its pool severed mid-request, so the outgoing revision spends the
+# restart failing whoever is calling instead of being cleanly out of the way.
+#
+# The second was measured here. A migration may reset a projection bookmark
+# so that a read model is rebuilt against the new code. A worker belonging to
+# the revision being replaced will happily take that reset and rebuild with
+# its own arms, and the bookmark then sits at the end of the log with nothing
+# left to replay. A migration added a column and reset the bookmark; the
+# outgoing revision rebuilt the whole table before the restart, leaving the
+# new column null on every row, the old column full of values no current arm
+# writes, and the rebuild already marked done. Nothing failed, which is what
+# made it worth a comment: the deploy reported success and the read model was
+# quietly a revision behind.
+#
+# Ignoring the failure covers the first install, where the unit does not
+# exist yet.
+systemctl --user stop cora-keeper.service 2>/dev/null || true
+
 # enable and restart, never `enable --now`. On a re-run `--now` is a no-op
 # against a service that is already up, so a changed unit or a changed
 # environment file is written to disk and never reaches the process. A deploy
@@ -249,23 +318,18 @@ podman exec keeper-postgres pg_isready -U keeper -d keeper >/dev/null 2>&1 \
 echo
 
 echo "Migrations"
-# The API is stopped first, and for a specific reason rather than general
-# caution. A migration may reset a projection bookmark so that a read model
-# is rebuilt against the new code. A worker belonging to the revision being
-# replaced will happily take that reset and rebuild with its own arms, and
-# the bookmark then sits at the end of the log with nothing left to replay.
-#
-# Measured here. A migration added a column and reset the bookmark; the
-# outgoing revision rebuilt the whole table before the restart, leaving the
-# new column null on every row, the old column full of values no current arm
-# writes, and the rebuild already marked done. Nothing failed, which is what
-# made it worth a comment: the deploy reported success and the read model
-# was quietly a revision behind.
-#
-# Ignoring the failure covers the first install, where the unit does not
-# exist yet.
-systemctl --user stop cora-keeper.service 2>/dev/null || true
+# The API has been down since the Database step above, which is where the
+# reasons for stopping it are.
 (cd "${ATLAS_DIR}" && DATABASE_URL="${ATLAS_DB_URL}" atlas migrate apply --env local)
+
+# After the migrations, because the role is created by the baseline and a
+# password cannot be set on a role that does not exist yet. Idempotent: every
+# install sets it again, which is also how a rotated password is deployed.
+podman exec -i -e PGPASSWORD="${PG_PASSWORD}" keeper-postgres \
+  psql -U keeper -d keeper -v ON_ERROR_STOP=1 -q \
+  -c "ALTER ROLE keeper_app WITH PASSWORD '${APP_PG_PASSWORD}'" \
+  || die "could not set the application role's password"
+say "application role password set"
 echo
 
 echo "JWKS"

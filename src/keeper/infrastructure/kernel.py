@@ -2,7 +2,7 @@
 
 `Kernel` carries the cross-BC primitives (settings, clock, id_generator,
 authorize, event_store, idempotency_store) plus the asyncpg `pool`, which is
-None when `app_env=test`. It is the "shared kernel" in the DDD sense: a
+None when `environment=test`. It is the "shared kernel" in the DDD sense: a
 deliberately-shared set of dependencies every bounded context's
 `wire_<bc>(deps)` function pulls from.
 
@@ -51,6 +51,7 @@ import asyncpg
 from keeper.infrastructure.ports import (
     Authorize,
     Clock,
+    EventLogReader,
     EventStore,
     IdempotencyStore,
     IdGenerator,
@@ -95,7 +96,7 @@ class UnreadableSummariesError(RuntimeError):
 class Kernel:
     """Process-wide dependencies. Immutable after construction.
 
-    `pool` is the asyncpg connection pool, None when `app_env=test`. A BC that
+    `pool` is the asyncpg connection pool, None when `environment=test`. A BC that
     needs an additional Postgres-backed adapter (an entry store, a projection)
     constructs it in its own `wire_<bc>(deps)` from this pool, which keeps
     BC-specific stores out of the kernel.
@@ -106,6 +107,16 @@ class Kernel:
     id_generator: IdGenerator
     authz: Authorize
     event_store: EventStore
+    event_log: EventLogReader
+    """Reads the whole log in commit order, for the one route that tails it.
+
+    A second seam onto the same table rather than a method on
+    `event_store`, because a caller tailing the log must never be handed
+    `append`. In the test environment one `InMemoryEventStore` satisfies
+    both, and the two fields still point at it through different
+    Protocols.
+    """
+
     idempotency_store: IdempotencyStore
 
     pool: asyncpg.Pool | None = None

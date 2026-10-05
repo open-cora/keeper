@@ -1,9 +1,16 @@
 """Who may issue which command, and where, when this deployment stops allowing everything.
 
-Today the keeper runs with no `AUTHZ_POLICY_ID`, so `build_authorize` hands
-back `AllowAllAuthorize` and every authenticated caller may issue every
-command. This module is the rulebook that replaces that, written as data so
-it can be read, argued with and replayed before anything is turned on.
+This module is the rulebook, written as data so it can be read, argued with
+and replayed before it is enabled. A keeper with no `AUTHZ_POLICY_ID` hands
+back `AllowAllAuthorize` instead, and every authenticated caller may then
+issue every command.
+
+**Which of those a deployment is doing is not written here, and must not
+be.** Only `AUTHZ_POLICY_ID` in that host's environment file answers it,
+and a sentence here claiming otherwise is a second copy that nothing
+compares. This page said the keeper ran permissively for long enough that
+the claim outlived the cutover it described, and it was read back as fact
+by somebody planning the next change.
 
 ## The shape of it
 
@@ -24,10 +31,11 @@ adopt a proposal, and it does not confine who may dispatch an execution.
 
 ## Why reads are granted to everyone
 
-Because that is what today does, and read scoping is a separate decision.
-This pass narrows writes. Narrowing reads at the same time would mean two
-behaviour changes arriving in one restart with one of them untested, and the
-read path is the one every client is on constantly.
+Because a permissive keeper allows them anyway, so granting them here
+narrows nothing and refusing them would be the change. Read scoping is a
+separate decision: this matrix narrows writes, and narrowing reads in the
+same restart would be two behaviour changes with one of them untested,
+on the path every client is on constantly.
 
 `GetActor` and `GetPolicy` are the exception and are held by the
 administrator alone. No deployed client calls either, measured against both
@@ -50,7 +58,20 @@ BEAMLINES: tuple[str, ...] = ("2-bm", "7-bm", "19-bm", "32-id")
 
 ADMIN = "admin"
 
-SUBJECTS: tuple[str, ...] = (*BEAMLINES, "thinker", ADMIN)
+VIEWER = "viewer"
+"""The principal that tails the event log, and does nothing else.
+
+Separate from the beamlines and from the thinker because what it holds is
+facility-wide and they hold nothing that is. The log cannot be fenced to
+one beamline: a beamline is named by the three events that open a stream
+and by nothing that follows one, so a beamline-scoped grant would deliver
+the opening of each thread and drop every claim, step and engine report
+after it. Whoever reads the log reads the facility, which is a property
+of the data rather than a choice this file makes, and the honest response
+is one subject that is meant to.
+"""
+
+SUBJECTS: tuple[str, ...] = (*BEAMLINES, "thinker", VIEWER, ADMIN)
 
 READS: tuple[str, ...] = (
     "GetDataset",
@@ -73,6 +94,31 @@ READS: tuple[str, ...] = (
 )
 
 ADMIN_ONLY_READS: tuple[str, ...] = ("GetActor", "GetPolicy")
+
+LOG_READS: tuple[str, ...] = ("ReadEventLog",)
+"""The log read every principal that watches the facility holds.
+
+Not in `READS`, because `READS` is granted to every subject and a
+conductor has no use for transitions: it asks what is dispatched to it and
+the answer is current state. Granting it anyway would make a viewer's
+reach every beamline account's reach for nothing gained.
+
+It widens nobody's extent. Every stream it returns is already readable
+through the per-context reads in `READS`, so what changes is the shape of
+the answer and the thread through it, not what a holder may learn.
+"""
+
+ADMIN_ONLY_LOG_READS: tuple[str, ...] = ("ReadFullEventLog",)
+"""The log read that also returns the Actor and Policy streams.
+
+The administrator's alone, and for the same reason `GetActor` and
+`GetPolicy` are: the Policy stream is the rulebook, so a reader of it
+learns which principal may issue which command where. Keeping the two
+lists in step is what
+`tests/architecture/test_the_log_read_mirrors_the_admin_only_reads.py`
+checks, because nothing else compares a grant here against the stream
+filter in `keeper.api.event_log`.
+"""
 
 FENCED: tuple[str, ...] = (
     "AdoptProposal",
@@ -150,6 +196,10 @@ def grants() -> Iterator[tuple[str, str, str | None]]:
         for command in READS:
             yield subject, command, None
 
+    for command in LOG_READS:
+        yield VIEWER, command, None
+        yield ADMIN, command, None
+
     for beamline in BEAMLINES:
         for command in BEAMLINE_WRITES:
             yield beamline, command, None
@@ -159,19 +209,22 @@ def grants() -> Iterator[tuple[str, str, str | None]]:
     for command in THINKER_WRITES:
         yield "thinker", command, None
 
-    for command in (*ADMIN_ONLY_READS, *ADMIN_WRITES):
+    for command in (*ADMIN_ONLY_READS, *ADMIN_ONLY_LOG_READS, *ADMIN_WRITES):
         yield ADMIN, command, None
 
 
 __all__ = [
     "ADMIN",
+    "ADMIN_ONLY_LOG_READS",
     "ADMIN_ONLY_READS",
     "ADMIN_WRITES",
     "BEAMLINES",
     "BEAMLINE_WRITES",
     "FENCED",
+    "LOG_READS",
     "READS",
     "SUBJECTS",
     "THINKER_WRITES",
+    "VIEWER",
     "grants",
 ]

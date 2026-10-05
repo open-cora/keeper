@@ -73,13 +73,11 @@ a stored name cannot be renamed without somebody noticing, that every context
 is actually mounted in the running app, and that every test says which lane
 runs it.
 
-## What is missing
+## What is not documented here
 
-No tutorial and no how-to guides. The beamline page describes 2-BM and the one
-script that reads it; nothing is running there, and its hardware register is
-still empty. There is no page on the chassis itself, so how the event log, the
-repeat-request wrapper and the startup wiring fit together is readable only
-from the code.
+No tutorial and no how-to guides. There is no page on the chassis itself, so
+how the event log, the repeat-request wrapper and the startup wiring fit
+together is readable only from the code.
 
 Part of the chassis was copied from an earlier private tree and has no user
 here yet. Which modules those are is pinned in

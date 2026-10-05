@@ -1,4 +1,4 @@
-"""In-memory `EventStore` for unit tests and the `test` app environment.
+"""In-memory `EventStore` and `EventLogReader` for unit tests and the `test` app environment.
 
 Mirrors the Postgres adapter's contract: same optimistic-concurrency
 semantics, same global ordering by an in-memory monotonic position counter,
@@ -18,6 +18,7 @@ from itertools import count
 from threading import Lock
 from uuid import UUID
 
+from keeper.infrastructure.ports.event_log_reader import LogCursor, LogPage
 from keeper.infrastructure.ports.event_store import (
     ConcurrencyError,
     NewEvent,
@@ -27,7 +28,14 @@ from keeper.infrastructure.ports.event_store import (
 
 
 class InMemoryEventStore:
-    """Thread-safe in-memory implementation of the EventStore port."""
+    """Thread-safe in-memory implementation of the EventStore port.
+
+    It satisfies `EventLogReader` as well, through `read_after`. Two
+    Protocols over one object rather than two objects, because the log and
+    the streams are the same events here and a second store would have to
+    be kept in step with this one. A caller still holds whichever Protocol
+    it was handed, so the route that tails the log never sees `append`.
+    """
 
     def __init__(self) -> None:
         self._streams: dict[tuple[str, UUID], list[StoredEvent]] = {}
@@ -68,6 +76,43 @@ class InMemoryEventStore:
         """
         with self._lock:
             return [stream_id for (kind, stream_id) in self._streams if kind == stream_type]
+
+    async def read_after(
+        self,
+        cursor: LogCursor,
+        *,
+        limit: int,
+        stream_types: Sequence[str],
+    ) -> LogPage:
+        """Committed events after `cursor`, oldest first, in commit order.
+
+        No in-flight exclusion, because there is no transaction here: an
+        append either finished before this call or had not started. The
+        Postgres adapter is where that distinction costs something, and
+        this one reproduces its ORDER and its cursor rather than its
+        visibility rules.
+        """
+        wanted = frozenset(stream_types)
+        if not wanted or limit <= 0:
+            return LogPage(items=[], next_cursor=None)
+
+        after = (cursor.transaction_id, cursor.position)
+        with self._lock:
+            every = [
+                event
+                for events in self._streams.values()
+                for event in events
+                if event.stream_type in wanted and (event.transaction_id, event.position) > after
+            ]
+        every.sort(key=lambda event: (event.transaction_id, event.position))
+        page = every[:limit]
+        if not page:
+            return LogPage(items=[], next_cursor=None)
+        last = page[-1]
+        return LogPage(
+            items=page,
+            next_cursor=LogCursor(transaction_id=last.transaction_id, position=last.position),
+        )
 
     async def append(
         self,

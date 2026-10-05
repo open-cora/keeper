@@ -51,7 +51,7 @@ The production gates are:
   INSERT-only (UPDATE / DELETE / TRUNCATE revoked). Migrations run as the
   database owner.
 - `REQUIRE_AUTHENTICATED_PRINCIPAL=true`
-- `APP_ENV=prod`, which refuses to boot if the above flag is not set.
+- `ENVIRONMENT=prod`, which refuses to boot if the above flag is not set.
 
 A verifying proxy in front of the API is mandatory in production: it must
 authenticate the caller, strip any client-supplied `X-Principal-Id` header, and

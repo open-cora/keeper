@@ -79,7 +79,7 @@ async def waiting_lifespan(deps: Kernel, settings: Settings) -> AsyncGenerator[W
     release races `pool.close()`.
 
     Falls back to `PollOnlyWakeup` with no pool or with LISTEN/NOTIFY
-    switched off, which is what `app_env=test` runs.
+    switched off, which is what `environment=test` runs.
     """
     source: WakeupSource = (
         ListenNotifyWakeup(deps.pool, channel=INQUIRY_NOTIFY_CHANNEL)

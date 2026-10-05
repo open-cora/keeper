@@ -76,7 +76,7 @@ async def waiting_lifespan(deps: Kernel, settings: Settings) -> AsyncGenerator[W
     release races `pool.close()`.
 
     Falls back to `PollOnlyWakeup` with no pool or with LISTEN/NOTIFY
-    switched off, which is what `app_env=test` runs. A held request
+    switched off, which is what `environment=test` runs. A held request
     there re-reads on a plain sleep, and no test asks it to: the one
     that passes a wait has work waiting already, so the first read
     answers and the loop is never entered.

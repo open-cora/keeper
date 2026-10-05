@@ -1,6 +1,6 @@
 """Pytest configuration and shared fixtures.
 
-`APP_ENV=test` is set before any test imports, so unit and contract tests that
+`ENVIRONMENT=test` is set before any test imports, so unit and contract tests that
 build an app via `create_app()` get the in-memory adapters by default.
 Integration tests build their own kernel against `db_pool`; e2e tests override
 the environment so the lifespan takes the Postgres branch.
@@ -42,7 +42,7 @@ from keeper.infrastructure.schema import parse_versions
 from tests._postgres import normalize_async_url
 from tests._roots import APP_ROOT
 
-os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ENVIRONMENT", "test")
 
 # Hypothesis profiles.
 # `dev` (the local default) keeps the example database on and allows shrinking:

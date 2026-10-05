@@ -52,6 +52,7 @@ from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventSt
 from keeper.infrastructure.adapters.in_memory_idempotency_store import (
     InMemoryIdempotencyStore,
 )
+from keeper.infrastructure.adapters.postgres_event_log_reader import PostgresEventLogReader
 from keeper.infrastructure.adapters.postgres_event_store import PostgresEventStore
 from keeper.infrastructure.adapters.postgres_idempotency_store import (
     PostgresIdempotencyStore,
@@ -65,6 +66,7 @@ from keeper.infrastructure.ports import (
     AllowAllAuthorize,
     Authorize,
     Clock,
+    EventLogReader,
     EventStore,
     IdempotencyStore,
     IdGenerator,
@@ -72,7 +74,12 @@ from keeper.infrastructure.ports import (
     TokenVerifier,
     UUIDv7Generator,
 )
-from keeper.infrastructure.schema import SchemaPosture, verify_schema_version
+from keeper.infrastructure.schema import (
+    RewritableHistoryError,
+    SchemaPosture,
+    verify_append_only_role,
+    verify_schema_version,
+)
 from keeper.infrastructure.settings import Settings
 
 Teardown = Callable[[], Awaitable[None]]
@@ -110,6 +117,7 @@ def make_inmemory_kernel(
     id_generator: IdGenerator,
     authz: Authorize,
     event_store: EventStore | None = None,
+    event_log: EventLogReader | None = None,
     idempotency_store: IdempotencyStore | None = None,
     token_verifier: TokenVerifier | None = None,
 ) -> Kernel:
@@ -120,13 +128,31 @@ def make_inmemory_kernel(
     so a field added to `Kernel` gets one default here instead of a default
     repeated across every test module. An architecture fitness test pins that
     single-site rule.
+
+    `event_log` defaults to the store itself, because `InMemoryEventStore`
+    satisfies both Protocols over one set of events and a test kernel can
+    therefore read back the log it just wrote. A caller supplying some
+    other store has to supply a reader too: pairing it with one that
+    answers empty would report a quiet facility where the honest answer is
+    that this combination was never wired.
     """
+    store = event_store if event_store is not None else InMemoryEventStore()
+    reader = event_log
+    if reader is None:
+        if not isinstance(store, InMemoryEventStore):
+            msg = (
+                "make_inmemory_kernel needs an event_log when event_store is not an "
+                "InMemoryEventStore; there is no log to read from the store supplied"
+            )
+            raise ValueError(msg)
+        reader = store
     return Kernel(
         settings=settings,
         clock=clock,
         id_generator=id_generator,
         authz=authz,
-        event_store=event_store if event_store is not None else InMemoryEventStore(),
+        event_store=store,
+        event_log=reader,
         idempotency_store=(
             idempotency_store if idempotency_store is not None else InMemoryIdempotencyStore()
         ),
@@ -151,6 +177,12 @@ def make_postgres_kernel(
 
     The Postgres twin of `make_inmemory_kernel`, and the other half of the
     single-construction-site rule.
+
+    The log reader is built from the pool rather than taken as an
+    argument, because it is a read over one table and a deployment has no
+    second place to point it at. A degraded schema leaves it alone: it
+    never writes, so the read-only wrapper the store gets has nothing to
+    add here.
     """
     return Kernel(
         settings=settings,
@@ -158,6 +190,7 @@ def make_postgres_kernel(
         id_generator=id_generator,
         authz=authz,
         event_store=event_store if event_store is not None else PostgresEventStore(pool),
+        event_log=PostgresEventLogReader(pool),
         idempotency_store=(
             idempotency_store if idempotency_store is not None else PostgresIdempotencyStore(pool)
         ),
@@ -226,7 +259,7 @@ async def build_kernel(
             raise ValueError(msg)
         if not settings.require_authenticated_principal:
             msg = (
-                "APP_ENV is production-tier but REQUIRE_AUTHENTICATED_PRINCIPAL "
+                "ENVIRONMENT is production-tier but REQUIRE_AUTHENTICATED_PRINCIPAL "
                 "is false; the API would accept a client-supplied X-Principal-Id "
                 "header and let any caller claim any principal"
             )
@@ -237,7 +270,7 @@ async def build_kernel(
             # adapter the factory actually returns is checked separately
             # below, which is the part a factory cannot talk its way out of.
             msg = (
-                "APP_ENV is production-tier but AUTHZ_POLICY_ID is unset; the "
+                "ENVIRONMENT is production-tier but AUTHZ_POLICY_ID is unset; the "
                 "authorize factory would hand back AllowAllAuthorize and every "
                 "command would be permitted. Author a policy under a "
                 "non-production tier, then set AUTHZ_POLICY_ID to its id"
@@ -257,6 +290,7 @@ async def build_kernel(
     schema = await verify_schema_version(
         pool, allow_mismatch=settings.allow_schema_version_mismatch
     )
+
     pg_event_store: EventStore = PostgresEventStore(pool)
     if schema.posture == "degraded":
         pg_event_store = ReadOnlyEventStore(
@@ -280,11 +314,27 @@ async def build_kernel(
         # guarantee that examining a class name cannot give.
         await pool.close()
         msg = (
-            "APP_ENV is production-tier and the authorize factory returned "
+            "ENVIRONMENT is production-tier and the authorize factory returned "
             "AllowAllAuthorize, which permits every command with nothing "
             "recording that no policy was consulted"
         )
         raise ValueError(msg)
+
+    # Last of the production gates, and last on purpose. The two above read
+    # settings and a class name; this one asks the database a question, so it
+    # is the expensive one and there is nothing it protects that the cheaper
+    # refusals would have let through. Nothing has appended yet either way.
+    #
+    # A role that may rewrite events makes the append-only record a property
+    # of this build's SQL rather than of the database. Below the production
+    # tier it warns instead: local development connects as the owner because
+    # it also runs the migrations, and refusing there would buy nothing a
+    # developer's database needs defending from.
+    try:
+        await verify_append_only_role(pool, refuse=settings.is_production_tier)
+    except RewritableHistoryError:
+        await pool.close()
+        raise
 
     kernel = make_postgres_kernel(
         pool,

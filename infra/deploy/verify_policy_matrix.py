@@ -15,9 +15,11 @@ the adapter's rule changes, this changes with it.
     without actors   every call denied, because Access holds nobody
     with actors      every call allowed, except the ones declared below
 
-The first run is not a control for its own sake. It is the state production
-is in right now, and the gap between the runs is exactly the work the
-cutover still needs.
+The first run is not a control for its own sake. It is what a deployment
+looks like before its actors are registered, which is where every
+deployment starts, and the gap between the runs is the work a cutover
+does. Whether a given host has done that work is a fact about its
+database and its environment file rather than about this script.
 
 ## Where the calls come from
 
@@ -260,7 +262,7 @@ async def main() -> int:
     if allowed_without:
         print("  UNEXPECTED: something was allowed with no actor registered")
         return 1
-    print("  every call denied, which is what production would do today\n")
+    print("  every call denied, which is what a keeper with no actors does\n")
 
     with_actors = await _run(register_actors=True)
     denied = [call for call, ok in with_actors if not ok]

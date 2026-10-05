@@ -51,7 +51,9 @@ It sits beside its database and reaches nothing. No hardware is driven from here
 
 ## Where it stands today
 
-Installed and running on a central host: the schema applied against a real Postgres, both services up under user-level systemd, and one beamline's devices registered and read back. What has not happened is a beamline turning the whole loop, because that needs the other three at once.
+Installed and running on a central host: the schema applied against a real Postgres, both services up under user-level systemd, and every beamline's devices registered and read back. Each of those beamlines runs a conductor and a reporter against this record, and a dispatch has been followed from here out to a scan and back to a dataset that says what is inside it, at every one of them.
+
+Every one of those scans drove a simulator serving records the deployment supplies itself, so what the loop establishes is the software and not any hardware: no real motor has been written to at any of the four. The part still unexercised is the thinker, which holds its intake open against this record and has had no inquiry reach it there.
 
 ## The pages
 

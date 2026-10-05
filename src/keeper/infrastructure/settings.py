@@ -35,9 +35,25 @@ _ALLOWED_DATABASE_SCHEMES = ("postgresql://", "postgres://")
 
 OtelExporter = Literal["otlp", "console", "none"]
 
-# Environments where a permissive default is a production incident rather than
-# a convenience. `staging` counts: it usually holds real data and is reachable.
-PRODUCTION_TIER_ENVS = frozenset({"prod", "production", "staging"})
+# The environments allowed to run with permissive defaults. Every other name,
+# including one nobody has thought of yet, is a production tier.
+#
+# Which side carries the list is the whole design. Enumerating PRODUCTION
+# names fails open: an environment spelled in a way the list does not know
+# boots with every refusal below switched off and says nothing about it. That
+# is not a hypothetical. The installer deployed `pilot` while the list named
+# only prod, production and staging, so the one installation holding a real
+# record ran for months with all four gates skipped, and nothing could have
+# reported it because nothing was asked. Enumerating DEVELOPMENT names fails
+# closed instead: an unrecognised environment refuses to boot and names its
+# remedy, which is a message an operator can act on rather than a silence
+# they cannot see.
+#
+# Adding a name here widens what may run permissively, so it is the edit to
+# look at twice. tests/architecture/test_the_deployed_environment_is_a_production_tier.py
+# checks this against what the installer actually deploys rather than letting
+# two files agree by hand.
+DEVELOPMENT_ENVIRONMENTS = frozenset({"dev", "local", "test"})
 
 
 class Settings(BaseSettings):
@@ -51,7 +67,7 @@ class Settings(BaseSettings):
     )
 
     # App
-    app_env: str = "local"
+    environment: str = "local"
     log_level: str = "INFO"
 
     # Database
@@ -83,7 +99,7 @@ class Settings(BaseSettings):
     # from an `X-Principal-Id` header. That is a development convenience and
     # nothing more: anyone can claim any principal. `require_authenticated_principal`
     # decides what happens when the header is absent (False yields the system
-    # principal, True yields 401), and a production-tier `app_env` refuses to
+    # principal, True yields 401), and a production-tier `environment` refuses to
     # boot unless it is True.
     #
     # Production must ALSO front the API with a proxy that authenticates the
@@ -139,12 +155,12 @@ class Settings(BaseSettings):
     @property
     def is_production_tier(self) -> bool:
         """True when this environment must refuse permissive defaults."""
-        return self.app_env.lower() in PRODUCTION_TIER_ENVS
+        return self.environment.lower() not in DEVELOPMENT_ENVIRONMENTS
 
     @property
     def is_test(self) -> bool:
         """True when adapters should be in-memory and no pool is built."""
-        return self.app_env.lower() == "test"
+        return self.environment.lower() == "test"
 
     @field_validator("database_url")
     @classmethod

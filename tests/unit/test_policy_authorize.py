@@ -58,7 +58,7 @@ class _FixedClock:
 
 def _kernel(event_store: InMemoryEventStore) -> Kernel:
     return make_inmemory_kernel(
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=_FixedClock(),
         id_generator=UUIDv7Generator(),
         authz=AllowAllAuthorize(),
@@ -230,12 +230,14 @@ async def test_a_grant_is_visible_to_the_very_next_decision() -> None:
 
 def test_the_factory_hands_back_the_permissive_adapter_when_no_policy_is_configured() -> None:
     """The bootstrap posture, and the one a production tier refuses."""
-    built = build_authorize(Settings(app_env="test"), InMemoryEventStore())
+    built = build_authorize(Settings(environment="test"), InMemoryEventStore())
     assert isinstance(built, AllowAllAuthorize)
 
 
 def test_the_factory_builds_the_policy_adapter_once_a_policy_is_configured() -> None:
-    built = build_authorize(Settings(app_env="test", authz_policy_id=uuid4()), InMemoryEventStore())
+    built = build_authorize(
+        Settings(environment="test", authz_policy_id=uuid4()), InMemoryEventStore()
+    )
     assert isinstance(built, PolicyAuthorize)
 
 

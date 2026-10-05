@@ -120,6 +120,25 @@ curl --cacert "$CORA_ROOT/etc/tls/ca.crt" -o /dev/null -w '%{http_code}\n' \
 401 then 200. `/health` answers without a token on purpose, so a liveness
 check needs no credential.
 
+**Authentication says who is calling, the policy says what they may do**, and
+the second needs its own negative control for the same reason the first does.
+A token that succeeds proves nothing on its own: a deployment with no
+`AUTHZ_POLICY_ID` permits every authenticated caller everything, and looks
+identical from the outside until something is refused.
+
+```bash
+curl --cacert "$CORA_ROOT/etc/tls/ca.crt" -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $(cat "$CORA_ROOT/etc/tokens/2-bm.token")" \
+  "https://$HOST:8443/events"
+curl --cacert "$CORA_ROOT/etc/tls/ca.crt" -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $(cat "$CORA_ROOT/etc/tokens/viewer.token")" \
+  "https://$HOST:8443/events"
+```
+
+403 then 200. A beamline token holds no log read and the viewer's does, so the
+pair separates an enforcing deployment from a permissive one in a way either
+request alone cannot.
+
 ## The wire
 
 `issue_tls.py` mints a small CA and a server certificate for the name
@@ -153,13 +172,6 @@ The certificate expires. 825 days for the leaf, ten years for the CA, and
 reissuing the leaf is deleting it and running `install.sh` again.
 
 ## What it is not
-
-**No authorization policy.** `APP_ENV` is set to a value that is not a
-production tier, which is accurate rather than a placeholder: a production
-tier refuses to boot without a policy, and the first policy has to be
-authored through the API before anything can be authorized against it.
-Authentication does not wait for that, which is why it is on here and the
-tier is not.
 
 **No backups.** The database is a bind mount at `$CORA_ROOT/pgdata`, so
 `pg_dump` through the container is the whole story for now.

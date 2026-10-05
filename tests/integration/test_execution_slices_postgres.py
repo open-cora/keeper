@@ -97,7 +97,7 @@ def handlers(db_pool: asyncpg.Pool) -> ExecutionHandlers:
     return wire_execution(
         make_postgres_kernel(
             db_pool,
-            settings=Settings(app_env="test"),
+            settings=Settings(environment="test"),
             clock=SystemClock(),
             id_generator=UUIDv7Generator(),
             authz=AllowAllAuthorize(),

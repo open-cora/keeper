@@ -67,7 +67,7 @@ def kernel(db_pool: asyncpg.Pool) -> Kernel:
     """A kernel over the real pool, built the way the application builds one."""
     return make_postgres_kernel(
         db_pool,
-        settings=Settings(app_env="test"),
+        settings=Settings(environment="test"),
         clock=SystemClock(),
         id_generator=UUIDv7Generator(),
         authz=AllowAllAuthorize(),
