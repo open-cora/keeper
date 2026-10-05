@@ -50,7 +50,20 @@ BEAMLINES: tuple[str, ...] = ("2-bm", "7-bm", "19-bm", "32-id")
 
 ADMIN = "admin"
 
-SUBJECTS: tuple[str, ...] = (*BEAMLINES, "thinker", ADMIN)
+VIEWER = "viewer"
+"""The principal that tails the event log, and does nothing else.
+
+Separate from the beamlines and from the thinker because what it holds is
+facility-wide and they hold nothing that is. The log cannot be fenced to
+one beamline: a beamline is named by the three events that open a stream
+and by nothing that follows one, so a beamline-scoped grant would deliver
+the opening of each thread and drop every claim, step and engine report
+after it. Whoever reads the log reads the facility, which is a property
+of the data rather than a choice this file makes, and the honest response
+is one subject that is meant to.
+"""
+
+SUBJECTS: tuple[str, ...] = (*BEAMLINES, "thinker", VIEWER, ADMIN)
 
 READS: tuple[str, ...] = (
     "GetDataset",
@@ -73,6 +86,31 @@ READS: tuple[str, ...] = (
 )
 
 ADMIN_ONLY_READS: tuple[str, ...] = ("GetActor", "GetPolicy")
+
+LOG_READS: tuple[str, ...] = ("ReadEventLog",)
+"""The log read every principal that watches the facility holds.
+
+Not in `READS`, because `READS` is granted to every subject and a
+conductor has no use for transitions: it asks what is dispatched to it and
+the answer is current state. Granting it anyway would make a viewer's
+reach every beamline account's reach for nothing gained.
+
+It widens nobody's extent. Every stream it returns is already readable
+through the per-context reads in `READS`, so what changes is the shape of
+the answer and the thread through it, not what a holder may learn.
+"""
+
+ADMIN_ONLY_LOG_READS: tuple[str, ...] = ("ReadFullEventLog",)
+"""The log read that also returns the Actor and Policy streams.
+
+The administrator's alone, and for the same reason `GetActor` and
+`GetPolicy` are: the Policy stream is the rulebook, so a reader of it
+learns which principal may issue which command where. Keeping the two
+lists in step is what
+`tests/architecture/test_the_log_read_mirrors_the_admin_only_reads.py`
+checks, because nothing else compares a grant here against the stream
+filter in `keeper.api.event_log`.
+"""
 
 FENCED: tuple[str, ...] = (
     "AdoptProposal",
@@ -150,6 +188,10 @@ def grants() -> Iterator[tuple[str, str, str | None]]:
         for command in READS:
             yield subject, command, None
 
+    for command in LOG_READS:
+        yield VIEWER, command, None
+        yield ADMIN, command, None
+
     for beamline in BEAMLINES:
         for command in BEAMLINE_WRITES:
             yield beamline, command, None
@@ -159,19 +201,22 @@ def grants() -> Iterator[tuple[str, str, str | None]]:
     for command in THINKER_WRITES:
         yield "thinker", command, None
 
-    for command in (*ADMIN_ONLY_READS, *ADMIN_WRITES):
+    for command in (*ADMIN_ONLY_READS, *ADMIN_ONLY_LOG_READS, *ADMIN_WRITES):
         yield ADMIN, command, None
 
 
 __all__ = [
     "ADMIN",
+    "ADMIN_ONLY_LOG_READS",
     "ADMIN_ONLY_READS",
     "ADMIN_WRITES",
     "BEAMLINES",
     "BEAMLINE_WRITES",
     "FENCED",
+    "LOG_READS",
     "READS",
     "SUBJECTS",
     "THINKER_WRITES",
+    "VIEWER",
     "grants",
 ]

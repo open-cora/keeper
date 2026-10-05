@@ -28,13 +28,41 @@ make dev            # the API, on http://localhost:8000
 Port 5433 rather than the usual 5432, so it does not clash with a Postgres you
 already have running.
 
-Three addresses are worth knowing:
+Four addresses are worth knowing:
 
 ```
    GET  /health    is the process alive
    GET  /readyz    can it serve a correct request
+   GET  /events    the log, from a cursor, oldest first
    POST /mcp       the same operations, for a machine
 ```
+
+## Reading the log
+
+`GET /events` hands back committed events in the order they committed,
+from a cursor the caller holds, and `wait` holds the request open until
+something lands rather than answering empty. It is how a terminal, a
+dashboard or an alerting path watches what is happening without polling.
+
+```bash
+curl -s "$KEEPER/events?limit=20"
+curl -s "$KEEPER/events?after=$CURSOR&wait=30"
+```
+
+It is not on the surface page with the other operations, because it
+belongs to no bounded context: it reads the table all of them write into.
+For the same reason it has no MCP tool. An agent asking what is happening
+has every context's reads already, and those answer with current state.
+
+Two grants decide what comes back. `ReadEventLog` returns every stream
+behind a read that all principals hold, and `ReadFullEventLog` adds the
+Actor and Policy streams, which are the administrator's for the same
+reason `GetActor` and `GetPolicy` are. Nothing is granted by default.
+
+**The log cannot be narrowed to one beamline.** Three events name a
+beamline and each opens a stream; nothing that follows one names it. So a
+reader of the log reads the facility, and whether that is acceptable is a
+question to answer before granting it rather than after.
 
 `/health` checks nothing and is meant to. Every dependency it could check is one
 a restart cannot fix, so a health probe that checked the database would restart

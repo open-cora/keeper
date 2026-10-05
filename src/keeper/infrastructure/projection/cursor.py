@@ -1,10 +1,18 @@
-"""Opaque keyset-pagination cursor encode / decode.
+"""Opaque cursor encode / decode, in two shapes.
 
 The convention: every `proj_*` table includes a
 `(created_at, id)` natural sort key, and every list endpoint paginates
 via an opaque base64-encoded `(created_at, UUID)` cursor produced by
-these helpers. Uniform format across BCs means a future "swap to
+`encode_cursor`. Uniform format across BCs means a future "swap to
 cursor-based pagination across all endpoints" never lands.
+
+The log read is the one caller that paginates over something other than a
+`proj_*` table, so it carries the second shape: `encode_log_cursor` over
+the `(transaction_id, position)` pair the event log advances by. Same
+encoding, same `InvalidCursorError`, same 422 at the route, and a
+different pair inside, which is why the two are separate functions rather
+than one generic over its halves. Encoding them identically is what lets
+a caller treat either as a token it got back and hands in again.
 
 The cursor is base64url-encoded (URL-safe, no padding) so it fits
 cleanly in a query string. The encoded body is `<isoformat>|<uuid>`;
@@ -70,4 +78,48 @@ def decode_cursor(cursor: str) -> tuple[datetime, UUID]:
     return created_at, item_id
 
 
-__all__ = ["InvalidCursorError", "decode_cursor", "encode_cursor"]
+def encode_log_cursor(*, transaction_id: int, position: int) -> str:
+    """Encode an event-log `(transaction_id, position)` pair to a cursor.
+
+    The encoded form is base64url(`<transaction_id>|<position>`) with
+    padding stripped, matching `encode_cursor`. Both halves are decimal
+    integers, so neither can contain the separator.
+    """
+    raw = f"{transaction_id}|{position}"
+    return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+
+def decode_log_cursor(cursor: str) -> tuple[int, int]:
+    """Inverse of `encode_log_cursor`. Raises `InvalidCursorError` on any
+    decoding failure, including a negative half, which no real cursor
+    carries and which would otherwise read as a position before the log
+    began."""
+    try:
+        padded = cursor + "=" * ((4 - len(cursor) % 4) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode()).decode()
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise InvalidCursorError(cursor, f"base64 decode failed: {exc}") from exc
+
+    if "|" not in raw:
+        raise InvalidCursorError(cursor, "missing '|' separator")
+    tx_str, pos_str = raw.split("|", 1)
+
+    try:
+        transaction_id = int(tx_str)
+        position = int(pos_str)
+    except ValueError as exc:
+        raise InvalidCursorError(cursor, f"malformed integer pair {raw!r}: {exc}") from exc
+
+    if transaction_id < 0 or position < 0:
+        raise InvalidCursorError(cursor, f"negative half in {raw!r}")
+
+    return transaction_id, position
+
+
+__all__ = [
+    "InvalidCursorError",
+    "decode_cursor",
+    "decode_log_cursor",
+    "encode_cursor",
+    "encode_log_cursor",
+]

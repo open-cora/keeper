@@ -48,7 +48,7 @@ WHERE stream_type = $1 AND stream_id = $2
 ORDER BY version
 """
 # asyncpg 0.31 + PG18 has no built-in OUTPUT codec for xid8, so we
-# cast to text in the SELECT and parse to Python int in `_row_to_event`.
+# cast to text in the SELECT and parse to Python int in `row_to_stored_event`.
 # (Re-verify against the driver on any asyncpg or Postgres major bump;
 # no test covers the codec gap itself.)
 # On the INPUT side asyncpg accepts a Python int for an `$1::xid8`
@@ -84,7 +84,7 @@ class PostgresEventStore:
     ) -> tuple[list[StoredEvent], int]:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(_LOAD_SQL, stream_type, stream_id)
-        events = [_row_to_event(row) for row in rows]
+        events = [row_to_stored_event(row) for row in rows]
         version = events[-1].version if events else 0
         return events, version
 
@@ -244,7 +244,16 @@ class PostgresEventStore:
             raise
 
 
-def _row_to_event(row: Any) -> StoredEvent:
+def row_to_stored_event(row: Any) -> StoredEvent:
+    """Build a `StoredEvent` from a row of the envelope columns.
+
+    Public because it is shared. Every query that selects the envelope
+    selects the same columns, including `transaction_id::text AS
+    transaction_id_text`, so one mapper serves the stream load here and
+    `PostgresEventLogReader` beside it. A second copy would have
+    to be kept in step by hand, which is what the projection worker used
+    to do and stopped doing once the two SELECT shapes converged.
+    """
     payload: dict[str, Any] = row["payload"]
     metadata: dict[str, Any] = row["metadata"]
     return StoredEvent(

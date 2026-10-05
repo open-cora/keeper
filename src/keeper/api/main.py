@@ -42,6 +42,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from keeper import __version__
 from keeper.access import register_access_routes, register_access_tools, wire_access
 from keeper.api._readiness import probe_database, readiness_body
+from keeper.api.event_log import register_event_log_route
 from keeper.api.exception_handlers import register_shared_exception_handlers
 from keeper.api.middleware import BodySizeLimitMiddleware
 from keeper.api.protected_resource_metadata import register_protected_resource_metadata_route
@@ -83,6 +84,7 @@ from keeper.infrastructure.deps import build_kernel
 from keeper.infrastructure.idempotency_pruner import idempotency_pruner_lifespan
 from keeper.infrastructure.observability import configure_tracing, instrument_app
 from keeper.infrastructure.projection.lifespan import projection_worker_lifespan
+from keeper.infrastructure.projection.log_waiting import log_waiting_lifespan
 from keeper.infrastructure.projection.registry import ProjectionRegistry
 from keeper.infrastructure.settings import Settings
 from keeper.pursuit import (
@@ -181,6 +183,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                     idempotency_pruner_lifespan(deps),
                     waiting_lifespan(deps, settings) as dispatch_signal,
                     counsel_waiting_lifespan(deps, settings) as inquiry_signal,
+                    log_waiting_lifespan(deps, settings) as log_signal,
                 ):
                     # Held open beside the workers so they are closed before
                     # the pool is, for the reason the comment below gives. A
@@ -190,6 +193,7 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                     # waits on a question, and neither wakes for the other.
                     app.state.dispatch_signal = dispatch_signal
                     app.state.inquiry_signal = inquiry_signal
+                    app.state.log_signal = log_signal
                     yield
             finally:
                 # Workers must stop before the pool closes, otherwise the next
@@ -264,6 +268,11 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     register_counsel_routes(fastapi_app)
     register_equipment_routes(fastapi_app)
     register_pursuit_routes(fastapi_app)
+
+    # The log read, which belongs to no bounded context because the table
+    # it reads belongs to all of them. Its own module says why it is here
+    # and not published as a slice.
+    register_event_log_route(fastapi_app)
 
     # RFC 9728 Protected Resource Metadata, discoverable at
     # /.well-known/oauth-protected-resource. Clients dereference it after a

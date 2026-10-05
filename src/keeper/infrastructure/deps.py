@@ -52,6 +52,7 @@ from keeper.infrastructure.adapters.in_memory_event_store import InMemoryEventSt
 from keeper.infrastructure.adapters.in_memory_idempotency_store import (
     InMemoryIdempotencyStore,
 )
+from keeper.infrastructure.adapters.postgres_event_log_reader import PostgresEventLogReader
 from keeper.infrastructure.adapters.postgres_event_store import PostgresEventStore
 from keeper.infrastructure.adapters.postgres_idempotency_store import (
     PostgresIdempotencyStore,
@@ -65,6 +66,7 @@ from keeper.infrastructure.ports import (
     AllowAllAuthorize,
     Authorize,
     Clock,
+    EventLogReader,
     EventStore,
     IdempotencyStore,
     IdGenerator,
@@ -110,6 +112,7 @@ def make_inmemory_kernel(
     id_generator: IdGenerator,
     authz: Authorize,
     event_store: EventStore | None = None,
+    event_log: EventLogReader | None = None,
     idempotency_store: IdempotencyStore | None = None,
     token_verifier: TokenVerifier | None = None,
 ) -> Kernel:
@@ -120,13 +123,31 @@ def make_inmemory_kernel(
     so a field added to `Kernel` gets one default here instead of a default
     repeated across every test module. An architecture fitness test pins that
     single-site rule.
+
+    `event_log` defaults to the store itself, because `InMemoryEventStore`
+    satisfies both Protocols over one set of events and a test kernel can
+    therefore read back the log it just wrote. A caller supplying some
+    other store has to supply a reader too: pairing it with one that
+    answers empty would report a quiet facility where the honest answer is
+    that this combination was never wired.
     """
+    store = event_store if event_store is not None else InMemoryEventStore()
+    reader = event_log
+    if reader is None:
+        if not isinstance(store, InMemoryEventStore):
+            msg = (
+                "make_inmemory_kernel needs an event_log when event_store is not an "
+                "InMemoryEventStore; there is no log to read from the store supplied"
+            )
+            raise ValueError(msg)
+        reader = store
     return Kernel(
         settings=settings,
         clock=clock,
         id_generator=id_generator,
         authz=authz,
-        event_store=event_store if event_store is not None else InMemoryEventStore(),
+        event_store=store,
+        event_log=reader,
         idempotency_store=(
             idempotency_store if idempotency_store is not None else InMemoryIdempotencyStore()
         ),
@@ -151,6 +172,12 @@ def make_postgres_kernel(
 
     The Postgres twin of `make_inmemory_kernel`, and the other half of the
     single-construction-site rule.
+
+    The log reader is built from the pool rather than taken as an
+    argument, because it is a read over one table and a deployment has no
+    second place to point it at. A degraded schema leaves it alone: it
+    never writes, so the read-only wrapper the store gets has nothing to
+    add here.
     """
     return Kernel(
         settings=settings,
@@ -158,6 +185,7 @@ def make_postgres_kernel(
         id_generator=id_generator,
         authz=authz,
         event_store=event_store if event_store is not None else PostgresEventStore(pool),
+        event_log=PostgresEventLogReader(pool),
         idempotency_store=(
             idempotency_store if idempotency_store is not None else PostgresIdempotencyStore(pool)
         ),

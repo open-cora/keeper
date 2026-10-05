@@ -51,6 +51,7 @@ import asyncpg
 from keeper.infrastructure.ports import (
     Authorize,
     Clock,
+    EventLogReader,
     EventStore,
     IdempotencyStore,
     IdGenerator,
@@ -106,6 +107,16 @@ class Kernel:
     id_generator: IdGenerator
     authz: Authorize
     event_store: EventStore
+    event_log: EventLogReader
+    """Reads the whole log in commit order, for the one route that tails it.
+
+    A second seam onto the same table rather than a method on
+    `event_store`, because a caller tailing the log must never be handed
+    `append`. In the test environment one `InMemoryEventStore` satisfies
+    both, and the two fields still point at it through different
+    Protocols.
+    """
+
     idempotency_store: IdempotencyStore
 
     pool: asyncpg.Pool | None = None

@@ -8,7 +8,7 @@ against in-memory implementations.
 Two families live here, and only one has members:
 
   - **Infrastructure seams**: `Clock`, `IdGenerator`, `EventStore`,
-    `IdempotencyStore`, `Authorize`, `TokenVerifier`.
+    `EventLogReader`, `IdempotencyStore`, `Authorize`, `TokenVerifier`.
     These are technology seams: the capability is generic and the adapter
     picks the substrate.
   - **Cross-BC lookups**: a `<Thing>Lookup` Protocol declared here,
@@ -44,6 +44,11 @@ from keeper.infrastructure.ports.clock import (
     Clock,
     FakeClock,
     SystemClock,
+)
+from keeper.infrastructure.ports.event_log_reader import (
+    EventLogReader,
+    LogCursor,
+    LogPage,
 )
 from keeper.infrastructure.ports.event_store import (
     ConcurrencyError,
@@ -89,6 +94,7 @@ __all__ = [
     "Clock",
     "ConcurrencyError",
     "Deny",
+    "EventLogReader",
     "EventStore",
     "FakeClock",
     "FixedIdGenerator",
@@ -101,6 +107,8 @@ __all__ = [
     "IntrospectionUnavailableError",
     "InvalidTokenError",
     "LockedRecent",
+    "LogCursor",
+    "LogPage",
     "NewEvent",
     "PrincipalKind",
     "StoredEvent",

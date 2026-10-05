@@ -24,12 +24,11 @@ silently skips an event.
 
 import asyncio
 import contextlib
-from typing import Any
 
 import asyncpg
 
+from keeper.infrastructure.adapters.postgres_event_store import row_to_stored_event
 from keeper.infrastructure.logging import get_logger
-from keeper.infrastructure.ports.event_store import StoredEvent
 from keeper.infrastructure.projection.bookmark import (
     read_bookmark,
     write_bookmark,
@@ -63,37 +62,6 @@ _BACKOFF_BASE_SECONDS = 1.0
 _BACKOFF_MAX_SECONDS = 60.0
 
 
-def _row_to_stored_event(row: Any) -> StoredEvent:
-    """Mirror of postgres.event_store._row_to_event for the advance query.
-    Duplicated rather than imported because the advance query has its
-    own SELECT shape (transaction_id alias) that differs from the
-    stream-load query.
-
-    Both projections of the SELECT must surface every column on
-    StoredEvent, otherwise subscribers see stale `None` values for
-    fields that exist on the row but were dropped here. Keep the
-    column lists in lock-step with `postgres.event_store._LOAD_SQL`
-    when adding new envelope fields.
-    """
-    return StoredEvent(
-        position=int(row["position"]),
-        event_id=row["event_id"],
-        stream_type=str(row["stream_type"]),
-        stream_id=row["stream_id"],
-        version=int(row["version"]),
-        event_type=str(row["event_type"]),
-        schema_version=int(row["schema_version"]),
-        payload=row["payload"],
-        metadata=row["metadata"],
-        correlation_id=row["correlation_id"],
-        causation_id=row["causation_id"],
-        occurred_at=row["occurred_at"],
-        recorded_at=row["recorded_at"],
-        transaction_id=int(row["transaction_id_text"]),
-        principal_id=row["principal_id"],
-    )
-
-
 async def advance_subscriber_once(
     pool: asyncpg.Pool,
     subscriber: Subscriber,
@@ -125,7 +93,7 @@ async def advance_subscriber_once(
         )
         if not rows:
             return 0
-        events = [_row_to_stored_event(row) for row in rows]
+        events = [row_to_stored_event(row) for row in rows]
         for event in events:
             await subscriber.apply(event, conn)
         last = events[-1]
