@@ -140,7 +140,7 @@ def define_policy(
 def main() -> int:
     """Register the actors, author the policy, and say what to do with it."""
     parser = argparse.ArgumentParser(description="Seed this deployment's first policy.")
-    parser.add_argument("--base-url", required=True, help="for example https://lyra:8443")
+    parser.add_argument("--base-url", required=True, help="for example https://<keeper-host>:8443")
     parser.add_argument("--ca", help="the CA certificate the keeper's TLS is signed by")
     parser.add_argument("--token-file", help="a bearer token this deployment accepts")
     parser.add_argument(
