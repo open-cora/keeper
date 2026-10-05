@@ -10,11 +10,19 @@ Postgres, and nothing else. No message broker, no cache, no other service. The
 keeper talks to its database and answers requests; everything else in the system
 dials in to it.
 
-Two database users, not one. Migrations run as the owner, which may change the
-schema. The application runs as `keeper_app`, which may read and add rows to the
-event log and may not change or delete them. That separation is what makes the
-history append-only in fact rather than by agreement, and the production check
-below refuses to start without it.
+Two database users, not one, and which is which is worth getting straight
+because the names do not help. `keeper` owns the schema and is what migrations
+run as; it may change anything, including the event log. `keeper_app` is what
+the running server connects as; it may read events and add events, and the
+schema revokes its UPDATE, DELETE and TRUNCATE.
+
+That separation is what makes the history append-only in fact rather than by
+agreement: the record is sealed by a database grant rather than by the
+application's own SQL being careful. Above the production tier the keeper
+refuses to start when the role it connected as can rewrite events, so a
+deployment cannot give the guarantee up by editing a connection string.
+Below that tier it logs a warning instead, because local development connects
+as the owner in order to run the migrations.
 
 ## Starting one locally
 

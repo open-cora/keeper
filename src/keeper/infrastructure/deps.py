@@ -74,7 +74,12 @@ from keeper.infrastructure.ports import (
     TokenVerifier,
     UUIDv7Generator,
 )
-from keeper.infrastructure.schema import SchemaPosture, verify_schema_version
+from keeper.infrastructure.schema import (
+    RewritableHistoryError,
+    SchemaPosture,
+    verify_append_only_role,
+    verify_schema_version,
+)
 from keeper.infrastructure.settings import Settings
 
 Teardown = Callable[[], Awaitable[None]]
@@ -285,6 +290,7 @@ async def build_kernel(
     schema = await verify_schema_version(
         pool, allow_mismatch=settings.allow_schema_version_mismatch
     )
+
     pg_event_store: EventStore = PostgresEventStore(pool)
     if schema.posture == "degraded":
         pg_event_store = ReadOnlyEventStore(
@@ -313,6 +319,22 @@ async def build_kernel(
             "recording that no policy was consulted"
         )
         raise ValueError(msg)
+
+    # Last of the production gates, and last on purpose. The two above read
+    # settings and a class name; this one asks the database a question, so it
+    # is the expensive one and there is nothing it protects that the cheaper
+    # refusals would have let through. Nothing has appended yet either way.
+    #
+    # A role that may rewrite events makes the append-only record a property
+    # of this build's SQL rather than of the database. Below the production
+    # tier it warns instead: local development connects as the owner because
+    # it also runs the migrations, and refusing there would buy nothing a
+    # developer's database needs defending from.
+    try:
+        await verify_append_only_role(pool, refuse=settings.is_production_tier)
+    except RewritableHistoryError:
+        await pool.close()
+        raise
 
     kernel = make_postgres_kernel(
         pool,

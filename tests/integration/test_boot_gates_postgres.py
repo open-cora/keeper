@@ -22,8 +22,11 @@ import pytest
 from keeper.authority import PolicyAuthorize, build_authorize
 from keeper.infrastructure.deps import build_kernel
 from keeper.infrastructure.ports import AllowAllAuthorize, Authorize, EventStore
+from keeper.infrastructure.schema import RewritableHistoryError
 from keeper.infrastructure.settings import Settings
 from tests.integration.conftest import ClonedDatabase
+
+_APP_ROLE = "keeper_app"
 
 pytestmark = [pytest.mark.integration]
 
@@ -42,12 +45,41 @@ def _permissive_factory(settings: Settings, event_store: EventStore) -> Authoriz
 
 
 def _production_settings(cloned_database: ClonedDatabase) -> Settings:
+    """Settings a production tier would actually accept, role included.
+
+    The URL names `keeper_app` rather than the owner, because a production
+    boot now refuses a role that can rewrite events. Reaching for the
+    owner here would make every test in this file refuse for that reason
+    instead of the one it is about, which is how the gate below earned
+    its own test rather than a shared fixture.
+    """
     return Settings(
+        app_env="prod",
+        database_url=cloned_database.url_as(_APP_ROLE, _APP_ROLE),
+        require_authenticated_principal=True,
+        authz_policy_id=uuid4(),
+    )
+
+
+async def test_a_production_tier_refuses_a_role_that_can_rewrite_events(
+    cloned_database: ClonedDatabase,
+) -> None:
+    """Every other gate satisfied, and the record still editable.
+
+    The owner is the role this whole suite connects as, and for a long
+    time it was the role the deployment ran as too, which is why the
+    append-only guarantee was a sentence in three documents rather than a
+    grant anybody held.
+    """
+    settings = Settings(
         app_env="prod",
         database_url=cloned_database.url,
         require_authenticated_principal=True,
         authz_policy_id=uuid4(),
     )
+
+    with pytest.raises(RewritableHistoryError, match="keeper_app"):
+        await build_kernel(settings=settings, authorize_factory=build_authorize)
 
 
 async def test_a_production_tier_refuses_a_factory_that_returns_the_permissive_adapter(

@@ -110,6 +110,7 @@ echo
 
 echo "Secrets"
 PG_ENV="${CORA_ROOT}/etc/postgres.env"
+APP_PG_ENV="${CORA_ROOT}/etc/keeper-app-db.env"
 KEEPER_ENV="${CORA_ROOT}/etc/keeper.env"
 
 if [ -f "${PG_ENV}" ]; then
@@ -129,7 +130,43 @@ ENV
 fi
 chmod 600 "${PG_ENV}"
 
-DATABASE_URL="postgresql://keeper:${PG_PASSWORD}@127.0.0.1:${PG_PORT}/keeper"
+# The application's own password, which is not the owner's.
+#
+# Two roles and two passwords, because the whole point of the second role is
+# that holding the application's credential does not let you rewrite history.
+# One password shared between them would hand the owner's privileges to
+# anything that read the keeper's environment file, and the separation would
+# be a label rather than a boundary.
+#
+# The baseline migration creates keeper_app with a password equal to its own
+# name, which is right for a local container reachable from nowhere and wrong
+# for a host. This rotates it on every install, so the published default is
+# never what a deployment runs with.
+if [ -f "${APP_PG_ENV}" ]; then
+  say "reusing the existing application password in ${APP_PG_ENV}"
+  APP_PG_PASSWORD="$(grep '^KEEPER_APP_PASSWORD=' "${APP_PG_ENV}" | cut -d= -f2-)"
+  [ -n "${APP_PG_PASSWORD}" ] || die "${APP_PG_ENV} exists but carries no KEEPER_APP_PASSWORD"
+else
+  APP_PG_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c 32)"
+  umask 077
+  cat > "${APP_PG_ENV}" <<ENV
+KEEPER_APP_PASSWORD=${APP_PG_PASSWORD}
+ENV
+  say "generated an application password in ${APP_PG_ENV}"
+fi
+chmod 600 "${APP_PG_ENV}"
+
+# What the API connects as, and it is deliberately not the owner.
+#
+# keeper_app holds SELECT and INSERT on events and is revoked UPDATE, DELETE
+# and TRUNCATE, so the running server cannot rewrite the record even if its
+# own code tried to. That is the difference between append-only as a database
+# guarantee and append-only as a promise about our SQL, and it is worth a
+# second role and a second password.
+#
+# Atlas keeps the owner below, because changing the schema is exactly what
+# this role may not do.
+DATABASE_URL="postgresql://keeper_app:${APP_PG_PASSWORD}@127.0.0.1:${PG_PORT}/keeper"
 
 # Atlas gets its own spelling of the same database, and the difference is not
 # cosmetic. Atlas negotiates SSL by default and fails outright against a
@@ -266,6 +303,15 @@ echo "Migrations"
 # exist yet.
 systemctl --user stop cora-keeper.service 2>/dev/null || true
 (cd "${ATLAS_DIR}" && DATABASE_URL="${ATLAS_DB_URL}" atlas migrate apply --env local)
+
+# After the migrations, because the role is created by the baseline and a
+# password cannot be set on a role that does not exist yet. Idempotent: every
+# install sets it again, which is also how a rotated password is deployed.
+podman exec -i -e PGPASSWORD="${PG_PASSWORD}" keeper-postgres \
+  psql -U keeper -d keeper -v ON_ERROR_STOP=1 -q \
+  -c "ALTER ROLE keeper_app WITH PASSWORD '${APP_PG_PASSWORD}'" \
+  || die "could not set the application role's password"
+say "application role password set"
 echo
 
 echo "JWKS"
