@@ -191,6 +191,20 @@ def tracked_other_python_files() -> frozenset[Path]:
     return _tracked_python_files_under(".") - known
 
 
+def _ls_files() -> list[str]:
+    """Every tracked path in this project, relative to its root."""
+    env = {k: v for k, v in os.environ.items() if k not in {"GIT_DIR", "GIT_INDEX_FILE"}}
+    result = subprocess.run(
+        ["git", "ls-files"],
+        cwd=_APP_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    return result.stdout.splitlines()
+
+
 def _tracked_python_files_under(subdir: str) -> frozenset[Path]:
     # Strip pre-commit's GIT_DIR and GIT_INDEX_FILE: inside a worktree they
     # point at the parent repo's hook staging area, which masks the worktree's
@@ -207,6 +221,19 @@ def _tracked_python_files_under(subdir: str) -> frozenset[Path]:
     return frozenset(
         _APP_ROOT / line for line in result.stdout.splitlines() if line.endswith(".py")
     )
+
+
+@cache
+def tracked_files() -> frozenset[Path]:
+    """Absolute paths to every tracked file in this project, whatever its suffix.
+
+    The enumerators above each name a kind of file, because the rule using
+    one cares about Python or about prose. A rule about what a string may
+    say does not: a facility address reads the same in a shell script, a
+    unit template, a register or a docstring, and the enumerators above
+    between them reach none of those first three.
+    """
+    return frozenset(_APP_ROOT / line for line in _ls_files())
 
 
 @cache

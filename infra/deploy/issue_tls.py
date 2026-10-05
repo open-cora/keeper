@@ -1,6 +1,6 @@
 """Mint a small certificate authority and the keeper's server certificate.
 
-    ./issue_tls.py --root /local/cora --host lyra.xray.aps.anl.gov
+    ./issue_tls.py --root /local/cora --host <keeper-fqdn>
 
 Run it on the host the keeper runs on. Both halves are reused if they exist,
 because replacing the CA means every client has to be handed a new bundle on
