@@ -35,17 +35,25 @@ _ALLOWED_DATABASE_SCHEMES = ("postgresql://", "postgres://")
 
 OtelExporter = Literal["otlp", "console", "none"]
 
-# Environments where a permissive default is a production incident rather than
-# a convenience. `staging` counts: it usually holds real data and is reachable.
+# The environments allowed to run with permissive defaults. Every other name,
+# including one nobody has thought of yet, is a production tier.
 #
-# So does `pilot`, which is the value infra/deploy/install.sh deploys with. A
-# pilot driving four beamlines holds a record somebody will be asked to
-# defend, which is the whole of the rule above, and it sat outside this set
-# long enough for every refusal below to be skipped on the one installation
-# that has real data in it. Membership is checked against the installer by
-# tests/architecture/test_the_deployed_env_is_a_production_tier.py rather
-# than agreed between two files by hand.
-PRODUCTION_TIER_ENVS = frozenset({"pilot", "prod", "production", "staging"})
+# Which side carries the list is the whole design. Enumerating PRODUCTION
+# names fails open: an environment spelled in a way the list does not know
+# boots with every refusal below switched off and says nothing about it. That
+# is not a hypothetical. The installer deployed `pilot` while the list named
+# only prod, production and staging, so the one installation holding a real
+# record ran for months with all four gates skipped, and nothing could have
+# reported it because nothing was asked. Enumerating DEVELOPMENT names fails
+# closed instead: an unrecognised environment refuses to boot and names its
+# remedy, which is a message an operator can act on rather than a silence
+# they cannot see.
+#
+# Adding a name here widens what may run permissively, so it is the edit to
+# look at twice. tests/architecture/test_the_deployed_env_is_a_production_tier.py
+# checks this against what the installer actually deploys rather than letting
+# two files agree by hand.
+DEVELOPMENT_TIER_ENVS = frozenset({"dev", "local", "test"})
 
 
 class Settings(BaseSettings):
@@ -147,7 +155,7 @@ class Settings(BaseSettings):
     @property
     def is_production_tier(self) -> bool:
         """True when this environment must refuse permissive defaults."""
-        return self.app_env.lower() in PRODUCTION_TIER_ENVS
+        return self.app_env.lower() not in DEVELOPMENT_TIER_ENVS
 
     @property
     def is_test(self) -> bool:

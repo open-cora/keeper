@@ -1,20 +1,21 @@
 """What the installer deploys with has to be an environment that refuses defaults.
 
-`PRODUCTION_TIER_ENVS` decides whether `build_kernel` enforces its
+`DEVELOPMENT_TIER_ENVS` decides whether `build_kernel` enforces its
 refusals: a real authorize adapter, authenticated callers, a policy id,
-and a database role that cannot rewrite events. An environment outside
+and a database role that cannot rewrite events. An environment named in
 that set skips all four.
 
 `infra/deploy/install.sh` chooses the environment every deployment runs
-under. The two were agreed by hand and drifted: the installer deployed
-`pilot`, the set never named it, and the only installation holding real
-data ran for months with every refusal switched off. Nothing compared
-them, because nothing had been asked to.
+under. The two were once agreed by hand and drifted: the list named only
+production environments, the installer deployed `pilot`, and the only
+installation holding real data ran for months with every refusal
+switched off. Nothing compared them, because nothing had been asked to.
 
-This is that comparison. It derives the environment from the installer
-rather than restating it, so the failure it catches is the real one:
-somebody changing what a deployment runs as, and the gates quietly
-ceasing to apply to it.
+Two checks, against the two ways that can happen again. The first derives
+the environment from the installer rather than restating it, so it
+catches somebody changing what a deployment runs as. The second covers
+the direction the list can be weakened from the other end, by growing
+until it swallows an environment that holds a record.
 """
 
 import re
@@ -22,13 +23,30 @@ from pathlib import Path
 
 import pytest
 
-from keeper.infrastructure.settings import PRODUCTION_TIER_ENVS
+from keeper.infrastructure.settings import DEVELOPMENT_TIER_ENVS, Settings
 
 pytestmark = pytest.mark.architecture
 
 _INSTALLER = Path(__file__).resolve().parents[2] / "infra" / "deploy" / "install.sh"
 
 _APP_ENV_DEFAULT = re.compile(r'^APP_ENV="\$\{APP_ENV:-([A-Za-z0-9_-]+)\}"', re.M)
+
+_NAMES_THAT_MUST_BE_GATED = (
+    "prod",
+    "production",
+    "staging",
+    "pilot",
+    "beamline",
+    "aps-u",
+    "",
+)
+"""Spellings a deployment might use, including ones nothing here has met.
+
+The last two are the point. `aps-u` and the empty string are not names
+this project has agreed anywhere, and a list of production environments
+could not have covered them. Gating by exclusion does, which is the
+property worth pinning rather than the specific words.
+"""
 
 
 def _deployed_env() -> str:
@@ -48,21 +66,36 @@ def _deployed_env() -> str:
 
 def test_the_installer_deploys_an_environment_that_refuses_permissive_defaults() -> None:
     deployed = _deployed_env()
-    assert deployed.lower() in PRODUCTION_TIER_ENVS, (
-        f"install.sh deploys APP_ENV={deployed}, which is not in "
-        f"PRODUCTION_TIER_ENVS {sorted(PRODUCTION_TIER_ENVS)}. Every refusal in "
-        "build_kernel is skipped for that environment: AllowAllAuthorize would "
-        "be accepted, an unset policy id would be accepted, and a database role "
-        "that can rewrite events would be accepted. Either add it to the set or "
-        "deploy an environment already in it."
+    assert Settings(app_env=deployed).is_production_tier, (
+        f"install.sh deploys APP_ENV={deployed}, which is in "
+        f"DEVELOPMENT_TIER_ENVS {sorted(DEVELOPMENT_TIER_ENVS)}. Every refusal "
+        "in build_kernel is skipped for that environment: AllowAllAuthorize "
+        "would be accepted, an unset policy id would be accepted, and a "
+        "database role that can rewrite events would be accepted. Either "
+        "deploy an environment outside that set or stop calling this one "
+        "development."
     )
 
 
-def test_the_set_still_holds_the_names_a_deployment_might_use() -> None:
-    """A guard on the check above, which passes on any single agreeing pair.
+@pytest.mark.parametrize("env", _NAMES_THAT_MUST_BE_GATED)
+def test_an_environment_this_list_does_not_know_is_gated_rather_than_exempt(env: str) -> None:
+    """The fail-closed direction, which is the reason the list holds this side.
 
-    Emptying the set and pointing the installer at nothing would satisfy
-    membership vacuously, and narrowing it to only what this installer
-    says would drop the names a hand-run deployment uses.
+    A list of production names would have to have met each of these to
+    gate it, and would exempt every name it had not. Growing the
+    development set until it covers one of these is the edit this
+    catches.
     """
-    assert {"prod", "production", "staging"} <= PRODUCTION_TIER_ENVS
+    assert Settings(app_env=env).is_production_tier
+
+
+def test_the_environments_the_suite_and_the_example_run_as_stay_permissive() -> None:
+    """The other direction, so the check above cannot be satisfied by gating all.
+
+    `test` is what `tests/conftest.py` sets and `local` is both the field
+    default and what `.env.example` ships. Gating either would refuse to
+    boot everywhere development happens, so the suite would say so
+    loudly, but it would say it in every test at once rather than here.
+    """
+    assert not Settings(app_env="test").is_production_tier
+    assert not Settings().is_production_tier

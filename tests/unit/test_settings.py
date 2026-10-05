@@ -39,12 +39,19 @@ def test_negative_idempotency_ttl_is_rejected_while_zero_disables_the_pruner() -
         Settings(app_env="test", idempotency_ttl_hours=-1)
 
 
-@pytest.mark.parametrize("env", ["prod", "production", "staging"])
-def test_production_tier_environments_are_recognised(env: str) -> None:
-    """Staging counts: it usually holds real data and is reachable."""
+@pytest.mark.parametrize("env", ["prod", "production", "staging", "pilot", "whatever"])
+def test_an_environment_outside_the_development_list_is_a_production_tier(env: str) -> None:
+    """Including `whatever`, which is the property rather than an oddity.
+
+    The tier is decided by exclusion, so a name nothing has agreed is
+    gated instead of exempt. Staging and pilot are here because both hold
+    real data; the last one is here because neither did when the question
+    was which names to enumerate.
+    """
     assert Settings(app_env=env).is_production_tier
 
 
-@pytest.mark.parametrize("env", ["local", "test", "dev"])
-def test_non_production_environments_are_not_production_tier(env: str) -> None:
+@pytest.mark.parametrize("env", ["local", "test", "dev", "LOCAL", "Dev"])
+def test_a_development_environment_is_not_a_production_tier(env: str) -> None:
+    """Case folded, so a capitalised .env does not quietly arm the gates."""
     assert not Settings(app_env=env).is_production_tier
