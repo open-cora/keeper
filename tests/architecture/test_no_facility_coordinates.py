@@ -53,8 +53,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import pytest
-
 from tests.architecture.conftest import KEEPER_ROOT as PROJECT_ROOT
 from tests.architecture.conftest import tracked_files
 
