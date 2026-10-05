@@ -64,11 +64,11 @@ JWKS_PORT="${JWKS_PORT:-8081}"
 # it, so whoever reads the log reads the facility.
 SUBJECTS="${SUBJECTS:-2-bm 7-bm 19-bm 32-id thinker viewer admin}"
 
-# Not a production-tier value, and that is the honest setting rather than a
-# placeholder. A production tier refuses to boot without configured
-# authentication and an authorization policy, neither of which exists yet.
-# Naming the tier accurately is what keeps the loopback bind in the unit
-# file correct instead of merely cautious.
+# A production-tier value, which arms four boot refusals: a real authorize
+# adapter, authenticated callers, a configured policy, and a database role
+# that cannot rewrite events. This script supplies all four, so a refusal
+# here means one of them did not take rather than that the tier is wrong.
+# Lowering it would switch the gates off and hide whichever one failed.
 APP_ENV="${APP_ENV:-pilot}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
